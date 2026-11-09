@@ -808,7 +808,7 @@ void MainComponent::startTutorial()
     steps.push_back ({ txt ("9. El mezclador"),
                        txt ("Aquí ajustas el volumen de cada sonido y le añades efectos: EQ, compresor, delay y reverb.\n\n"
                             "Prueba a subir la REVERB de la pista \"Caja\" mientras suena la canción."),
-                       [this] { showView (View::mixer); }, nullptr, nullptr });
+                       [this] { showView (View::mixer); }, [this] { return (juce::Component*) mixerView.get(); }, nullptr });
     steps.push_back ({ txt ("10. Guarda y exporta"),
                        txt ("Abre el menú Archivo (las tres rayas) para guardar tu proyecto (Ctrl+S) y para exportar tu "
                             "canción a WAV o MP3 y escucharla en el móvil.\n\nStudoo también guarda una copia automática "

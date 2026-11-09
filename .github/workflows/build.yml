@@ -15,6 +15,11 @@ on:
         description: "Versión a publicar en Releases (por ejemplo 1.0.0). Déjalo vacío para solo compilar."
         required: false
         default: ""
+      reemplazar:
+        description: "Si esa versión ya existe en Releases, sustituirla por esta (mismo número de versión)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   linux:
@@ -101,6 +106,12 @@ jobs:
           cp README.md Studoo-Windows/LEEME.md
           zip -r Studoo-${{ env.TAG }}-Windows.zip Studoo-Windows
           cp artifacts/Studoo-Linux/Studoo-Linux.tar.gz Studoo-${{ env.TAG }}-Linux.tar.gz
+
+      - name: Reemplazar la versión si ya existe
+        if: inputs.reemplazar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete "$TAG" --cleanup-tag --yes --repo "${{ github.repository }}" || true
 
       - uses: softprops/action-gh-release@v2
         with:
