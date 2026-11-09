@@ -4,6 +4,7 @@
 // ============================================================================
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MainComponent.h"
+#include <BinaryData.h>
 
 namespace studoo
 {
@@ -14,6 +15,7 @@ namespace studoo
             : DocumentWindow (name, Colours::background, DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar (true);
+            setIcon (juce::ImageCache::getFromMemory (BinaryData::icon_png, BinaryData::icon_pngSize));
             content = new MainComponent();
             setContentOwned (content, true);
             setResizable (true, true);

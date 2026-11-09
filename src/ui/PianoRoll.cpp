@@ -68,11 +68,13 @@ void PianoRollGrid::paint (juce::Graphics& g)
     for (int note = lowestNote; note <= highestNote; ++note)
     {
         const int y = yForNote (note);
-        g.setColour (isBlackKey (note) ? juce::Colour (0xff22272c) : juce::Colour (0xff2b3137));
+        g.setColour (isBlackKey (note) ? juce::Colour (0xff181b20) : juce::Colour (0xff1f2329));
         g.fillRect (keyboardWidth, y, getWidth() - keyboardWidth, rowHeight);
+        g.setColour (juce::Colours::black.withAlpha (0.25f));
+        g.drawHorizontalLine (y + rowHeight - 1, (float) keyboardWidth, (float) getWidth());
         if (note % 12 == 0)
         {
-            g.setColour (Colours::outline);
+            g.setColour (Colours::outline.brighter (0.2f));
             g.drawHorizontalLine (y + rowHeight - 1, (float) keyboardWidth, (float) getWidth());
         }
     }
@@ -81,7 +83,8 @@ void PianoRollGrid::paint (juce::Graphics& g)
     for (int s = 0; s <= length; ++s)
     {
         const float x = stepsToX (s);
-        g.setColour (s % 16 == 0 ? Colours::outline.brighter (0.4f) : s % 4 == 0 ? Colours::outline : Colours::outline.withAlpha (0.35f));
+        g.setColour (s % 16 == 0 ? Colours::outline.brighter (0.5f) : s % 4 == 0 ? Colours::outline.brighter (0.1f)
+                                                                                 : Colours::outline.withAlpha (0.3f));
         g.drawVerticalLine ((int) x, 0.0f, (float) getHeight());
     }
 
@@ -90,8 +93,8 @@ void PianoRollGrid::paint (juce::Graphics& g)
         if (n.hasType (ids::NOTE) && (int) n[ids::channel] != uid)
         {
             g.setColour (juce::Colours::white.withAlpha (0.07f));
-            g.fillRect (stepsToX (n[ids::start]), (float) yForNote (n[ids::pitch]) + 1.0f,
-                        (float) ((double) n[ids::length] * sw), (float) rowHeight - 2.0f);
+            g.fillRoundedRectangle (stepsToX (n[ids::start]), (float) yForNote (n[ids::pitch]) + 1.0f,
+                                    (float) ((double) n[ids::length] * sw), (float) rowHeight - 2.0f, 3.0f);
         }
 
     // Notas del canal
@@ -100,43 +103,72 @@ void PianoRollGrid::paint (juce::Graphics& g)
         if (! n.hasType (ids::NOTE) || (int) n[ids::channel] != uid)
             continue;
         auto r = juce::Rectangle<float> (stepsToX (n[ids::start]), (float) yForNote (n[ids::pitch]),
-                                         (float) ((double) n[ids::length] * sw), (float) rowHeight).reduced (0.5f, 1.0f);
+                                         (float) ((double) n[ids::length] * sw), (float) rowHeight).reduced (0.5f, 0.5f);
         const float vel = n.getProperty (ids::velocity, 0.8f);
-        g.setColour (Colours::accent.withMultipliedBrightness (0.6f + vel * 0.5f));
-        g.fillRoundedRectangle (r, 2.5f);
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.drawRoundedRectangle (r, 2.5f, 1.0f);
-        if (r.getWidth() > 28.0f)
+        Draw::glow (g, r, Colours::accent, 4.0f, 3.5f);
+        Draw::accentFill (g, r, 3.5f);
+        if (vel < 0.7f)
         {
-            g.setColour (juce::Colours::black);
-            g.setFont (juce::FontOptions (10.0f));
-            g.drawText (noteName (n[ids::pitch]), r.reduced (3.0f, 0.0f), juce::Justification::centredLeft);
+            g.setColour (juce::Colours::black.withAlpha ((0.7f - vel) * 0.8f));
+            g.fillRoundedRectangle (r, 3.5f);
+        }
+        g.setColour (Colours::accentDeep.darker (0.5f));
+        g.drawRoundedRectangle (r, 3.5f, 1.0f);
+        // Asa para alargar
+        g.setColour (juce::Colours::black.withAlpha (0.3f));
+        g.fillRoundedRectangle (r.withLeft (r.getRight() - 4.0f).reduced (1.0f, 2.5f), 1.0f);
+        if (r.getWidth() > 30.0f)
+        {
+            g.setColour (juce::Colour (0xff2a1500));
+            g.setFont (Fonts::bold (10.0f));
+            g.drawText (noteName (n[ids::pitch]), r.reduced (4.0f, 0.0f), juce::Justification::centredLeft);
         }
     }
 
-    // Teclado
+    // Teclado: teclas blancas
+    auto keys = juce::Rectangle<float> (0.0f, 0.0f, (float) keyboardWidth, (float) getHeight());
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffc9cdd3), 0.0f, 0.0f, juce::Colour (0xfff4f5f7), (float) keyboardWidth * 0.8f, 0.0f, false));
+    g.fillRect (keys);
     for (int note = lowestNote; note <= highestNote; ++note)
     {
         const int y = yForNote (note);
-        const bool black = isBlackKey (note);
-        auto key = juce::Rectangle<int> (0, y, black ? keyboardWidth - 22 : keyboardWidth, rowHeight);
-        g.setColour (black ? juce::Colour (0xff15181b) : juce::Colour (0xffe8e8e8));
-        g.fillRect (key.reduced (0, 0).withTrimmedBottom (1));
-        if (note % 12 == 0)
+        const int n = ((note % 12) + 12) % 12;
+        g.setColour (juce::Colour (0xff8a9099));
+        if (isBlackKey (note))
+            g.drawHorizontalLine (y + rowHeight / 2, 0.0f, (float) keyboardWidth);       // la tecla blanca termina a mitad de la negra
+        else if (n == 4 || n == 11)
+            g.drawHorizontalLine (y, 0.0f, (float) keyboardWidth);                       // entre Mi-Fa y Si-Do
+        if (n == 0)
         {
-            g.setColour (juce::Colours::black);
-            g.setFont (juce::FontOptions (10.0f, juce::Font::bold));
-            g.drawText (noteName (note), key.withTrimmedRight (4), juce::Justification::centredRight);
+            g.setColour (juce::Colour (0xff5a616b));
+            g.setFont (Fonts::bold (9.5f));
+            g.drawText (noteName (note), juce::Rectangle<int> (0, y, keyboardWidth - 5, rowHeight), juce::Justification::centredRight);
         }
     }
-    g.setColour (Colours::outline);
-    g.drawVerticalLine (keyboardWidth, 0.0f, (float) getHeight());
+    // Teclas negras
+    for (int note = lowestNote; note <= highestNote; ++note)
+    {
+        if (! isBlackKey (note))
+            continue;
+        auto key = juce::Rectangle<float> (0.0f, (float) yForNote (note) + 1.0f, (float) keyboardWidth * 0.6f, (float) rowHeight - 2.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.fillRoundedRectangle (key.translated (1.5f, 1.0f), 2.5f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3a3f46), 0.0f, 0.0f, juce::Colour (0xff0e1013), key.getRight(), 0.0f, false));
+        g.fillRoundedRectangle (key, 2.5f);
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.fillRoundedRectangle (key.withTrimmedLeft (key.getWidth() - 6.0f).reduced (1.0f, 2.0f), 1.5f);
+    }
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.5f), (float) keyboardWidth, 0.0f,
+                                             juce::Colours::transparentBlack, (float) keyboardWidth + 8.0f, 0.0f, false));
+    g.fillRect ((float) keyboardWidth, 0.0f, 8.0f, (float) getHeight());
 
     // Cursor de reproducción
     if (playhead >= 0.0)
     {
+        auto line = juce::Rectangle<float> (stepsToX (playhead) - 1.0f, 0.0f, 2.0f, (float) getHeight());
+        Draw::glow (g, line, Colours::green, 5.0f, 1.0f);
         g.setColour (Colours::green);
-        g.fillRect (stepsToX (playhead), 0.0f, 2.0f, (float) getHeight());
+        g.fillRect (line);
     }
 }
 

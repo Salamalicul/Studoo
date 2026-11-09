@@ -1,5 +1,6 @@
 #include "Toolbar.h"
 #include "HelpTexts.h"
+#include <BinaryData.h>
 
 namespace studoo
 {
@@ -53,6 +54,7 @@ Toolbar::Toolbar (AppContext& c)
     addAndMakeVisible (bpmLabel);
     bpmLabel.setText ("BPM", juce::dontSendNotification);
     bpmLabel.setColour (juce::Label::textColourId, Colours::textDim);
+    bpmLabel.setFont (Fonts::bold (12.0f));
     bpmLabel.setJustificationType (juce::Justification::centredRight);
 
     addAndMakeVisible (bpmSlider);
@@ -67,9 +69,9 @@ Toolbar::Toolbar (AppContext& c)
 
     addAndMakeVisible (positionLabel);
     positionLabel.setJustificationType (juce::Justification::centred);
-    positionLabel.setFont (juce::FontOptions (18.0f, juce::Font::bold));
-    positionLabel.setColour (juce::Label::textColourId, Colours::accent);
-    positionLabel.setColour (juce::Label::backgroundColourId, juce::Colour (0xff101316));
+    positionLabel.setFont (Fonts::bold (20.0f));
+    positionLabel.setColour (juce::Label::textColourId, Colours::accentLight);
+    positionLabel.setColour (juce::Label::backgroundColourId, juce::Colours::transparentBlack);
     positionLabel.setTooltip (txt ("Posición: compás . tiempo"));
 
     addAndMakeVisible (metronomeButton);
@@ -158,13 +160,39 @@ void Toolbar::timerCallback()
 
 void Toolbar::paint (juce::Graphics& g)
 {
-    g.fillAll (Colours::header);
-    g.setColour (Colours::outline);
+    g.setGradientFill (juce::ColourGradient (Colours::panelLight.darker (0.1f), 0.0f, 0.0f,
+                                             Colours::header, 0.0f, (float) getHeight(), false));
+    g.fillAll();
+    g.setColour (juce::Colours::black.withAlpha (0.5f));
     g.drawHorizontalLine (getHeight() - 1, 0.0f, (float) getWidth());
+    // Línea naranja con brillo debajo del logo
+    g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.8f), 0.0f, 0.0f,
+                                             Colours::accent.withAlpha (0.0f), (float) getWidth() * 0.5f, 0.0f, false));
+    g.fillRect (0, getHeight() - 2, getWidth() / 2, 1);
 
-    g.setFont (juce::FontOptions (24.0f, juce::Font::bold));
-    g.setColour (Colours::accent);
-    g.drawText ("STUDOO", logoArea, juce::Justification::centredLeft);
+    // Logo
+    auto logo = juce::ImageCache::getFromMemory (BinaryData::icon_png, BinaryData::icon_pngSize);
+    auto area = logoArea;
+    auto iconArea = area.removeFromLeft (logoArea.getHeight()).toFloat();
+    Draw::glow (g, iconArea.reduced (6.0f), Colours::accent, 6.0f, 8.0f);
+    g.setOpacity (1.0f);
+    g.drawImage (logo, iconArea, juce::RectanglePlacement::centred);
+    area.removeFromLeft (8);
+    g.setFont (Fonts::display (24.0f));
+    g.setGradientFill (juce::ColourGradient (Colours::accentLight, 0.0f, (float) area.getY(),
+                                             Colours::accentDeep, 0.0f, (float) area.getBottom(), false));
+    g.drawText ("STUDOO", area, juce::Justification::centredLeft);
+
+    // Cápsula de reproducción y pantalla de posición
+    auto pill = transportArea.toFloat().expanded (5.0f, 4.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.fillRoundedRectangle (pill, 12.0f);
+    g.setColour (Colours::outline.withAlpha (0.8f));
+    g.drawRoundedRectangle (pill.reduced (0.5f), 12.0f, 1.0f);
+    Draw::lcd (g, positionLabel.getBounds().toFloat());
+    g.setColour (Colours::textDim.withAlpha (0.7f));
+    g.setFont (Fonts::regular (9.0f));
+    g.drawText (txt ("COMPÁS . TIEMPO"), positionLabel.getBounds().removeFromBottom (11), juce::Justification::centred);
 }
 
 void Toolbar::resized()
@@ -172,7 +200,7 @@ void Toolbar::resized()
     auto area = getLocalBounds().reduced (10, 9);
     auto gap = [&area] (int w) { area.removeFromLeft (w); };
 
-    logoArea = area.removeFromLeft (108);
+    logoArea = area.removeFromLeft (142);
     fileButton.setBounds (area.removeFromLeft (38)); gap (10);
     undoButton.setBounds (area.removeFromLeft (34)); gap (4);
     redoButton.setBounds (area.removeFromLeft (34)); gap (14);
@@ -184,13 +212,19 @@ void Toolbar::resized()
         songModeButton.setBounds (m);
     }
     gap (10);
-    playButton.setBounds (area.removeFromLeft (44));  gap (4);
-    stopButton.setBounds (area.removeFromLeft (44));  gap (4);
-    recordButton.setBounds (area.removeFromLeft (44)); gap (12);
+    gap (4);
+    transportArea = area.removeFromLeft (140);
+    {
+        auto t = transportArea;
+        playButton.setBounds (t.removeFromLeft (44)); t.removeFromLeft (4);
+        stopButton.setBounds (t.removeFromLeft (44)); t.removeFromLeft (4);
+        recordButton.setBounds (t.removeFromLeft (44));
+    }
+    gap (16);
 
     bpmLabel.setBounds (area.removeFromLeft (36)); gap (4);
     bpmSlider.setBounds (area.removeFromLeft (84)); gap (10);
-    positionLabel.setBounds (area.removeFromLeft (90)); gap (10);
+    positionLabel.setBounds (area.removeFromLeft (100)); gap (10);
     metronomeButton.setBounds (area.removeFromLeft (96));
 
     helpButton.setBounds (area.removeFromRight (28).withSizeKeepingCentre (26, 26));

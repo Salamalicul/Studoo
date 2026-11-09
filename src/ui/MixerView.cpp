@@ -135,41 +135,61 @@ void MixerStrip::mouseDoubleClick (const juce::MouseEvent& e)
 
 void MixerStrip::paint (juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat().reduced (2.0f);
-    g.setColour (index == 0 ? Colours::panelLight.darker (0.1f) : Colours::panelLight.darker (0.25f));
-    g.fillRoundedRectangle (bounds, 5.0f);
-    g.setColour (Colours::outline);
-    g.drawRoundedRectangle (bounds, 5.0f, 1.0f);
+    auto bounds = getLocalBounds().toFloat().reduced (3.0f);
+    const bool master = index == 0;
 
+    Draw::shadow (g, bounds, 8.0f, 8);
+    g.setGradientFill (juce::ColourGradient (master ? Colours::panelLight.brighter (0.04f) : Colours::panelLight.darker (0.05f), 0.0f, bounds.getY(),
+                                             Colours::panelDark, 0.0f, bounds.getBottom(), false));
+    g.fillRoundedRectangle (bounds, 8.0f);
+    g.setColour (master ? Colours::accent.withAlpha (0.7f) : Colours::outline);
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 8.0f, master ? 1.4f : 1.0f);
+
+    // Cabecera con el nombre
+    auto head = nameArea.toFloat().expanded (3.0f, 3.0f);
+    g.setColour (master ? Colours::accent.withAlpha (0.18f) : juce::Colours::black.withAlpha (0.25f));
+    g.fillRoundedRectangle (head, 6.0f);
     auto track = ctx.project.getMixerTrack (index);
-    g.setColour (index == 0 ? Colours::accent : Colours::text);
-    g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
-    const auto name = index == 0 ? juce::String ("MASTER") : juce::String (index) + ". " + track[ids::name].toString();
-    g.drawText (name, nameArea, juce::Justification::centred);
+    g.setColour (master ? Colours::accentLight : Colours::text);
+    g.setFont (Fonts::bold (13.0f));
+    const auto name = master ? juce::String ("MASTER") : juce::String (index) + ". " + track[ids::name].toString();
+    g.drawFittedText (name, nameArea, juce::Justification::centred, 1, 0.8f);
 
-    // Títulos de cada efecto
-    g.setFont (juce::FontOptions (10.0f, juce::Font::bold));
-    g.setColour (Colours::accent.withAlpha (0.8f));
+    // Títulos de cada efecto, con una línea fina
     auto label = [&] (juce::Component* c, const char* text)
     {
-        g.drawText (txt (text), juce::Rectangle<int> (6, c->getY() - 11, getWidth() - 12, 11), juce::Justification::centredLeft);
+        auto r = juce::Rectangle<int> (8, c->getY() - 12, getWidth() - 16, 11);
+        g.setFont (Fonts::bold (9.5f));
+        g.setColour (Colours::accent.withAlpha (0.9f));
+        g.drawText (txt (text), r, juce::Justification::centredLeft);
+        const int textW = juce::GlyphArrangement::getStringWidthInt (Fonts::bold (9.5f), txt (text));
+        g.setColour (Colours::outline.withAlpha (0.8f));
+        g.drawHorizontalLine (r.getCentreY(), (float) (r.getX() + textW + 6), (float) r.getRight());
     };
     label (eqLow, "EQ");
     label (compThreshold, "COMPRESOR");
     label (delayMix, "DELAY");
     label (reverbMix, "REVERB");
 
-    // Medidor de nivel
+    // Medidor de nivel con LEDs
     auto drawBar = [&] (juce::Rectangle<int> r, float level)
     {
-        g.setColour (juce::Colour (0xff101316));
-        g.fillRect (r);
+        g.setColour (juce::Colour (0xff07090b));
+        g.fillRoundedRectangle (r.toFloat(), 2.5f);
         const float db = juce::Decibels::gainToDecibels (level, -60.0f);
         const float prop = juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 63.0f);
-        auto fill = r.toFloat().withTrimmedTop (r.getHeight() * (1.0f - prop));
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffff4040), 0.0f, (float) r.getY(),
-                                                 Colours::green, 0.0f, (float) r.getBottom(), false));
-        g.fillRect (fill);
+        const int segments = juce::jmax (8, r.getHeight() / 5);
+        const float segH = (float) r.getHeight() / (float) segments;
+        for (int i = 0; i < segments; ++i)
+        {
+            const float pos = (float) i / (float) segments; // 0 = abajo
+            auto seg = juce::Rectangle<float> ((float) r.getX() + 1.0f, (float) r.getBottom() - (float) (i + 1) * segH + 0.6f,
+                                               (float) r.getWidth() - 2.0f, segH - 1.2f);
+            const juce::Colour c = pos > 0.9f ? juce::Colour (0xffff4040) : pos > 0.72f ? juce::Colour (0xffffc23d) : Colours::green;
+            const bool lit = pos < prop;
+            g.setColour (lit ? c : c.withAlpha (0.08f));
+            g.fillRect (seg);
+        }
     };
     auto m = meterArea;
     drawBar (m.removeFromLeft (m.getWidth() / 2 - 1), meterL);

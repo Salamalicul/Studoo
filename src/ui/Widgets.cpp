@@ -44,8 +44,8 @@ void Knob::resized()
 
 void Knob::paint (juce::Graphics& g)
 {
-    g.setColour (Colours::textDim);
-    g.setFont (juce::FontOptions (11.0f));
+    g.setColour (slider.isMouseOverOrDragging() ? Colours::text : Colours::textDim);
+    g.setFont (Fonts::regular (10.5f));
     g.drawText (label, getLocalBounds().removeFromBottom (14), juce::Justification::centred);
 }
 
@@ -59,56 +59,73 @@ IconButton::IconButton (Icon i, juce::Colour activeColour) : juce::Button ({}), 
 
 void IconButton::paintButton (juce::Graphics& g, bool isMouseOver, bool isButtonDown)
 {
-    auto area = getLocalBounds().toFloat().reduced (0.5f);
+    auto area = getLocalBounds().toFloat().reduced (1.0f);
     const bool on = getToggleState();
+    const float corner = 8.0f;
 
-    g.setColour (on ? colour.withAlpha (0.25f) : Colours::panelLight.brighter (isMouseOver ? 0.12f : 0.0f));
-    g.fillRoundedRectangle (area, 4.0f);
-    g.setColour (on ? colour : Colours::outline);
-    g.drawRoundedRectangle (area, 4.0f, 1.0f);
+    // Fondo del botón
+    if (on)
+        Draw::glow (g, area, colour, 8.0f, corner);
+    auto base = on ? colour.withAlpha (0.22f).overlaidWith (Colours::panelLight.withAlpha (0.4f)) : Colours::panelLight;
+    if (isMouseOver) base = base.brighter (0.1f);
+    if (isButtonDown) base = base.darker (0.2f);
+    g.setGradientFill (juce::ColourGradient (base.brighter (0.08f), 0.0f, area.getY(), base.darker (0.25f), 0.0f, area.getBottom(), false));
+    g.fillRoundedRectangle (area, corner);
+    g.setColour (juce::Colours::white.withAlpha (0.06f));
+    g.drawHorizontalLine ((int) area.getY() + 1, area.getX() + corner, area.getRight() - corner);
+    g.setColour (on ? colour.withAlpha (0.9f) : Colours::outline.brighter (isMouseOver ? 0.35f : 0.05f));
+    g.drawRoundedRectangle (area, corner, 1.0f);
 
-    const float size = area.getHeight() * 0.45f;
+    const float size = area.getHeight() * 0.42f;
     auto r = area.withSizeKeepingCentre (size, size);
     if (isButtonDown)
         r = r.reduced (1.0f);
 
-    const auto c = isEnabled() ? (on || isMouseOver ? colour : colour.withMultipliedBrightness (0.8f))
-                               : Colours::textDim.withAlpha (0.4f);
-    g.setColour (c);
+    const auto c = isEnabled() ? (on || isMouseOver ? colour.brighter (0.15f) : colour.withMultipliedBrightness (0.85f))
+                               : Colours::textDim.withAlpha (0.35f);
 
     juce::Path p;
     switch (icon)
     {
         case Icon::play:
-            p.addTriangle (r.getX(), r.getY(), r.getX(), r.getBottom(), r.getRight(), r.getCentreY());
-            g.fillPath (p);
+            p.addTriangle (r.getX() + size * 0.08f, r.getY(), r.getX() + size * 0.08f, r.getBottom(), r.getRight(), r.getCentreY());
             break;
         case Icon::stop:
-            g.fillRoundedRectangle (r, 1.5f);
+            p.addRoundedRectangle (r.reduced (size * 0.04f), 2.5f);
             break;
         case Icon::record:
-            g.fillEllipse (r);
+            p.addEllipse (r);
             break;
         case Icon::undo:
         case Icon::redo:
         {
-            p.addCentredArc (r.getCentreX(), r.getCentreY() + size * 0.1f, size * 0.42f, size * 0.42f, 0.0f,
-                             -juce::MathConstants<float>::halfPi * 1.6f, juce::MathConstants<float>::halfPi * 1.2f, true);
-            g.strokePath (p, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
-                          icon == Icon::redo ? juce::AffineTransform::scale (-1.0f, 1.0f, r.getCentreX(), r.getCentreY())
-                                             : juce::AffineTransform());
-            juce::Path arrow;
-            const float ax = r.getX() + size * 0.08f, ay = r.getY() + size * 0.22f;
-            arrow.addTriangle (ax - 4.0f, ay, ax + 4.0f, ay, ax, ay + 6.0f);
-            g.fillPath (arrow, icon == Icon::redo ? juce::AffineTransform::scale (-1.0f, 1.0f, r.getCentreX(), r.getCentreY())
-                                                   : juce::AffineTransform());
-            break;
+            // Flecha curva
+            juce::Path arc;
+            arc.addCentredArc (r.getCentreX(), r.getCentreY() + size * 0.08f, size * 0.42f, size * 0.38f, 0.0f,
+                               -juce::MathConstants<float>::pi * 0.55f, juce::MathConstants<float>::pi * 0.62f, true);
+            const auto flip = icon == Icon::redo ? juce::AffineTransform::scale (-1.0f, 1.0f, r.getCentreX(), r.getCentreY())
+                                                 : juce::AffineTransform();
+            g.setColour (c);
+            g.strokePath (arc, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), flip);
+            const auto start = arc.getPointAlongPath (0.0f);
+            juce::Path head;
+            head.addTriangle (start.x - 5.0f, start.y - 1.0f, start.x + 3.5f, start.y - 5.5f, start.x + 2.5f, start.y + 4.5f);
+            g.fillPath (head, flip);
+            return;
         }
         case Icon::menu:
             for (int i = 0; i < 3; ++i)
-                g.fillRoundedRectangle (r.getX(), r.getY() + (float) i * size * 0.4f, size, size * 0.18f, 1.0f);
+                p.addRoundedRectangle (r.getX(), r.getY() + (float) i * size * 0.4f, size, size * 0.17f, 1.2f);
             break;
     }
+
+    if (on && isEnabled())
+    {
+        g.setColour (colour.withAlpha (0.35f));
+        g.fillPath (p, juce::AffineTransform::scale (1.25f, 1.25f, r.getCentreX(), r.getCentreY()));
+    }
+    g.setColour (c);
+    g.fillPath (p);
 }
 
 // ============================================================================
@@ -117,17 +134,28 @@ void IconButton::paintButton (juce::Graphics& g, bool isMouseOver, bool isButton
 void drawPanel (juce::Graphics& g, juce::Rectangle<int> area, juce::Rectangle<int> header, const juce::String& title)
 {
     auto bounds = area.toFloat();
-    g.setColour (Colours::panel);
-    g.fillRoundedRectangle (bounds, 6.0f);
-    g.setColour (Colours::outline);
-    g.drawRoundedRectangle (bounds.reduced (0.5f), 6.0f, 1.0f);
+    Draw::shadow (g, bounds, 10.0f, 12);
+    g.setGradientFill (juce::ColourGradient (Colours::panel.brighter (0.03f), 0.0f, bounds.getY(),
+                                             Colours::panelDark, 0.0f, bounds.getBottom(), false));
+    g.fillRoundedRectangle (bounds, 10.0f);
 
-    g.setColour (Colours::header);
-    g.fillRoundedRectangle (header.toFloat(), 6.0f);
-    g.fillRect (header.withTrimmedTop (header.getHeight() / 2));
+    // Cabecera
+    auto h = header.toFloat();
+    juce::Path headerShape;
+    headerShape.addRoundedRectangle (h.getX(), h.getY(), h.getWidth(), h.getHeight(), 10.0f, 10.0f, true, true, false, false);
+    g.setGradientFill (juce::ColourGradient (Colours::panelLight, 0.0f, h.getY(), Colours::header, 0.0f, h.getBottom(), false));
+    g.fillPath (headerShape);
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.drawHorizontalLine ((int) h.getBottom(), h.getX(), h.getRight());
+
+    g.setColour (Colours::outline.withAlpha (0.9f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 10.0f, 1.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.05f));
+    g.drawHorizontalLine ((int) h.getY() + 1, h.getX() + 10.0f, h.getRight() - 10.0f);
+
     g.setColour (Colours::text);
-    g.setFont (juce::FontOptions (16.0f, juce::Font::bold));
-    g.drawText (title, header.withTrimmedLeft (44), juce::Justification::centredLeft);
+    g.setFont (Fonts::bold (16.0f));
+    g.drawText (title, header.withTrimmedLeft (46), juce::Justification::centredLeft);
 }
 
 juce::String noteName (int midiNote, bool withOctave)

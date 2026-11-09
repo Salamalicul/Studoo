@@ -24,20 +24,20 @@ TutorialOverlay::TutorialOverlay()
     skipButton.onClick = [this] { stop(); };
 
     addAndMakeVisible (titleLabel);
-    titleLabel.setFont (juce::FontOptions (19.0f, juce::Font::bold));
+    titleLabel.setFont (Fonts::display (22.0f));
     titleLabel.setColour (juce::Label::textColourId, Colours::accent);
 
     addAndMakeVisible (bodyLabel);
-    bodyLabel.setFont (juce::FontOptions (15.0f));
+    bodyLabel.setFont (Fonts::regular (15.5f));
     bodyLabel.setColour (juce::Label::textColourId, Colours::text);
     bodyLabel.setJustificationType (juce::Justification::topLeft);
 
     addAndMakeVisible (progressLabel);
-    progressLabel.setFont (juce::FontOptions (12.0f));
+    progressLabel.setFont (Fonts::regular (12.0f));
     progressLabel.setColour (juce::Label::textColourId, Colours::textDim);
 
     addAndMakeVisible (doneLabel);
-    doneLabel.setFont (juce::FontOptions (15.0f, juce::Font::bold));
+    doneLabel.setFont (Fonts::bold (15.0f));
     doneLabel.setColour (juce::Label::textColourId, Colours::green);
 }
 
@@ -151,14 +151,23 @@ void TutorialOverlay::paint (juce::Graphics& g)
 
     if (! hole.isEmpty())
     {
+        for (int i = 1; i <= 5; ++i)
+        {
+            g.setColour (Colours::accent.withAlpha (0.22f / (float) i));
+            g.drawRoundedRectangle (hole.toFloat().expanded ((float) i * 2.0f), 8.0f + (float) i * 2.0f, 2.0f);
+        }
         g.setColour (Colours::accent);
-        g.drawRoundedRectangle (hole.toFloat(), 6.0f, 3.0f);
+        g.drawRoundedRectangle (hole.toFloat(), 8.0f, 2.5f);
     }
 
-    g.setColour (Colours::panel);
-    g.fillRoundedRectangle (bubble.toFloat(), 10.0f);
+    auto b = bubble.toFloat();
+    Draw::shadow (g, b, 14.0f, 22);
+    Draw::glow (g, b, Colours::accent, 10.0f, 14.0f);
+    g.setGradientFill (juce::ColourGradient (Colours::panelLight, 0.0f, b.getY(), Colours::panelDark, 0.0f, b.getBottom(), false));
+    g.fillRoundedRectangle (b, 14.0f);
     g.setColour (Colours::accent);
-    g.drawRoundedRectangle (bubble.toFloat(), 10.0f, 2.0f);
+    g.drawRoundedRectangle (b.reduced (0.5f), 14.0f, 1.5f);
+    Draw::accentFill (g, b.withHeight (5.0f).reduced (14.0f, 0.0f), 2.5f);
 }
 
 void TutorialOverlay::resized()

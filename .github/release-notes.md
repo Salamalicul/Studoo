@@ -1,5 +1,11 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
+### 🆕 Novedades de la versión 1.1
+- 🎨 **Diseño totalmente renovado**: fuente moderna, botones y ruedas con relieve, pasos que brillan como LEDs, pantallas LCD para el BPM y la posición, medidores de LEDs en el mezclador, teclado de piano realista y bloques de playlist con sombra.
+- ☀️ **Logo nuevo** en la app, en la barra de tareas y en Studoo.exe.
+- 🎓 Apartado **Aprende** más bonito y fácil de leer.
+- 🐧 En Linux, los ajustes se guardan en la carpeta oculta `~/.config/Studoo`.
+
 ### 📥 Cómo instalarlo
 
 **Windows**

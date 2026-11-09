@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # instalar nada extra para abrir la app.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-project(Studoo VERSION 1.0.0 LANGUAGES C CXX)
+project(Studoo VERSION 1.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -53,6 +53,7 @@ set(STUDOO_ENGINE_SOURCES
 # ----------------------------------------------------------------------------
 juce_add_gui_app(Studoo
     PRODUCT_NAME "Studoo"
+    ICON_BIG resources/icon.png
     COMPANY_NAME "Studoo"
     VERSION ${PROJECT_VERSION})
 
@@ -75,6 +76,13 @@ target_sources(Studoo PRIVATE
 
 target_include_directories(Studoo PRIVATE src)
 
+# Imágenes que van dentro de la app (el logo)
+juce_add_binary_data(StudooData SOURCES
+    resources/icon.png
+    resources/fonts/Inter-Regular.otf
+    resources/fonts/Inter-SemiBold.otf
+    resources/fonts/InterDisplay-Black.otf)
+
 set(STUDOO_DEFINITIONS
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
@@ -96,6 +104,7 @@ target_compile_definitions(Studoo PRIVATE
 
 target_link_libraries(Studoo
     PRIVATE
+        StudooData
         juce::juce_audio_utils
         juce::juce_audio_devices
         juce::juce_audio_formats
