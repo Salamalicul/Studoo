@@ -77,7 +77,11 @@ target_sources(Studoo PRIVATE
 target_include_directories(Studoo PRIVATE src)
 
 # Imágenes que van dentro de la app (el logo)
-juce_add_binary_data(StudooData SOURCES resources/icon.png)
+juce_add_binary_data(StudooData SOURCES
+    resources/icon.png
+    resources/fonts/Inter-Regular.otf
+    resources/fonts/Inter-SemiBold.otf
+    resources/fonts/InterDisplay-Black.otf)
 
 set(STUDOO_DEFINITIONS
     JUCE_WEB_BROWSER=0

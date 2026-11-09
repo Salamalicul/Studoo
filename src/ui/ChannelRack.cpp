@@ -122,6 +122,15 @@ void StepGrid::paint (juce::Graphics& g)
     auto pattern = rack.getPattern();
     const int length = rack.getPatternLength();
 
+    // Columna de luz del paso que está sonando
+    if (playingStep >= 0 && playingStep < length && rack.getNumRows() > 0)
+    {
+        auto col = getCellBounds (0, playingStep).withBottom ((float) getHeight()).withY (0.0f).expanded (2.0f, 0.0f);
+        g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.16f), col.getCentreX(), 0.0f,
+                                                 Colours::accent.withAlpha (0.04f), col.getCentreX(), (float) getHeight(), false));
+        g.fillRoundedRectangle (col, 5.0f);
+    }
+
     for (int row = 0; row < rack.getNumRows(); ++row)
     {
         const int uid = rack.getRowUid (row);
@@ -138,22 +147,37 @@ void StepGrid::paint (juce::Graphics& g)
         {
             auto cell = getCellBounds (row, s);
             const bool on = s < data.length() && data[s] == '1';
+            const bool playing = (s == playingStep);
+            const float corner = juce::jmin (6.0f, cell.getWidth() * 0.25f);
 
-            juce::Colour colour = ((s / 4) % 2 == 0) ? Colours::stepOffA : Colours::stepOffB;
-            if (on)    colour = Colours::stepOn;
-            if (muted) colour = colour.withMultipliedSaturation (0.3f).withMultipliedBrightness (0.6f);
-            if (isAudio) colour = colour.withAlpha (0.3f);
-
-            g.setColour (colour);
-            g.fillRoundedRectangle (cell, 3.0f);
-            g.setColour (juce::Colours::white.withAlpha (on ? 0.25f : 0.05f));
-            g.fillRoundedRectangle (cell.withHeight (cell.getHeight() * 0.35f), 3.0f);
-
-            if (s == playingStep)
+            if (on && ! muted && ! isAudio)
             {
-                g.setColour (Colours::accent.withAlpha (on ? 0.9f : 0.5f));
-                g.drawRoundedRectangle (cell.expanded (1.0f), 3.0f, 2.0f);
+                // Paso encendido: LED naranja con brillo (más intenso si está sonando)
+                Draw::glow (g, cell, Colours::accent, playing ? 9.0f : 4.0f, corner);
+                Draw::accentFill (g, cell, corner);
+                if (playing)
+                {
+                    g.setColour (juce::Colours::white.withAlpha (0.35f));
+                    g.fillRoundedRectangle (cell, corner);
+                }
+                g.setColour (Colours::accentDeep.darker (0.4f));
+                g.drawRoundedRectangle (cell.reduced (0.5f), corner, 1.0f);
+                continue;
             }
+
+            // Paso apagado
+            juce::Colour base = ((s / 4) % 2 == 0) ? Colours::stepOffA : Colours::stepOffB;
+            if (on) base = Colours::accent.withMultipliedSaturation (0.3f).withMultipliedBrightness (0.5f); // en mute
+            if (playing) base = base.brighter (0.25f);
+            if (isAudio) base = base.withAlpha (0.35f);
+
+            g.setGradientFill (juce::ColourGradient (base.brighter (0.12f), 0.0f, cell.getY(),
+                                                     base.darker (0.25f), 0.0f, cell.getBottom(), false));
+            g.fillRoundedRectangle (cell, corner);
+            g.setColour (juce::Colours::black.withAlpha (0.45f));
+            g.drawRoundedRectangle (cell.reduced (0.5f), corner, 1.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.05f));
+            g.drawHorizontalLine ((int) cell.getY() + 1, cell.getX() + corner, cell.getRight() - corner);
         }
 
         // Vista previa de las notas del piano roll de este canal
@@ -173,7 +197,7 @@ void StepGrid::paint (juce::Graphics& g)
                                                          (float) getWidth(), (float) ChannelRack::rowHeight - 16.0f);
             const float range = (float) juce::jmax (1, hi - lo);
             const float pxPerStep = (getCellBounds (0, length - 1).getRight() + cellGap) / (float) length;
-            g.setColour (Colours::accent.withAlpha (0.85f));
+            g.setColour (Colours::accentLight.withAlpha (0.9f));
             for (auto& n : notes)
             {
                 const float x = (float) (double) n[ids::start] * pxPerStep;
@@ -305,14 +329,21 @@ ChannelRack::ChannelRack (AppContext& c)
         for (int r = 0; r < rows.size(); ++r)
         {
             auto rowArea = juce::Rectangle<int> (0, r * rowHeight, content.getWidth(), rowHeight);
+            if (r % 2 == 1)
+            {
+                g.setColour (juce::Colours::white.withAlpha (0.015f));
+                g.fillRect (rowArea);
+            }
             if (rows[r]->uid == selected)
             {
-                g.setColour (Colours::accent.withAlpha (0.08f));
+                g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.16f), 0.0f, 0.0f,
+                                                         Colours::accent.withAlpha (0.0f), (float) controlsWidth + 120.0f, 0.0f, false));
                 g.fillRect (rowArea);
-                g.setColour (Colours::accent);
-                g.fillRect (rowArea.removeFromLeft (3));
+                auto bar = rowArea.removeFromLeft (3).toFloat().reduced (0.0f, 6.0f);
+                Draw::glow (g, bar, Colours::accent, 5.0f, 1.5f);
+                Draw::accentFill (g, bar, 1.5f);
             }
-            g.setColour (Colours::outline.withAlpha (0.4f));
+            g.setColour (juce::Colours::black.withAlpha (0.3f));
             g.drawHorizontalLine ((r + 1) * rowHeight - 1, 0.0f, (float) content.getWidth());
         }
     };

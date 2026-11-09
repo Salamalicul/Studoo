@@ -143,6 +143,7 @@ MainComponent::MainComponent()
         auto* b = viewButtons.add (new juce::TextButton (txt (viewNames[i])));
         b->setTooltip (txt (viewTips[i]));
         b->setClickingTogglesState (false);
+        b->getProperties().set ("tab", true);
         b->onClick = [this, i] { showView ((View) i); };
         makeNonFocusing (*b);
         addAndMakeVisible (b);
@@ -928,11 +929,23 @@ void MainComponent::timerCallback()
 // ============================================================================
 void MainComponent::paint (juce::Graphics& g)
 {
+    // Fondo con un brillo naranja muy suave arriba a la izquierda
     g.fillAll (Colours::background);
+    g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.06f), 0.0f, 0.0f,
+                                             juce::Colours::transparentBlack, (float) getWidth() * 0.6f, (float) getHeight() * 0.7f, true));
+    g.fillAll();
 
-    g.setColour (Colours::header);
+    // Barra de pestañas
+    g.setColour (Colours::panelDark.withAlpha (0.7f));
+    g.fillRoundedRectangle (viewBarArea.toFloat().expanded (4.0f, 3.0f), 10.0f);
+
+    // Barra de estado
+    g.setGradientFill (juce::ColourGradient (Colours::header, 0.0f, (float) statusArea.getY(),
+                                             Colours::panelDark, 0.0f, (float) statusArea.getBottom(), false));
     g.fillRect (statusArea);
-    g.setFont (juce::FontOptions (13.0f));
+    g.setColour (Colours::outline.withAlpha (0.7f));
+    g.drawHorizontalLine (statusArea.getY(), 0.0f, (float) getWidth());
+    g.setFont (Fonts::regular (12.5f));
 
     auto area = statusArea.reduced (12, 0);
     if (auto* device = deviceManager.getCurrentAudioDevice())

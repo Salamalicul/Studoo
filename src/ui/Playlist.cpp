@@ -62,14 +62,9 @@ void PlaylistGrid::paint (juce::Graphics& g)
     for (int t = 0; t < numPlaylistTracks; ++t)
     {
         const int y = rulerHeight + t * trackHeight;
-        g.setColour (t % 2 == 0 ? juce::Colour (0xff2a3036) : juce::Colour (0xff262b31));
+        g.setColour (t % 2 == 0 ? juce::Colour (0xff1d2126) : juce::Colour (0xff1a1d22));
         g.fillRect (labelWidth, y, getWidth() - labelWidth, trackHeight);
-        g.setColour (Colours::header);
-        g.fillRect (0, y, labelWidth, trackHeight);
-        g.setColour (Colours::textDim);
-        g.setFont (juce::FontOptions (12.0f));
-        g.drawText ("Pista " + juce::String (t + 1), juce::Rectangle<int> (8, y, labelWidth - 8, trackHeight), juce::Justification::centredLeft);
-        g.setColour (Colours::outline.withAlpha (0.6f));
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
         g.drawHorizontalLine (y + trackHeight - 1, 0.0f, (float) getWidth());
     }
 
@@ -77,35 +72,63 @@ void PlaylistGrid::paint (juce::Graphics& g)
     for (int b = 0; b <= bars; ++b)
     {
         const float x = stepsToX (b * stepsPerBar);
-        g.setColour (Colours::outline.brighter (0.2f));
+        g.setColour (b % 4 == 0 ? Colours::outline.brighter (0.35f) : Colours::outline.brighter (0.05f));
         g.drawVerticalLine ((int) x, (float) rulerHeight, (float) getHeight());
         if (pps * stepsPerBeat > 10.0)
             for (int beat = 1; beat < 4; ++beat)
             {
-                g.setColour (Colours::outline.withAlpha (0.35f));
+                g.setColour (Colours::outline.withAlpha (0.3f));
                 g.drawVerticalLine ((int) (x + beat * stepsPerBeat * pps), (float) rulerHeight, (float) getHeight());
             }
     }
 
+    // Nombres de las pistas
+    for (int t = 0; t < numPlaylistTracks; ++t)
+    {
+        const int y = rulerHeight + t * trackHeight;
+        auto label = juce::Rectangle<int> (0, y, labelWidth, trackHeight);
+        g.setGradientFill (juce::ColourGradient (Colours::panelLight, 0.0f, (float) y, Colours::header, 0.0f, (float) (y + trackHeight), false));
+        g.fillRect (label);
+        g.setColour (juce::Colours::black.withAlpha (0.4f));
+        g.drawHorizontalLine (y + trackHeight - 1, 0.0f, (float) labelWidth);
+        auto dot = juce::Rectangle<float> (10.0f, (float) y + trackHeight * 0.5f - 9.0f, 18.0f, 18.0f);
+        g.setColour (Colours::panelDark);
+        g.fillEllipse (dot);
+        g.setColour (Colours::accent.withAlpha (0.8f));
+        g.setFont (Fonts::bold (10.5f));
+        g.drawText (juce::String (t + 1), dot, juce::Justification::centred);
+        g.setColour (Colours::textDim);
+        g.setFont (Fonts::regular (12.0f));
+        g.drawText ("Pista", label.withTrimmedLeft (34), juce::Justification::centredLeft);
+    }
+    g.setColour (juce::Colours::black.withAlpha (0.5f));
+    g.drawVerticalLine (labelWidth - 1, (float) rulerHeight, (float) getHeight());
+
     // Regla
-    g.setColour (Colours::header);
+    g.setGradientFill (juce::ColourGradient (Colours::panelLight, 0.0f, 0.0f, Colours::header, 0.0f, (float) rulerHeight, false));
     g.fillRect (0, 0, getWidth(), rulerHeight);
-    g.setFont (juce::FontOptions (12.0f, juce::Font::bold));
     for (int b = 0; b < bars; ++b)
     {
         const float x = stepsToX (b * stepsPerBar);
-        g.setColour (Colours::textDim);
-        g.drawText (juce::String (b + 1), juce::Rectangle<float> (x + 4.0f, 0.0f, 40.0f, (float) rulerHeight), juce::Justification::centredLeft);
-        g.drawVerticalLine ((int) x, 12.0f, (float) rulerHeight);
+        g.setColour (b % 4 == 0 ? Colours::text : Colours::textDim);
+        g.setFont (b % 4 == 0 ? Fonts::bold (12.0f) : Fonts::regular (11.5f));
+        g.drawText (juce::String (b + 1), juce::Rectangle<float> (x + 5.0f, 0.0f, 40.0f, (float) rulerHeight - 4.0f), juce::Justification::centredLeft);
+        g.setColour (Colours::outline.brighter (0.4f));
+        g.drawVerticalLine ((int) x, 8.0f, (float) rulerHeight);
+        for (int beat = 1; beat < 4 && pps * stepsPerBeat > 8.0; ++beat)
+            g.drawVerticalLine ((int) (x + beat * stepsPerBeat * pps), (float) rulerHeight - 5.0f, (float) rulerHeight);
     }
     const double songEnd = ctx.project.getSongLengthSteps();
-    g.setColour (Colours::accent.withAlpha (0.25f));
-    g.fillRect (stepsToX (0.0), (float) rulerHeight - 4.0f, (float) (songEnd * pps), 4.0f);
+    auto songBar = juce::Rectangle<float> (stepsToX (0.0), (float) rulerHeight - 3.0f, (float) (songEnd * pps), 3.0f);
+    Draw::glow (g, songBar, Colours::accent, 4.0f, 1.5f);
+    Draw::accentFill (g, songBar, 1.5f);
+    g.setColour (juce::Colours::black.withAlpha (0.5f));
+    g.drawHorizontalLine (rulerHeight - 1, 0.0f, (float) getWidth());
 
     // Bloques (clips)
     for (auto clip : ctx.project.playlist())
     {
-        auto r = clipBounds (clip);
+        auto r = clipBounds (clip).reduced (1.0f, 1.0f);
         const bool audio = clip[ids::kind].toString() == "audio";
         juce::String name;
         juce::Colour colour = Colours::green;
@@ -121,22 +144,30 @@ void PlaylistGrid::paint (juce::Graphics& g)
             colour = juce::Colour ((juce::uint32) (juce::int64) pattern.getProperty (ids::colour, (juce::int64) 0xffff8a1f));
         }
 
-        g.setColour (colour.withAlpha (0.35f));
-        g.fillRoundedRectangle (r, 3.0f);
-        g.setColour (colour);
-        g.fillRoundedRectangle (r.withHeight (14.0f), 3.0f);
-        g.drawRoundedRectangle (r, 3.0f, 1.0f);
-        g.setColour (juce::Colours::black);
-        g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
-        g.drawText (name, r.withHeight (14.0f).reduced (4.0f, 0.0f), juce::Justification::centredLeft);
+        const float corner = 6.0f;
+        Draw::shadow (g, r, corner, 8);
+        g.setGradientFill (juce::ColourGradient (colour.withAlpha (0.42f).overlaidWith (juce::Colour (0x22000000)), 0.0f, r.getY(),
+                                                 colour.withAlpha (0.18f), 0.0f, r.getBottom(), false));
+        g.fillRoundedRectangle (r, corner);
 
-        // Mini vista de las notas del patrón
+        auto head = r.withHeight (15.0f);
+        juce::Path headShape;
+        headShape.addRoundedRectangle (head.getX(), head.getY(), head.getWidth(), head.getHeight(), corner, corner, true, true, false, false);
+        g.setGradientFill (juce::ColourGradient (colour.brighter (0.25f), 0.0f, head.getY(), colour.darker (0.1f), 0.0f, head.getBottom(), false));
+        g.fillPath (headShape);
+        g.setColour (colour.brighter (0.3f));
+        g.drawRoundedRectangle (r, corner, 1.0f);
+        g.setColour (juce::Colour (0xff140c02));
+        g.setFont (Fonts::bold (10.5f));
+        g.drawText (name, head.reduced (6.0f, 0.0f), juce::Justification::centredLeft, true);
+
+        auto body = r.withTrimmedTop (17.0f).reduced (3.0f, 2.0f);
         if (! audio)
         {
+            // Mini vista de los pasos y notas del patrón
             auto pattern = ctx.project.findPattern (clip[ids::ref]);
             const double len = Project::getPatternLength (pattern);
-            auto body = r.withTrimmedTop (16.0f).reduced (2.0f, 2.0f);
-            g.setColour (colour.brighter (0.4f).withAlpha (0.8f));
+            g.setColour (colour.brighter (0.6f).withAlpha (0.9f));
             const int channels = juce::jmax (1, ctx.project.channels().getNumChildren());
             for (double rep = 0.0; rep < (double) clip[ids::length]; rep += len)
                 for (auto item : pattern)
@@ -148,17 +179,29 @@ void PlaylistGrid::paint (juce::Graphics& g)
                         const auto data = item[ids::data].toString();
                         for (int s = 0; s < juce::jmin (data.length(), (int) len); ++s)
                             if (data[s] == '1' && rep + s < (double) clip[ids::length])
-                                g.fillRect (r.getX() + (float) ((rep + s) * pps), y, juce::jmax (1.0f, (float) pps - 1.0f), 2.0f);
+                                g.fillRoundedRectangle (r.getX() + 3.0f + (float) ((rep + s) * pps), y,
+                                                        juce::jmax (1.5f, (float) pps - 1.0f), 2.2f, 1.0f);
+                    }
+                    else if (item.hasType (ids::NOTE) && rep + (double) item[ids::start] < (double) clip[ids::length])
+                    {
+                        g.fillRoundedRectangle (r.getX() + 3.0f + (float) ((rep + (double) item[ids::start]) * pps), y,
+                                                juce::jmax (2.0f, (float) ((double) item[ids::length] * pps) - 1.0f), 2.2f, 1.0f);
                     }
                 }
         }
         else
         {
-            g.setColour (colour.withAlpha (0.8f));
-            auto body = r.withTrimmedTop (16.0f).reduced (2.0f, 4.0f);
-            g.drawHorizontalLine ((int) body.getCentreY(), body.getX(), body.getRight());
-            g.setFont (juce::FontOptions (10.0f));
-            g.drawText (txt ("audio grabado"), body, juce::Justification::centredLeft);
+            // Forma de onda decorativa
+            juce::Path wave;
+            const float cy = body.getCentreY(), amp = body.getHeight() * 0.45f;
+            juce::Random rnd ((juce::int64) (int) clip[ids::uid]);
+            for (float x = body.getX(); x < body.getRight(); x += 2.0f)
+            {
+                const float a = amp * (0.25f + 0.75f * rnd.nextFloat()) * (0.6f + 0.4f * std::sin (x * 0.05f));
+                wave.addRectangle (x, cy - a, 1.2f, a * 2.0f);
+            }
+            g.setColour (colour.brighter (0.4f).withAlpha (0.85f));
+            g.fillPath (wave);
         }
     }
 
@@ -166,10 +209,12 @@ void PlaylistGrid::paint (juce::Graphics& g)
     if (ctx.engine.isSongMode())
     {
         const float x = stepsToX (ctx.engine.getPlayPosition());
+        auto line = juce::Rectangle<float> (x - 1.0f, 0.0f, 2.0f, (float) getHeight());
+        Draw::glow (g, line, Colours::green, 6.0f, 1.0f);
         g.setColour (Colours::green);
-        g.fillRect (x, 0.0f, 2.0f, (float) getHeight());
+        g.fillRect (line);
         juce::Path tri;
-        tri.addTriangle (x - 6.0f, 0.0f, x + 8.0f, 0.0f, x + 1.0f, 10.0f);
+        tri.addTriangle (x - 7.0f, 0.0f, x + 7.0f, 0.0f, x, 10.0f);
         g.fillPath (tri);
     }
 }

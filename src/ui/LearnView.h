@@ -8,6 +8,20 @@
 
 namespace studoo
 {
+    // Muestra un tema con título grande y texto bien maquetado
+    class LearnArticle : public juce::Component
+    {
+    public:
+        void setArticle (const juce::String& title, const juce::String& body, int number);
+        void layoutForWidth (int width);
+        void paint (juce::Graphics&) override;
+
+    private:
+        juce::String title, body;
+        int number = 0;
+        juce::TextLayout layout;
+    };
+
     class LearnView : public juce::Component, private juce::ListBoxModel
     {
     public:
@@ -25,7 +39,8 @@ namespace studoo
         HelpButton helpButton;
         juce::TextButton tutorialButton;
         juce::ListBox list { "temas", this };
-        juce::TextEditor text;
+        juce::Viewport viewport;
+        LearnArticle article;
         juce::Rectangle<int> headerArea;
     };
 }

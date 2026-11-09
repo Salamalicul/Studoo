@@ -18,15 +18,15 @@ void HelpButton::paintButton (juce::Graphics& g, bool isMouseOver, bool isButton
     const float size = juce::jmin (area.getWidth(), area.getHeight());
     auto circle = area.withSizeKeepingCentre (size, size);
 
-    auto colour = Colours::accent;
-    if (isButtonDown)     colour = colour.darker (0.3f);
-    else if (isMouseOver) colour = colour.brighter (0.2f);
-
-    g.setColour (colour);
+    if (isMouseOver)
+        Draw::glow (g, circle, Colours::accent, 5.0f, size * 0.5f);
+    g.setColour (Colours::accent.withAlpha (isMouseOver ? 0.3f : 0.14f));
     g.fillEllipse (circle);
-    g.setColour (juce::Colours::black);
-    g.setFont (juce::FontOptions (size * 0.7f, juce::Font::bold));
-    g.drawText ("?", circle, juce::Justification::centred);
+    g.setColour (isButtonDown ? Colours::accentDeep : Colours::accent);
+    g.drawEllipse (circle.reduced (1.0f), 1.6f);
+    g.setColour (isMouseOver ? Colours::accentLight : Colours::accent);
+    g.setFont (Fonts::bold (size * 0.62f));
+    g.drawText ("?", circle.translated (0.0f, 0.5f), juce::Justification::centred);
 }
 
 void HelpButton::showHelp()

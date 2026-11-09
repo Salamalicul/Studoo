@@ -167,21 +167,26 @@ void InstrumentPanel::refresh()
 void InstrumentPanel::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
-    g.setColour (Colours::panel);
-    g.fillRoundedRectangle (bounds, 6.0f);
+    Draw::shadow (g, bounds, 10.0f, 10);
+    g.setGradientFill (juce::ColourGradient (Colours::panel.brighter (0.03f), 0.0f, 0.0f, Colours::panelDark, 0.0f, bounds.getBottom(), false));
+    g.fillRoundedRectangle (bounds, 10.0f);
     g.setColour (Colours::outline);
-    g.drawRoundedRectangle (bounds.reduced (0.5f), 6.0f, 1.0f);
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 10.0f, 1.0f);
 
     auto top = getLocalBounds().reduced (10, 6).removeFromTop (24).withTrimmedLeft (34);
-    g.setFont (juce::FontOptions (15.0f, juce::Font::bold));
+    g.setFont (Fonts::bold (15.0f));
     g.setColour (Colours::text);
     if (channel.isValid())
     {
         g.drawText (title, top, juce::Justification::centredLeft);
-        g.setColour (Colours::accent);
-        g.setFont (juce::FontOptions (13.0f));
-        g.drawText (typeName, top.withTrimmedLeft (juce::GlyphArrangement::getStringWidthInt (juce::FontOptions (15.0f, juce::Font::bold), title) + 12),
-                    juce::Justification::centredLeft);
+        const int w = juce::GlyphArrangement::getStringWidthInt (Fonts::bold (15.0f), title);
+        auto chip = juce::Rectangle<float> ((float) (top.getX() + w + 12), (float) top.getY() + 3.0f,
+                                            (float) juce::GlyphArrangement::getStringWidthInt (Fonts::bold (11.0f), typeName) + 16.0f, 18.0f);
+        g.setColour (Colours::accent.withAlpha (0.18f));
+        g.fillRoundedRectangle (chip, 9.0f);
+        g.setColour (Colours::accentLight);
+        g.setFont (Fonts::bold (11.0f));
+        g.drawText (typeName, chip, juce::Justification::centred);
     }
     else
     {
