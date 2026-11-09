@@ -2,103 +2,158 @@
 // ============================================================================
 //  AudioEngine: el "corazón" que produce el sonido.
 //
-//  La tarjeta de sonido le pide constantemente pequeños trozos de audio
-//  (por ejemplo 512 muestras, unos 10 milisegundos). El motor cuenta el tiempo
-//  muestra a muestra: cuando toca un nuevo paso del secuenciador, dispara los
-//  sonidos que estén activados en ese paso.
+//  Cómo funciona, paso a paso:
+//   1. La tarjeta de sonido pide trocitos de audio (unas 512 muestras, ~10 ms).
+//   2. El motor mira qué pasos y notas caen en ese trocito (del patrón actual
+//      en modo PATRÓN, o de la playlist en modo CANCIÓN).
+//   3. Envía esas notas a cada instrumento, que genera su sonido.
+//   4. Cada canal va a una pista del mezclador, que aplica sus efectos.
+//   5. Todas las pistas se suman en el Master y salen por los altavoces.
 //
-//  La interfaz (botones, cuadrícula...) y el audio funcionan en "hilos"
-//  distintos, como dos personas trabajando a la vez. Para que no se pisen,
-//  comparten la información mediante variables "atómicas" (std::atomic),
-//  que se pueden leer y escribir de forma segura desde los dos lados.
+//  La interfaz y el audio funcionan en hilos distintos. El motor recibe
+//  "fotos" del proyecto (Snapshot) y usa un candado (lock) muy breve para
+//  cambiarlas de forma segura.
 // ============================================================================
-#include <juce_audio_basics/juce_audio_basics.h>
-#include <array>
-#include <atomic>
+#include <juce_audio_devices/juce_audio_devices.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <map>
 
-#include "DrumSounds.h"
+#include "Instruments.h"
+#include "MixerTrack.h"
+#include "SampleCache.h"
+#include "Snapshot.h"
 
 namespace studoo
 {
-    constexpr int numSteps    = 16; // 16 pasos = 1 compás de 4 tiempos
-    constexpr int numChannels = 4;  // Bombo, caja, hi-hat, palmada
-
-    class AudioEngine : public juce::AudioSource
+    class AudioEngine : public juce::AudioIODeviceCallback,
+                        public juce::AudioPlayHead
     {
     public:
         AudioEngine();
+        ~AudioEngine() override;
 
-        // --- Llamadas que hace la tarjeta de sonido -------------------------
-        void prepareToPlay (int samplesPerBlockExpected, double sampleRate) override;
-        void releaseResources() override {}
-        void getNextAudioBlock (const juce::AudioSourceChannelInfo& info) override;
+        // --- Conexión con la tarjeta de sonido --------------------------------
+        void audioDeviceAboutToStart (juce::AudioIODevice*) override;
+        void audioDeviceStopped() override;
+        void audioDeviceIOCallbackWithContext (const float* const* inputs, int numInputs,
+                                               float* const* outputs, int numOutputs, int numSamples,
+                                               const juce::AudioIODeviceCallbackContext&) override;
 
-        // --- Transporte (reproducir / parar) --------------------------------
+        void prepare (double sampleRate, int maxBlockSize);
+        double getSampleRate() const { return sampleRate; }
+        int getBlockSize() const     { return blockSize; }
+
+        // Genera audio (lo usa la tarjeta de sonido y también la exportación)
+        void render (const float* const* inputs, int numInputs, float* const* outputs, int numOutputs, int numSamples);
+
+        // --- Proyecto ----------------------------------------------------------
+        // Crea una foto nueva del proyecto y se la pasa al hilo de audio
+        void updateFromProject (const juce::ValueTree& projectState, SampleCache&);
+
+        // --- Transporte ----------------------------------------------------------
         void play();
         void stop();
         bool isPlaying() const              { return playing.load(); }
+        void setPlayPosition (double steps);
+        double getPlayPosition() const      { return position.load(); }
+        bool isSongMode() const             { return songModeFlag.load(); }
 
-        void   setBpm (double newBpm);
-        double getBpm() const               { return bpm.load(); }
+        // --- Sonar notas desde la interfaz o un teclado MIDI ------------------------
+        void previewNote (int channelUid, int note, float velocity, double seconds);
+        void setLiveChannel (int channelUid) { liveChannelUid.store (channelUid); }
+        juce::MidiMessageCollector& getMidiCollector() { return midiCollector; }
 
-        void setMetronomeEnabled (bool on)  { metronomeOn.store (on); }
-        bool isMetronomeEnabled() const     { return metronomeOn.load(); }
+        // --- Medidores del mezclador -------------------------------------------------
+        float getTrackPeak (int track, int channel) const;
+        void decayMeters();
 
-        void  setMasterVolume (float gain)  { masterGain.store (gain); }
-        float getMasterVolume() const       { return masterGain.load(); }
+        // --- Plugins VST3 --------------------------------------------------------------
+        void setChannelPlugin (int channelUid, std::unique_ptr<juce::AudioPluginInstance>);
+        juce::AudioPluginInstance* getChannelPlugin (int channelUid);
+        void setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginInstance>);
+        juce::AudioPluginInstance* getMixerPlugin (int track);
+        void clearAllPlugins();
+        std::function<void (juce::AudioPluginInstance*)> onPluginWillBeDeleted;
 
-        // Paso que está sonando ahora (0..15), o -1 si está parado
-        int getCurrentStep() const          { return currentStep.load(); }
+        // --- Grabación de audio -------------------------------------------------------
+        bool startRecording (const juce::File& file, juce::String& error);
+        struct RecordingResult { juce::File file; double startSteps = 0.0, lengthSteps = 0.0; bool valid = false; };
+        RecordingResult stopRecording();
+        bool isRecording() const { return recording.load(); }
+        int getNumInputChannels() const { return numInputChannels; }
 
-        // --- Patrón ----------------------------------------------------------
-        void setStep (int channel, int step, bool on);
-        bool getStep (int channel, int step) const;
-        void clearPattern();
-        void loadExamplePattern();
+        // --- Exportación (sin tarjeta de sonido) ---------------------------------------
+        // Debe llamarse con el motor desconectado de la tarjeta de sonido
+        bool renderSongToFile (const juce::File& wavFile, double sampleRate,
+                               std::function<bool (float progress)> keepGoing, juce::String& error);
 
-        // --- Canales ---------------------------------------------------------
-        static juce::String getChannelName (int channel);
-        void  setChannelVolume (int channel, float gain);
-        float getChannelVolume (int channel) const;
-        void  setChannelMuted (int channel, bool muted);
-        bool  isChannelMuted (int channel) const;
-
-        // Hace sonar un canal una vez (al hacer clic en su nombre)
-        void previewChannel (int channel);
+        // --- AudioPlayHead (para que los plugins sepan el tempo) ---------------------------
+        juce::Optional<PositionInfo> getPosition() const override;
 
     private:
-        struct Voice
+        struct ChannelRuntime
         {
-            const juce::AudioBuffer<float>* sound = nullptr;
-            int position = 0;
-            float gain = 0.0f;
+            int uid = 0;
+            ChannelType type = ChannelType::sampler;
+            std::unique_ptr<Instrument> instrument;
+            SamplePtr audioSample; // para canales de audio grabado
+            juce::String audioSamplePath;
+            juce::MidiBuffer midi;
+            juce::AudioBuffer<float> buffer;
+            std::array<juce::int64, 128> noteOffAt;
         };
 
-        void triggerStep (int step);
-        static void startVoice (Voice& v, const juce::AudioBuffer<float>& sound, float gain);
+        struct PreviewEvent { int channelUid = 0, note = 60; float velocity = 0.8f; int lengthSamples = 0; };
 
-        // Datos compartidos entre la interfaz y el audio
-        std::array<std::array<std::atomic<bool>, numSteps>, numChannels> pattern;
-        std::array<std::atomic<float>, numChannels> channelVolume;
-        std::array<std::atomic<bool>,  numChannels> channelMuted;
-        std::array<std::atomic<bool>,  numChannels> previewRequested;
+        void renderChunk (const float* const* inputs, int numInputs, float* const* outputs, int numOutputs,
+                          int outputOffset, int n);
+        void scheduleNote (ChannelRuntime&, int note, float velocity, int sampleOffset, juce::int64 lengthSamples);
+        void collectEvents (const Snapshot&, double from, double to, int sampleOffset, double samplesPerStep);
+        void collectPatternEvents (const Snapshot&, const PatternSnap&, double localFrom, double localTo,
+                                   double localEnd, double globalShift, double segmentStart,
+                                   int sampleOffset, double samplesPerStep);
+        void renderAudioClips (const Snapshot&, double from, double to, int sampleOffset, double samplesPerStep);
+        std::unique_ptr<ChannelRuntime> createRuntime (const ChannelSnap&);
+        void releaseAllNotes();
 
-        std::atomic<bool>   playing { false };
-        std::atomic<bool>   restartRequested { false };
-        std::atomic<double> bpm { 140.0 };
-        std::atomic<bool>   metronomeOn { false };
-        std::atomic<float>  masterGain { 0.8f };
-        std::atomic<int>    currentStep { -1 };
+        int currentChunkSize = 0;
+        bool wasPlaying = false;
+        bool lastSongMode = false;
+        std::atomic<bool> exportingSong { false };
 
-        // Datos que solo usa el hilo de audio
+        juce::CriticalSection lock;
+        std::shared_ptr<const Snapshot> snapshot;
+        std::vector<std::unique_ptr<ChannelRuntime>> runtimes;
+        std::array<MixerTrack, numMixerTracks> mixer;
+        MetronomeInstrument metronome;
+
+        std::map<int, std::unique_ptr<juce::AudioPluginInstance>> channelPlugins;
+        std::array<std::unique_ptr<juce::AudioPluginInstance>, numMixerTracks> mixerPlugins;
+
         double sampleRate = 44100.0;
-        double samplesUntilNextStep = 0.0;
-        int    nextStep = 0;
+        int blockSize = 512;
+        int numInputChannels = 0;
+        juce::int64 sampleClock = 0;
 
-        std::array<juce::AudioBuffer<float>, numChannels> channelSounds;
-        juce::AudioBuffer<float> clickHigh, clickLow;
+        std::atomic<bool> playing { false }, songModeFlag { false };
+        std::atomic<double> position { 0.0 };
+        std::atomic<double> requestedPosition { -1.0 };
+        std::atomic<double> currentBpm { 140.0 };
+        std::atomic<int> liveChannelUid { 0 };
 
-        std::array<Voice, numChannels> voices;
-        Voice metronomeVoice;
+        juce::AbstractFifo previewFifo { 64 };
+        std::array<PreviewEvent, 64> previewEvents;
+
+        juce::MidiMessageCollector midiCollector;
+        juce::MidiBuffer liveMidi;
+
+        // Grabación
+        juce::TimeSliceThread writerThread { "Studoo grabación" };
+        std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> recordWriter;
+        juce::File recordFile;
+        std::atomic<bool> recording { false };
+        double recordStartSteps = -1.0;
+        juce::int64 recordedSamples = 0;
+        juce::AudioBuffer<float> recordScratch;
     };
 }

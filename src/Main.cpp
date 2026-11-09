@@ -14,9 +14,10 @@ namespace studoo
             : DocumentWindow (name, Colours::background, DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar (true);
-            setContentOwned (new MainComponent(), true);
+            content = new MainComponent();
+            setContentOwned (content, true);
             setResizable (true, true);
-            setResizeLimits (900, 340, 4000, 3000);
+            setResizeLimits (1000, 640, 6000, 4000);
             centreWithSize (getWidth(), getHeight());
             setVisible (true);
         }
@@ -25,6 +26,14 @@ namespace studoo
         {
             juce::JUCEApplication::getInstance()->systemRequestedQuit();
         }
+
+        // Si ningún control tiene el teclado, se lo pasamos a la pantalla principal
+        bool keyPressed (const juce::KeyPress& key) override
+        {
+            return content != nullptr && content->keyPressed (key);
+        }
+
+        MainComponent* content = nullptr;
     };
 
     class StudooApplication : public juce::JUCEApplication
@@ -36,11 +45,18 @@ namespace studoo
 
         void initialise (const juce::String&) override
         {
-            mainWindow = std::make_unique<MainWindow> ("Studoo " + getApplicationVersion());
+            mainWindow = std::make_unique<MainWindow> ("Studoo");
         }
 
         void shutdown() override { mainWindow = nullptr; }
-        void systemRequestedQuit() override { quit(); }
+
+        void systemRequestedQuit() override
+        {
+            if (mainWindow != nullptr && mainWindow->content != nullptr)
+                mainWindow->content->requestQuit ([] { juce::JUCEApplication::getInstance()->quit(); });
+            else
+                quit();
+        }
 
     private:
         std::unique_ptr<MainWindow> mainWindow;

@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # instalar nada extra para abrir la app.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-project(Studoo VERSION 0.1.0 LANGUAGES C CXX)
+project(Studoo VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,8 +39,14 @@ endif()
 
 # Código del motor de audio (lo comparten la app y las pruebas)
 set(STUDOO_ENGINE_SOURCES
+    src/model/Project.cpp
     src/audio/AudioEngine.cpp
-    src/audio/DrumSounds.cpp)
+    src/audio/DrumSounds.cpp
+    src/audio/Instruments.cpp
+    src/audio/MixerTrack.cpp
+    src/audio/PluginHost.cpp
+    src/audio/SampleCache.cpp
+    src/audio/Snapshot.cpp)
 
 # ----------------------------------------------------------------------------
 #  La aplicación
@@ -54,9 +60,17 @@ target_sources(Studoo PRIVATE
     src/Main.cpp
     src/MainComponent.cpp
     src/ui/StudooLookAndFeel.cpp
-    src/ui/TransportBar.cpp
-    src/ui/StepSequencer.cpp
+    src/ui/Widgets.cpp
     src/ui/HelpButton.cpp
+    src/ui/Toolbar.cpp
+    src/ui/ChannelRack.cpp
+    src/ui/InstrumentPanel.cpp
+    src/ui/PianoRoll.cpp
+    src/ui/Playlist.cpp
+    src/ui/MixerView.cpp
+    src/ui/AutomationView.cpp
+    src/ui/LearnView.cpp
+    src/ui/Tutorial.cpp
     ${STUDOO_ENGINE_SOURCES})
 
 target_include_directories(Studoo PRIVATE src)
@@ -65,6 +79,9 @@ set(STUDOO_DEFINITIONS
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_USE_MP3AUDIOFORMAT=1
+    JUCE_PLUGINHOST_VST3=1
+    JUCE_PLUGINHOST_LV2=0
+    JUCE_PLUGINHOST_AU=0
     STUDOO_VERSION="${PROJECT_VERSION}")
 
 # Sistemas de audio de Linux (ALSA y JACK; PipeWire funciona a través de ambos)
@@ -82,6 +99,8 @@ target_link_libraries(Studoo
         juce::juce_audio_utils
         juce::juce_audio_devices
         juce::juce_audio_formats
+        juce::juce_audio_processors
+        juce::juce_dsp
         juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
@@ -102,7 +121,7 @@ if(STUDOO_BUILD_TESTS)
     target_include_directories(StudooEngineTest PRIVATE src)
     target_compile_definitions(StudooEngineTest PRIVATE ${STUDOO_DEFINITIONS})
     target_link_libraries(StudooEngineTest
-        PRIVATE juce::juce_audio_formats juce::juce_audio_basics
+        PRIVATE juce::juce_audio_utils juce::juce_audio_processors juce::juce_dsp juce::juce_gui_extra
         PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     if(MSVC)
         target_compile_options(StudooEngineTest PRIVATE /utf-8)

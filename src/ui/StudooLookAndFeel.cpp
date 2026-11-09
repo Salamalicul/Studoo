@@ -34,6 +34,23 @@ StudooLookAndFeel::StudooLookAndFeel()
     setColour (juce::AlertWindow::textColourId,        Colours::text);
     setColour (juce::AlertWindow::outlineColourId,     Colours::accent);
     setColour (juce::ResizableWindow::backgroundColourId, Colours::background);
+    setColour (juce::ComboBox::backgroundColourId,     Colours::panelLight);
+    setColour (juce::ComboBox::outlineColourId,        Colours::outline);
+    setColour (juce::ComboBox::textColourId,           Colours::text);
+    setColour (juce::ComboBox::arrowColourId,          Colours::accent);
+    setColour (juce::PopupMenu::backgroundColourId,    Colours::panel);
+    setColour (juce::PopupMenu::textColourId,          Colours::text);
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, Colours::accent);
+    setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::black);
+    setColour (juce::ScrollBar::thumbColourId,         Colours::outline.brighter (0.2f));
+    setColour (juce::ToggleButton::textColourId,       Colours::text);
+    setColour (juce::ToggleButton::tickColourId,       Colours::accent);
+    setColour (juce::ListBox::backgroundColourId,      Colours::panel);
+    setColour (juce::TextEditor::backgroundColourId,   Colours::panel);
+    setColour (juce::TextEditor::textColourId,         Colours::text);
+    setColour (juce::TextEditor::outlineColourId,      Colours::outline);
+    setColour (juce::TextEditor::highlightColourId,    Colours::accent.withAlpha (0.4f));
+    setColour (juce::CaretComponent::caretColourId,    Colours::accent);
 }
 
 void StudooLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
