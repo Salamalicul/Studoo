@@ -1,28 +1,65 @@
-# 🎛️ Studoo
+<p align="center">
+  <img src="docs/images/banner.png" alt="Studoo: tu estudio para hacer música y beats, en español" width="100%">
+</p>
 
-**Studoo** es un programa para hacer música y beats (una *DAW*), inspirado en FL Studio.
-Funciona en **Windows** y **Linux** y está preparado para adaptarse a **Mac** más adelante.
-Todo está en español y pensado para aprender mientras produces.
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-listo-ff8a1f?style=for-the-badge&logo=windows&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/Linux-listo-ff8a1f?style=for-the-badge&logo=linux&logoColor=white" alt="Linux">
+  <img src="https://img.shields.io/badge/Idioma-español-5fd35a?style=for-the-badge" alt="Español">
+  <img src="https://img.shields.io/badge/Hecho_con-JUCE_+_C++-4fc3f7?style=for-the-badge" alt="JUCE + C++">
+</p>
 
-## ✨ Qué incluye
+<h3 align="center">Haz beats, escribe melodías, graba tu voz y mezcla tu canción.<br>Todo en español, y aprendiendo mientras produces. 🎶</h3>
 
-| Función | Dónde está |
-|---|---|
-| Secuenciador de patrones (16/32/64 pasos), varios patrones | Pestaña **Secuenciador** (F6) |
-| Piano roll para melodías, acordes (con ayudante de acordes) y 808 | Pestaña **Piano roll** (F7) |
-| Playlist para montar la canción con patrones y grabaciones | Pestaña **Playlist** (F5) |
-| Tus samples (WAV, MP3, AIFF, FLAC, OGG) y kits de batería (carpeta entera) | Secuenciador > **+ Añadir**, o arrastrando archivos |
-| Instrumentos: kit de batería, **sampler**, **sintetizador** y **808** con glide | Secuenciador > **+ Añadir** |
-| Mezclador: volumen, panorama, mute/solo, **EQ, compresor, delay y reverb**, medidores | Pestaña **Mezclador** (F9) |
-| Automatización (volumen, panorama, efectos, filtro) | Pestaña **Automatización** (F8) |
-| Grabación de voz o audio con el micrófono | Botón rojo / tecla **R** |
-| Plugins **VST3** (instrumentos y efectos) | Botón **Plugins** + **+ Añadir** / mezclador |
-| Teclados y controladores **MIDI** (se activan solos) | Botón **Audio** |
-| Guardar/abrir proyectos (`.studoo`) y **autoguardado** cada minuto | Menú Archivo (☰) |
-| Deshacer / rehacer (**Ctrl+Z / Ctrl+Y**) | Flechas de la barra superior |
-| Exportar a **WAV** y **MP3** | Menú Archivo (☰) |
-| BPM, metrónomo, modo PATRÓN/CANCIÓN y atajos de teclado | Barra superior |
-| Tutorial "Tu primer beat", botón **?** en cada sección, tooltips y apartado **Aprende** | Pestaña **Aprende** (F1) |
+---
+
+## 🎬 Así es Studoo
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/secuenciador.png" alt="Secuenciador"><p align="center"><b>🥁 Secuenciador de patrones</b><br>Crea ritmos encendiendo pasos</p></td>
+    <td width="50%"><img src="docs/images/pianoroll.png" alt="Piano roll"><p align="center"><b>🎹 Piano roll</b><br>Melodías, acordes y 808 nota a nota</p></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/playlist.png" alt="Playlist"><p align="center"><b>🧩 Playlist</b><br>Coloca los patrones y monta la canción</p></td>
+    <td><img src="docs/images/mezclador.png" alt="Mezclador"><p align="center"><b>🎛️ Mezclador</b><br>EQ, compresor, delay y reverb en cada pista</p></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/tutorial.png" alt="Tutorial"><p align="center"><b>🧭 Tutorial guiado</b><br>Tu primer beat, paso a paso</p></td>
+    <td><img src="docs/images/aprende.png" alt="Aprende"><p align="center"><b>🎓 Aprende</b><br>BPM, 808, acordes, mezcla y más, explicados fácil</p></td>
+  </tr>
+</table>
+
+## ✨ Todo lo que puedes hacer
+
+| | Función | Dónde |
+|---|---|---|
+| 🥁 | Secuenciador de patrones (16/32/64 pasos) y varios patrones | **Secuenciador** (F6) |
+| 🎹 | Piano roll con ayudante de acordes, ideal para el 808 | **Piano roll** (F7) |
+| 🧩 | Playlist para montar la canción completa | **Playlist** (F5) |
+| 📂 | Tus samples (WAV, MP3, AIFF, FLAC, OGG) y kits de batería, arrastrando archivos | **+ Añadir** |
+| 🎸 | Instrumentos: batería incluida, **sampler**, **sintetizador** y **808** con glide | **+ Añadir** |
+| 🎛️ | Mezclador: volumen, panorama, mute/solo, **EQ, compresor, delay y reverb** | **Mezclador** (F9) |
+| 📈 | Automatización de volumen, panorama, efectos y filtro | **Automatización** (F8) |
+| 🎙️ | Grabación de voz con el micrófono | Botón rojo o tecla **R** |
+| 🔌 | Plugins **VST3** (instrumentos y efectos) | Botón **Plugins** |
+| 🎹 | Teclados y controladores **MIDI** | Botón **Audio** |
+| 💾 | Guardar y abrir proyectos, con **autoguardado** cada minuto | Menú ☰ |
+| ↩️ | Deshacer y rehacer (**Ctrl+Z / Ctrl+Y**) | Barra superior |
+| 💿 | Exportar a **WAV** y **MP3** | Menú ☰ |
+| ⏱️ | BPM, metrónomo, modos PATRÓN/CANCIÓN y atajos de teclado | Barra superior |
+| 🎓 | Tutorial, botón **?** en cada sección, mensajes de ayuda y apartado **Aprende** | **Aprende** (F1) |
+
+## ⌨️ Atajos principales
+
+| Tecla | Acción | | Tecla | Acción |
+|---|---|---|---|---|
+| `Espacio` | Reproducir / parar | | `F5` | Playlist |
+| `L` | Modo PATRÓN ↔ CANCIÓN | | `F6` | Secuenciador |
+| `R` | Grabar | | `F7` | Piano roll |
+| `Ctrl+Z` / `Ctrl+Y` | Deshacer / rehacer | | `F8` | Automatización |
+| `Ctrl+S` | Guardar | | `F9` | Mezclador |
+| `Ctrl+E` | Exportar a WAV | | `F1` | Aprende |
 
 ---
 
