@@ -63,14 +63,13 @@
 
 ---
 
-## 📥 Opción A (la más fácil): descargar la app ya hecha
+## 📥 Descargar Studoo (la forma más fácil)
 
-GitHub compila Studoo automáticamente cada vez que se sube un cambio.
+👉 Ve a **[Releases](../../releases/latest)** (a la derecha de la página del proyecto) y descarga:
+- **`Studoo-...-Windows.zip`** si usas Windows.
+- **`Studoo-...-Linux.tar.gz`** si usas Linux.
 
-1. Entra en la página del repositorio en GitHub e inicia sesión.
-2. Pulsa la pestaña **Actions** (arriba).
-3. Haz clic en la ejecución más reciente que tenga un ✅ verde.
-4. Baja hasta **Artifacts** y descarga **Studoo-Windows** o **Studoo-Linux**.
+> Las versiones de prueba más recientes también están en la pestaña **Actions** → la última ejecución con ✅ → **Artifacts**.
 
 ### Windows
 1. Descomprime el `.zip` descargado (clic derecho → *Extraer todo*).
@@ -79,12 +78,11 @@ GitHub compila Studoo automáticamente cada vez que se sube un cambio.
    Sale porque la app es nueva y no está "firmada". Es normal en programas caseros.
 
 ### Linux (Ubuntu y otras distribuciones)
-1. Descomprime el `.zip` descargado. Dentro hay un archivo `Studoo-Linux.tar.gz`.
-2. Abre una terminal en esa carpeta y escribe:
-   ```bash
-   tar -xzf Studoo-Linux.tar.gz
-   ./Studoo-Linux/Studoo
-   ```
+Abre una terminal en la carpeta de descargas y escribe:
+```bash
+tar -xzf Studoo-*-Linux.tar.gz
+./Studoo-Linux/Studoo
+```
 
 ---
 

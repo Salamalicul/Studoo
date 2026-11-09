@@ -66,3 +66,37 @@ jobs:
         with:
           name: Studoo-Windows
           path: build/Studoo_artefacts/Release/Studoo.exe
+
+  # --------------------------------------------------------------------------
+  #  Publicar un "Release" (descarga directa) cuando se sube una etiqueta
+  #  de versión, por ejemplo v1.0.0
+  # --------------------------------------------------------------------------
+  release:
+    name: Publicar release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Preparar archivos
+        run: |
+          mkdir -p Studoo-Windows
+          cp artifacts/Studoo-Windows/Studoo.exe Studoo-Windows/
+          cp README.md Studoo-Windows/LEEME.md
+          zip -r Studoo-${{ github.ref_name }}-Windows.zip Studoo-Windows
+          cp artifacts/Studoo-Linux/Studoo-Linux.tar.gz Studoo-${{ github.ref_name }}-Linux.tar.gz
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Studoo ${{ github.ref_name }}
+          body_path: .github/release-notes.md
+          files: |
+            Studoo-${{ github.ref_name }}-Windows.zip
+            Studoo-${{ github.ref_name }}-Linux.tar.gz
