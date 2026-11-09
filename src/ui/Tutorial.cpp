@@ -107,7 +107,13 @@ void TutorialOverlay::updateLayout()
     if (running)
         if (auto& step = steps[(size_t) current]; step.target != nullptr)
             if (auto* c = step.target(); c != nullptr && c->isShowing())
-                hole = getLocalArea (c, c->getLocalBounds()).expanded (6);
+            {
+                // Solo la parte visible del control (por ejemplo, dentro de una zona con scroll)
+                auto visible = getLocalArea (c, c->getLocalBounds());
+                for (auto* p = c->getParentComponent(); p != nullptr && p != getParentComponent(); p = p->getParentComponent())
+                    visible = visible.getIntersection (getLocalArea (p, p->getLocalBounds()));
+                hole = visible.expanded (6).getIntersection (getLocalBounds());
+            }
 
     // La burbuja se coloca debajo del control resaltado, o encima si no cabe
     const int w = juce::jmin (480, getWidth() - 40);
@@ -120,7 +126,7 @@ void TutorialOverlay::updateLayout()
     else if (hole.getY() - h - 14 > 0)
         b.setPosition (hole.getCentreX() - w / 2, hole.getY() - h - 14);
     else
-        b.setPosition (getWidth() - w - 20, 20);
+        b.setPosition (hole.getRight() - w - 18, hole.getY() + 18); // zona grande: arriba a la derecha, dentro
     b = b.constrainedWithin (getLocalBounds().reduced (12));
 
     if (b != bubble || old != hole)
@@ -133,7 +139,9 @@ void TutorialOverlay::updateLayout()
 
 bool TutorialOverlay::hitTest (int x, int y)
 {
-    // Dentro del "agujero" los clics llegan al control de debajo
+    // La burbuja siempre recibe sus clics; dentro del "agujero" los clics llegan al control de debajo
+    if (bubble.contains (x, y))
+        return true;
     return ! hole.contains (x, y);
 }
 
