@@ -1,0 +1,204 @@
+#include "Toolbar.h"
+#include "HelpTexts.h"
+
+namespace studoo
+{
+Toolbar::Toolbar (AppContext& c)
+    : ctx (c), helpButton (txt (help::toolbarTitle), txt (help::toolbarText))
+{
+    addAndMakeVisible (fileButton);
+    fileButton.setTooltip (txt ("Archivo: nuevo, abrir, guardar, exportar a WAV/MP3, tutorial y atajos de teclado."));
+    fileButton.onClick = [this] { if (onFileMenu) onFileMenu(); };
+
+    addAndMakeVisible (undoButton);
+    undoButton.setTooltip (txt ("Deshacer el último cambio (Ctrl+Z)."));
+    undoButton.onClick = [this] { ctx.project.getUndo().undo(); };
+
+    addAndMakeVisible (redoButton);
+    redoButton.setTooltip (txt ("Rehacer lo que deshiciste (Ctrl+Y)."));
+    redoButton.onClick = [this] { ctx.project.getUndo().redo(); };
+
+    addAndMakeVisible (modeArea);
+    for (auto* b : { &patternModeButton, &songModeButton })
+    {
+        modeArea.addAndMakeVisible (*b);
+        makeNonFocusing (*b);
+        b->setClickingTogglesState (false);
+    }
+    patternModeButton.setButtonText (txt ("PATRÓN"));
+    patternModeButton.setTooltip (txt ("Modo PATRÓN: repite solo el patrón que estás editando. "
+                                       "Ideal para crear el beat. (Tecla L)"));
+    patternModeButton.setConnectedEdges (juce::Button::ConnectedOnRight);
+    patternModeButton.onClick = [this] { ctx.project.getState().setProperty (ids::playMode, "pattern", nullptr); };
+
+    songModeButton.setButtonText (txt ("CANCIÓN"));
+    songModeButton.setTooltip (txt ("Modo CANCIÓN: reproduce la playlist completa, con todos los patrones "
+                                    "colocados en orden. (Tecla L)"));
+    songModeButton.setConnectedEdges (juce::Button::ConnectedOnLeft);
+    songModeButton.onClick = [this] { ctx.project.getState().setProperty (ids::playMode, "song", nullptr); };
+
+    addAndMakeVisible (playButton);
+    playButton.setTooltip (txt ("Reproducir (barra espaciadora)."));
+    playButton.onClick = [this] { ctx.engine.play(); };
+
+    addAndMakeVisible (stopButton);
+    stopButton.setTooltip (txt ("Parar y volver al principio (barra espaciadora)."));
+    stopButton.onClick = [this] { ctx.engine.stop(); };
+
+    addAndMakeVisible (recordButton);
+    recordButton.setTooltip (txt ("Grabar audio con el micrófono (tecla R). Se graba en la playlist, en modo CANCIÓN. "
+                                  "Pulsa otra vez para terminar."));
+    recordButton.onClick = [this] { if (onRecord) onRecord(); };
+
+    addAndMakeVisible (bpmLabel);
+    bpmLabel.setText ("BPM", juce::dontSendNotification);
+    bpmLabel.setColour (juce::Label::textColourId, Colours::textDim);
+    bpmLabel.setJustificationType (juce::Justification::centredRight);
+
+    addAndMakeVisible (bpmSlider);
+    bpmSlider.setSliderStyle (juce::Slider::LinearBar);
+    bpmSlider.setRange (40.0, 250.0, 1.0);
+    bpmSlider.setDoubleClickReturnValue (true, 140.0);
+    bpmSlider.setColour (juce::Slider::textBoxTextColourId, Colours::accent);
+    bpmSlider.setTooltip (txt ("BPM (pulsaciones por minuto): la velocidad de tu canción. Arrastra a izquierda/derecha "
+                               "para cambiarla. Doble clic: 140."));
+    bpmSlider.onDragStart = [this] { ctx.project.beginTransaction(); };
+    makeNonFocusing (bpmSlider);
+
+    addAndMakeVisible (positionLabel);
+    positionLabel.setJustificationType (juce::Justification::centred);
+    positionLabel.setFont (juce::FontOptions (18.0f, juce::Font::bold));
+    positionLabel.setColour (juce::Label::textColourId, Colours::accent);
+    positionLabel.setColour (juce::Label::backgroundColourId, juce::Colour (0xff101316));
+    positionLabel.setTooltip (txt ("Posición: compás . tiempo"));
+
+    addAndMakeVisible (metronomeButton);
+    metronomeButton.setButtonText (txt ("Metrónomo"));
+    metronomeButton.setClickingTogglesState (true);
+    metronomeButton.setTooltip (txt ("Metrónomo: un \"clic\" en cada tiempo para seguir el ritmo (Ctrl+M)."));
+    makeNonFocusing (metronomeButton);
+
+    addAndMakeVisible (volumeKnob);
+
+    addAndMakeVisible (audioButton);
+    audioButton.setButtonText ("Audio");
+    audioButton.setTooltip (txt ("Ajustes de audio y MIDI: altavoces, auriculares, micrófono y teclados MIDI. "
+                                 "En Linux puedes elegir ALSA o JACK."));
+    audioButton.onClick = [this] { if (onAudioSettings) onAudioSettings(); };
+    makeNonFocusing (audioButton);
+
+    addAndMakeVisible (pluginsButton);
+    pluginsButton.setButtonText ("Plugins");
+    pluginsButton.setTooltip (txt ("Busca los plugins VST3 instalados en tu ordenador para poder usarlos."));
+    pluginsButton.onClick = [this] { if (onPlugins) onPlugins(); };
+    makeNonFocusing (pluginsButton);
+
+    addAndMakeVisible (helpButton);
+
+    for (auto* b : { (juce::Component*) &undoButton, (juce::Component*) &redoButton })
+        makeNonFocusing (*b);
+
+    ctx.project.addChangeListener (this);
+    bindToProject();
+    startTimerHz (30);
+}
+
+Toolbar::~Toolbar()
+{
+    ctx.project.removeChangeListener (this);
+}
+
+void Toolbar::bindToProject()
+{
+    auto& state = ctx.project.getState();
+    bpmSlider.getValueObject().referTo (state.getPropertyAsValue (ids::bpm, ctx.project.um()));
+    metronomeButton.getToggleStateValue().referTo (state.getPropertyAsValue (ids::metronome, nullptr));
+    volumeKnob.bind (ctx.project.getMixerTrack (0), ids::volume, ctx.project.um(), 0.0, 1.0, 0.8);
+    updateModeButtons();
+}
+
+void Toolbar::changeListenerCallback (juce::ChangeBroadcaster*)
+{
+    updateModeButtons();
+}
+
+void Toolbar::updateModeButtons()
+{
+    const bool song = ctx.project.getState()[ids::playMode].toString() == "song";
+    patternModeButton.setToggleState (! song, juce::dontSendNotification);
+    songModeButton.setToggleState (song, juce::dontSendNotification);
+    undoButton.setEnabled (ctx.project.getUndo().canUndo());
+    redoButton.setEnabled (ctx.project.getUndo().canRedo());
+}
+
+void Toolbar::togglePlayStop()
+{
+    if (ctx.engine.isPlaying()) ctx.engine.stop();
+    else                        ctx.engine.play();
+}
+
+void Toolbar::timerCallback()
+{
+    const bool playing = ctx.engine.isPlaying();
+    if (playButton.getToggleState() != playing)
+        playButton.setToggleState (playing, juce::dontSendNotification);
+
+    const bool rec = ctx.engine.isRecording();
+    if (recordButton.getToggleState() != rec)
+        recordButton.setToggleState (rec, juce::dontSendNotification);
+
+    const double pos = ctx.engine.getPlayPosition();
+    const int bar = (int) (pos / stepsPerBar) + 1;
+    const int beat = (int) std::fmod (pos, (double) stepsPerBar) / stepsPerBeat + 1;
+    positionLabel.setText (juce::String (bar).paddedLeft ('0', 3) + " . " + juce::String (beat), juce::dontSendNotification);
+
+    undoButton.setEnabled (ctx.project.getUndo().canUndo());
+    redoButton.setEnabled (ctx.project.getUndo().canRedo());
+}
+
+void Toolbar::paint (juce::Graphics& g)
+{
+    g.fillAll (Colours::header);
+    g.setColour (Colours::outline);
+    g.drawHorizontalLine (getHeight() - 1, 0.0f, (float) getWidth());
+
+    g.setFont (juce::FontOptions (24.0f, juce::Font::bold));
+    g.setColour (Colours::accent);
+    g.drawText ("STUDOO", logoArea, juce::Justification::centredLeft);
+}
+
+void Toolbar::resized()
+{
+    auto area = getLocalBounds().reduced (10, 9);
+    auto gap = [&area] (int w) { area.removeFromLeft (w); };
+
+    logoArea = area.removeFromLeft (108);
+    fileButton.setBounds (area.removeFromLeft (38)); gap (10);
+    undoButton.setBounds (area.removeFromLeft (34)); gap (4);
+    redoButton.setBounds (area.removeFromLeft (34)); gap (14);
+
+    modeArea.setBounds (area.removeFromLeft (170));
+    {
+        auto m = modeArea.getLocalBounds();
+        patternModeButton.setBounds (m.removeFromLeft (m.getWidth() / 2));
+        songModeButton.setBounds (m);
+    }
+    gap (10);
+    playButton.setBounds (area.removeFromLeft (44));  gap (4);
+    stopButton.setBounds (area.removeFromLeft (44));  gap (4);
+    recordButton.setBounds (area.removeFromLeft (44)); gap (12);
+
+    bpmLabel.setBounds (area.removeFromLeft (36)); gap (4);
+    bpmSlider.setBounds (area.removeFromLeft (84)); gap (10);
+    positionLabel.setBounds (area.removeFromLeft (90)); gap (10);
+    metronomeButton.setBounds (area.removeFromLeft (96));
+
+    helpButton.setBounds (area.removeFromRight (28).withSizeKeepingCentre (26, 26));
+    area.removeFromRight (8);
+    pluginsButton.setBounds (area.removeFromRight (70));
+    area.removeFromRight (6);
+    audioButton.setBounds (area.removeFromRight (60));
+    area.removeFromRight (8);
+    volumeKnob.setBounds (area.removeFromRight (52).withTrimmedTop (-6).withTrimmedBottom (-6));
+}
+}
