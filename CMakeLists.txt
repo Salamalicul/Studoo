@@ -65,10 +65,12 @@ set(STUDOO_DEFINITIONS
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_USE_MP3AUDIOFORMAT=1
-    JUCE_ALSA=1
-    JUCE_JACK=1
-    JUCE_DISPLAY_SPLASH_SCREEN=0
     STUDOO_VERSION="${PROJECT_VERSION}")
+
+# Sistemas de audio de Linux (ALSA y JACK; PipeWire funciona a través de ambos)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND STUDOO_DEFINITIONS JUCE_ALSA=1 JUCE_JACK=1)
+endif()
 
 target_compile_definitions(Studoo PRIVATE
     ${STUDOO_DEFINITIONS}
