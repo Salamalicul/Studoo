@@ -1,0 +1,68 @@
+# ============================================================================
+#  Compilación automática de Studoo para Windows y Linux.
+#  Cada vez que se suben cambios a GitHub, GitHub compila la app en sus
+#  propios ordenadores y deja los programas listos para descargar
+#  (pestaña "Actions" del repositorio -> la ejecución más reciente -> "Artifacts").
+# ============================================================================
+name: Compilar Studoo
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libasound2-dev libjack-jackd2-dev \
+            libfreetype-dev libfontconfig1-dev libx11-dev libxcomposite-dev \
+            libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev \
+            libgl1-mesa-dev
+
+      - name: Configurar
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSTUDOO_BUILD_TESTS=ON
+
+      - name: Compilar
+        run: cmake --build build
+
+      - name: Pruebas del motor de audio
+        run: ./build/StudooEngineTest_artefacts/Release/StudooEngineTest
+
+      - name: Empaquetar
+        run: |
+          mkdir -p Studoo-Linux
+          cp build/Studoo_artefacts/Release/Studoo Studoo-Linux/
+          chmod +x Studoo-Linux/Studoo
+          tar -czf Studoo-Linux.tar.gz Studoo-Linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Studoo-Linux
+          path: Studoo-Linux.tar.gz
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar
+        run: cmake -B build -DSTUDOO_BUILD_TESTS=ON
+
+      - name: Compilar
+        run: cmake --build build --config Release
+
+      - name: Pruebas del motor de audio
+        run: .\build\StudooEngineTest_artefacts\Release\StudooEngineTest.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Studoo-Windows
+          path: build/Studoo_artefacts/Release/Studoo.exe
