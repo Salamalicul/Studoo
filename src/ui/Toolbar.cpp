@@ -1,5 +1,6 @@
 #include "Toolbar.h"
 #include "HelpTexts.h"
+#include <BinaryData.h>
 
 namespace studoo
 {
@@ -162,9 +163,13 @@ void Toolbar::paint (juce::Graphics& g)
     g.setColour (Colours::outline);
     g.drawHorizontalLine (getHeight() - 1, 0.0f, (float) getWidth());
 
-    g.setFont (juce::FontOptions (24.0f, juce::Font::bold));
+    auto logo = juce::ImageCache::getFromMemory (BinaryData::icon_png, BinaryData::icon_pngSize);
+    auto area = logoArea;
+    g.drawImage (logo, area.removeFromLeft (logoArea.getHeight()).toFloat(), juce::RectanglePlacement::centred);
+    area.removeFromLeft (8);
+    g.setFont (juce::FontOptions (22.0f, juce::Font::bold));
     g.setColour (Colours::accent);
-    g.drawText ("STUDOO", logoArea, juce::Justification::centredLeft);
+    g.drawText ("STUDOO", area, juce::Justification::centredLeft);
 }
 
 void Toolbar::resized()
@@ -172,7 +177,7 @@ void Toolbar::resized()
     auto area = getLocalBounds().reduced (10, 9);
     auto gap = [&area] (int w) { area.removeFromLeft (w); };
 
-    logoArea = area.removeFromLeft (108);
+    logoArea = area.removeFromLeft (142);
     fileButton.setBounds (area.removeFromLeft (38)); gap (10);
     undoButton.setBounds (area.removeFromLeft (34)); gap (4);
     redoButton.setBounds (area.removeFromLeft (34)); gap (14);

@@ -53,6 +53,7 @@ set(STUDOO_ENGINE_SOURCES
 # ----------------------------------------------------------------------------
 juce_add_gui_app(Studoo
     PRODUCT_NAME "Studoo"
+    ICON_BIG resources/icon.png
     COMPANY_NAME "Studoo"
     VERSION ${PROJECT_VERSION})
 
@@ -75,6 +76,9 @@ target_sources(Studoo PRIVATE
 
 target_include_directories(Studoo PRIVATE src)
 
+# Imágenes que van dentro de la app (el logo)
+juce_add_binary_data(StudooData SOURCES resources/icon.png)
+
 set(STUDOO_DEFINITIONS
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
@@ -96,6 +100,7 @@ target_compile_definitions(Studoo PRIVATE
 
 target_link_libraries(Studoo
     PRIVATE
+        StudooData
         juce::juce_audio_utils
         juce::juce_audio_devices
         juce::juce_audio_formats

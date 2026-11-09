@@ -96,7 +96,11 @@ MainComponent::MainComponent()
 
     juce::PropertiesFile::Options options;
     options.applicationName     = "Studoo";
+   #if JUCE_LINUX
+    options.folderName          = ".config/Studoo"; // carpeta oculta de ajustes, como el resto de programas
+   #else
     options.folderName          = "Studoo";
+   #endif
     options.filenameSuffix      = ".settings";
     options.osxLibrarySubFolder = "Application Support";
     settings = std::make_unique<juce::PropertiesFile> (options);
@@ -420,7 +424,7 @@ void MainComponent::checkUnsavedThen (std::function<void()> action)
 
     juce::Component::SafePointer<MainComponent> safe (this);
     juce::AlertWindow::showAsync (juce::MessageBoxOptions()
-                                      .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                                      .withIconType (juce::MessageBoxIconType::NoIcon)
                                       .withTitle (txt ("Cambios sin guardar"))
                                       .withMessage (txt ("¿Quieres guardar los cambios de \"") + project.getDisplayName() + "\"?")
                                       .withButton ("Guardar")
@@ -860,7 +864,7 @@ void MainComponent::checkAutosaveRecovery()
     {
         juce::Component::SafePointer<MainComponent> safe (this);
         juce::AlertWindow::showAsync (juce::MessageBoxOptions()
-                                          .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                                          .withIconType (juce::MessageBoxIconType::NoIcon)
                                           .withTitle (txt ("Recuperar trabajo"))
                                           .withMessage (txt ("Studoo no se cerró correctamente la última vez, pero hay una copia "
                                                              "automática de tu trabajo.\n\n¿Quieres recuperarla?"))
