@@ -19,8 +19,9 @@
 2. Abre una terminal en la carpeta de descargas y escribe:
    ```bash
    tar -xzf Studoo-*-Linux.tar.gz
-   ./Studoo-Linux/Studoo
+   ./Studoo-Linux/instalar.sh
    ```
+3. ¡Listo! Studoo aparece en tu **menú de aplicaciones** (y en el escritorio) con su icono. No pide contraseña.
 
 La primera vez se abre el **tutorial "Tu primer beat"**. ¡Síguelo para hacer tu primer ritmo en 5 minutos!
 
