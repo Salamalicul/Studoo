@@ -49,7 +49,8 @@ jobs:
         run: |
           mkdir -p Studoo-Linux
           cp build/Studoo_artefacts/Release/Studoo Studoo-Linux/
-          chmod +x Studoo-Linux/Studoo
+          cp packaging/linux/instalar.sh packaging/linux/desinstalar.sh packaging/linux/studoo.png Studoo-Linux/
+          chmod +x Studoo-Linux/Studoo Studoo-Linux/*.sh
           tar -czf Studoo-Linux.tar.gz Studoo-Linux
 
       - uses: actions/upload-artifact@v4

@@ -81,8 +81,10 @@
 Abre una terminal en la carpeta de descargas y escribe:
 ```bash
 tar -xzf Studoo-*-Linux.tar.gz
-./Studoo-Linux/Studoo
+./Studoo-Linux/instalar.sh
 ```
+Studoo aparece en tu **menú de aplicaciones** con su icono (no pide contraseña).
+Para desinstalarlo: `~/.local/share/studoo/desinstalar.sh`
 
 ---
 
