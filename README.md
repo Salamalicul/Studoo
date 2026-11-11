@@ -64,28 +64,22 @@
 
 ---
 
-## 📥 Descargar Studoo (la forma más fácil)
+## 📥 Descargar e instalar Studoo
 
-👉 Ve a **[Releases](../../releases/latest)** (a la derecha de la página del proyecto) y descarga:
-- **`Studoo-...-Windows.zip`** si usas Windows.
-- **`Studoo-...-Linux.tar.gz`** si usas Linux.
+👉 Ve a **[Releases](../../releases/latest)** (a la derecha de la página del proyecto) y descarga el que necesites:
+
+| Sistema | Archivo | Cómo se instala |
+|---|---|---|
+| 🪟 **Windows** | `Studoo-...-Instalador-Windows.exe` | Doble clic y "Siguiente". Aparece en el menú Inicio. |
+| 🐧 **Ubuntu / Linux Mint / Debian** | `Studoo-...-Linux.deb` | Doble clic → **Instalar**. Aparece en el menú de aplicaciones. |
+| 🐧 **Otras distribuciones** | `Studoo-...-Linux.tar.gz` | `tar -xzf Studoo-*-Linux.tar.gz` y `./Studoo-Linux/instalar.sh` |
+| 🪟 Windows sin instalar | `Studoo-...-Windows.zip` | Descomprimir y abrir `Studoo.exe` |
+
+- En Windows, si aparece *"Windows protegió su PC"*, pulsa **Más información** → **Ejecutar de todas formas** (sale porque la app es nueva y no está "firmada").
+- Si el `.deb` no se abre con doble clic: `sudo apt install ./Studoo-*-Linux.deb`
+- Desinstalar: Windows → *Configuración → Aplicaciones*; `.deb` → `sudo apt remove studoo`; `.tar.gz` → `~/.local/share/studoo/desinstalar.sh`
 
 > Las versiones de prueba más recientes también están en la pestaña **Actions** → la última ejecución con ✅ → **Artifacts**.
-
-### Windows
-1. Descomprime el `.zip` descargado (clic derecho → *Extraer todo*).
-2. Haz doble clic en **Studoo.exe**.
-3. Si Windows muestra *"Windows protegió su PC"*, pulsa **Más información** → **Ejecutar de todas formas**.
-   Sale porque la app es nueva y no está "firmada". Es normal en programas caseros.
-
-### Linux (Ubuntu y otras distribuciones)
-Abre una terminal en la carpeta de descargas y escribe:
-```bash
-tar -xzf Studoo-*-Linux.tar.gz
-./Studoo-Linux/instalar.sh
-```
-Studoo aparece en tu **menú de aplicaciones** con su icono (no pide contraseña).
-Para desinstalarlo: `~/.local/share/studoo/desinstalar.sh`
 
 ---
 
