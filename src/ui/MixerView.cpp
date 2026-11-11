@@ -145,12 +145,31 @@ void MixerStrip::paint (juce::Graphics& g)
     g.setColour (master ? Colours::accent.withAlpha (0.7f) : Colours::outline);
     g.drawRoundedRectangle (bounds.reduced (0.5f), 8.0f, master ? 1.4f : 1.0f);
 
+    // Color de la pista: el del primer canal que manda su sonido aquí
+    juce::Colour trackColour = Colours::accent;
+    bool used = master;
+    if (! master)
+        for (auto ch : ctx.project.channels())
+            if ((int) ch[ids::mixer] == index)
+            {
+                trackColour = Colours::forChannelType (ch[ids::type].toString());
+                used = true;
+                break;
+            }
+
     // Cabecera con el nombre
     auto head = nameArea.toFloat().expanded (3.0f, 3.0f);
-    g.setColour (master ? Colours::accent.withAlpha (0.18f) : juce::Colours::black.withAlpha (0.25f));
+    g.setColour (master ? Colours::accent.withAlpha (0.18f)
+                        : used ? trackColour.withAlpha (0.12f) : juce::Colours::black.withAlpha (0.25f));
     g.fillRoundedRectangle (head, 6.0f);
+    if (used && ! master)
+    {
+        auto bar = head.withHeight (3.0f).reduced (8.0f, 0.0f).translated (0.0f, -2.0f);
+        Draw::glow (g, bar, trackColour, 5.0f, 1.5f);
+        Draw::colourFill (g, bar, trackColour, 1.5f);
+    }
     auto track = ctx.project.getMixerTrack (index);
-    g.setColour (master ? Colours::accentLight : Colours::text);
+    g.setColour (master ? Colours::accentLight : used ? Colours::text : Colours::textDim);
     g.setFont (Fonts::bold (13.0f));
     const auto name = master ? juce::String ("MASTER") : juce::String (index) + ". " + track[ids::name].toString();
     g.drawFittedText (name, nameArea, juce::Justification::centred, 1, 0.8f);

@@ -53,6 +53,7 @@ namespace studoo
         juce::TextButton audioButton, pluginsButton;
         HelpButton helpButton;
 
-        juce::Rectangle<int> logoArea, transportArea;
+        juce::Rectangle<int> logoArea, transportArea, meterArea;
+        float meterL = 0.0f, meterR = 0.0f;
     };
 }

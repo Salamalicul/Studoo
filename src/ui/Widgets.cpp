@@ -99,17 +99,22 @@ void IconButton::paintButton (juce::Graphics& g, bool isMouseOver, bool isButton
         case Icon::undo:
         case Icon::redo:
         {
-            // Flecha curva
-            juce::Path arc;
-            arc.addCentredArc (r.getCentreX(), r.getCentreY() + size * 0.08f, size * 0.42f, size * 0.38f, 0.0f,
-                               -juce::MathConstants<float>::pi * 0.55f, juce::MathConstants<float>::pi * 0.62f, true);
+            // Flecha en forma de "U" (como en la mayoría de programas)
+            const float top = r.getY() + size * 0.22f, bottom = r.getY() + size * 0.9f;
+            const float rad = (bottom - top) * 0.5f;
+            const float xa = r.getRight() - rad - size * 0.02f;
+            juce::Path arrow;
+            arrow.startNewSubPath (r.getX() + size * 0.3f, top);
+            arrow.lineTo (xa, top);
+            arrow.addCentredArc (xa, top + rad, rad, rad, 0.0f, 0.0f, juce::MathConstants<float>::pi, false);
+            arrow.lineTo (r.getX() + size * 0.22f, bottom);
             const auto flip = icon == Icon::redo ? juce::AffineTransform::scale (-1.0f, 1.0f, r.getCentreX(), r.getCentreY())
                                                  : juce::AffineTransform();
             g.setColour (c);
-            g.strokePath (arc, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), flip);
-            const auto start = arc.getPointAlongPath (0.0f);
+            g.strokePath (arrow, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), flip);
             juce::Path head;
-            head.addTriangle (start.x - 5.0f, start.y - 1.0f, start.x + 3.5f, start.y - 5.5f, start.x + 2.5f, start.y + 4.5f);
+            head.addTriangle (r.getX() - size * 0.04f, top, r.getX() + size * 0.36f, top - size * 0.3f,
+                              r.getX() + size * 0.36f, top + size * 0.3f);
             g.fillPath (head, flip);
             return;
         }

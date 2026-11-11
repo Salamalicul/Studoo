@@ -56,6 +56,7 @@ namespace studoo
         ~PianoRoll() override;
 
         int getChannelUid() const;
+        juce::String getChannelType() const;
         juce::ValueTree getPattern();
         double getSnap() const;
         juce::Array<int> getChordIntervals() const;

@@ -144,6 +144,7 @@ MainComponent::MainComponent()
         b->setTooltip (txt (viewTips[i]));
         b->setClickingTogglesState (false);
         b->getProperties().set ("tab", true);
+        b->getProperties().set ("tabIcon", i);
         b->onClick = [this, i] { showView ((View) i); };
         makeNonFocusing (*b);
         addAndMakeVisible (b);
@@ -950,10 +951,21 @@ void MainComponent::paint (juce::Graphics& g)
     auto area = statusArea.reduced (12, 0);
     if (auto* device = deviceManager.getCurrentAudioDevice())
     {
-        g.setColour (Colours::textDim);
-        const auto text = deviceManager.getCurrentAudioDeviceType() + "  |  " + device->getName() + "  |  "
+        // Cápsula con un punto verde: el audio funciona
+        const auto text = deviceManager.getCurrentAudioDeviceType() + "  ·  " + device->getName() + "  ·  "
                           + juce::String ((int) device->getCurrentSampleRate()) + " Hz";
-        g.drawText (text, area.removeFromRight (420), juce::Justification::centredRight);
+        const float w = juce::GlyphArrangement::getStringWidth (Fonts::regular (12.0f), text) + 34.0f;
+        auto pill = area.removeFromRight ((int) w + 2).toFloat().reduced (0.0f, 4.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.3f));
+        g.fillRoundedRectangle (pill, pill.getHeight() * 0.5f);
+        auto dot = pill.removeFromLeft (pill.getHeight()).withSizeKeepingCentre (7.0f, 7.0f).translated (4.0f, 0.0f);
+        Draw::glow (g, dot, Colours::green, 4.0f, 3.5f);
+        g.setColour (Colours::green);
+        g.fillEllipse (dot);
+        g.setColour (Colours::textDim);
+        g.setFont (Fonts::regular (12.0f));
+        g.drawText (text, pill.withTrimmedLeft (4.0f), juce::Justification::centredLeft);
+        g.setFont (Fonts::regular (12.5f));
     }
     else
     {

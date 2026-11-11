@@ -39,11 +39,67 @@ namespace
     };
 }
 
-// Botón del nombre del canal: clic izquierdo = seleccionar, clic derecho = menú
+// Botón del nombre del canal: clic izquierdo = seleccionar, clic derecho = menú.
+// Tiene una franja con el color del tipo de canal que se ilumina cuando suena.
 class ChannelRack::NameButton : public juce::TextButton
 {
 public:
     std::function<void()> onRightClick;
+    juce::Colour colour { Colours::accent };
+    juce::String typeName;
+    bool selected = false;
+    float activity = 0.0f;
+
+    void setActivity (float a)
+    {
+        a = juce::jlimit (0.0f, 1.0f, a * 1.6f);
+        if (std::abs (a - activity) > 0.02f)
+        {
+            activity = a;
+            repaint();
+        }
+    }
+
+    void paintButton (juce::Graphics& g, bool isMouseOver, bool isButtonDown) override
+    {
+        auto r = getLocalBounds().toFloat().reduced (1.0f);
+        const float corner = 6.0f;
+
+        auto base = Colours::panelLight;
+        if (selected)          base = base.interpolatedWith (colour, 0.18f);
+        if (isButtonDown)      base = base.darker (0.15f);
+        else if (isMouseOver)  base = base.brighter (0.1f);
+
+        g.setGradientFill (juce::ColourGradient (base.brighter (0.08f), 0.0f, r.getY(),
+                                                 base.darker (0.2f), 0.0f, r.getBottom(), false));
+        g.fillRoundedRectangle (r, corner);
+
+        // Franja de color + luz de actividad
+        auto strip = r.withWidth (5.0f).reduced (0.0f, 3.0f).translated (3.0f, 0.0f);
+        if (activity > 0.03f)
+            Draw::glow (g, strip, colour, 3.0f + activity * 7.0f, 2.5f);
+        g.setColour (colour.withMultipliedBrightness (0.55f + 0.45f * activity));
+        g.fillRoundedRectangle (strip, 2.5f);
+        if (activity > 0.03f)
+        {
+            g.setColour (juce::Colours::white.withAlpha (activity * 0.6f));
+            g.fillRoundedRectangle (strip.reduced (1.0f, 2.0f), 2.0f);
+        }
+
+        g.setColour (selected ? colour.withAlpha (0.85f) : juce::Colours::black.withAlpha (0.55f));
+        g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.06f));
+        g.drawHorizontalLine ((int) r.getY() + 1, r.getX() + corner, r.getRight() - corner);
+
+        auto text = r.withTrimmedLeft (14.0f).withTrimmedRight (6.0f);
+        g.setColour (selected ? Colours::text : Colours::text.withAlpha (0.88f));
+        g.setFont (Fonts::bold (13.0f));
+        g.drawFittedText (getButtonText(), text.removeFromTop (r.getHeight() * 0.62f).toNearestInt(),
+                          juce::Justification::bottomLeft, 1, 0.8f);
+        g.setColour (colour.withAlpha (0.75f));
+        g.setFont (Fonts::regular (9.5f));
+        g.drawText (typeName.toUpperCase(), text, juce::Justification::topLeft);
+    }
 
     void mouseDown (const juce::MouseEvent& e) override
     {
@@ -59,6 +115,39 @@ public:
     {
         if (! e.mods.isPopupMenu())
             juce::TextButton::mouseUp (e);
+    }
+};
+
+// Fila "+ Añadir canal" al final de la lista
+class ChannelRack::AddRow : public juce::Button
+{
+public:
+    AddRow() : juce::Button ("addRow")
+    {
+        setTooltip (txt ("Añadir un canal nuevo: un kit de batería, un sonido incluido, tu propio sample, un 808, "
+                         "un sintetizador o un plugin."));
+        makeNonFocusing (*this);
+    }
+
+    void paintButton (juce::Graphics& g, bool isMouseOver, bool isButtonDown) override
+    {
+        auto r = getLocalBounds().toFloat().reduced (6.0f, 6.0f);
+        if (isMouseOver)
+        {
+            g.setColour (Colours::accent.withAlpha (isButtonDown ? 0.14f : 0.08f));
+            g.fillRoundedRectangle (r, 8.0f);
+        }
+        juce::Path outline;
+        outline.addRoundedRectangle (r, 8.0f);
+        juce::Path dashed;
+        const float dashes[] = { 5.0f, 4.0f };
+        juce::PathStrokeType (1.2f).createDashedStroke (dashed, outline, dashes, 2);
+        g.setColour (isMouseOver ? Colours::accent.withAlpha (0.8f) : Colours::outline.brighter (0.25f));
+        g.fillPath (dashed);
+
+        g.setColour (isMouseOver ? Colours::accentLight : Colours::textDim);
+        g.setFont (Fonts::bold (13.0f));
+        g.drawText (txt ("+  Añadir canal"), r, juce::Justification::centred);
     }
 };
 
@@ -137,6 +226,8 @@ void StepGrid::paint (juce::Graphics& g)
         auto channel = ctx.project.findChannel (uid);
         const bool muted = channel[ids::muted];
         const bool isAudio = channel[ids::type].toString() == "audio";
+        const auto colour = Colours::forChannelType (channel[ids::type].toString());
+        const bool orange = colour == Colours::accent;
 
         juce::String data;
         for (auto item : pattern)
@@ -153,21 +244,22 @@ void StepGrid::paint (juce::Graphics& g)
             if (on && ! muted && ! isAudio)
             {
                 // Paso encendido: LED naranja con brillo (más intenso si está sonando)
-                Draw::glow (g, cell, Colours::accent, playing ? 9.0f : 4.0f, corner);
-                Draw::accentFill (g, cell, corner);
+                Draw::glow (g, cell, colour, playing ? 9.0f : 4.0f, corner);
+                if (orange) Draw::accentFill (g, cell, corner);
+                else        Draw::colourFill (g, cell, colour, corner);
                 if (playing)
                 {
                     g.setColour (juce::Colours::white.withAlpha (0.35f));
                     g.fillRoundedRectangle (cell, corner);
                 }
-                g.setColour (Colours::accentDeep.darker (0.4f));
+                g.setColour ((orange ? Colours::accentDeep : colour).darker (0.6f));
                 g.drawRoundedRectangle (cell.reduced (0.5f), corner, 1.0f);
                 continue;
             }
 
             // Paso apagado
             juce::Colour base = ((s / 4) % 2 == 0) ? Colours::stepOffA : Colours::stepOffB;
-            if (on) base = Colours::accent.withMultipliedSaturation (0.3f).withMultipliedBrightness (0.5f); // en mute
+            if (on) base = colour.withMultipliedSaturation (0.3f).withMultipliedBrightness (0.5f); // en mute
             if (playing) base = base.brighter (0.25f);
             if (isAudio) base = base.withAlpha (0.35f);
 
@@ -197,7 +289,7 @@ void StepGrid::paint (juce::Graphics& g)
                                                          (float) getWidth(), (float) ChannelRack::rowHeight - 16.0f);
             const float range = (float) juce::jmax (1, hi - lo);
             const float pxPerStep = (getCellBounds (0, length - 1).getRight() + cellGap) / (float) length;
-            g.setColour (Colours::accentLight.withAlpha (0.9f));
+            g.setColour (colour.brighter (0.3f).withAlpha (0.95f));
             for (auto& n : notes)
             {
                 const float x = (float) (double) n[ids::start] * pxPerStep;
@@ -323,6 +415,9 @@ ChannelRack::ChannelRack (AppContext& c)
     viewport.setViewedComponent (&content, false);
     viewport.setScrollBarsShown (true, false);
     content.addAndMakeVisible (grid);
+    addRow = std::make_unique<AddRow>();
+    addRow->onClick = [this] { showAddMenu(); };
+    content.addAndMakeVisible (*addRow);
     content.onPaint = [this] (juce::Graphics& g)
     {
         const int selected = ctx.project.getSelectedChannel();
@@ -336,12 +431,13 @@ ChannelRack::ChannelRack (AppContext& c)
             }
             if (rows[r]->uid == selected)
             {
-                g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.16f), 0.0f, 0.0f,
-                                                         Colours::accent.withAlpha (0.0f), (float) controlsWidth + 120.0f, 0.0f, false));
+                const auto c = rows[r]->name.colour;
+                g.setGradientFill (juce::ColourGradient (c.withAlpha (0.16f), 0.0f, 0.0f,
+                                                         c.withAlpha (0.0f), (float) controlsWidth + 120.0f, 0.0f, false));
                 g.fillRect (rowArea);
                 auto bar = rowArea.removeFromLeft (3).toFloat().reduced (0.0f, 6.0f);
-                Draw::glow (g, bar, Colours::accent, 5.0f, 1.5f);
-                Draw::accentFill (g, bar, 1.5f);
+                Draw::glow (g, bar, c, 5.0f, 1.5f);
+                Draw::colourFill (g, bar, c, 1.5f);
             }
             g.setColour (juce::Colours::black.withAlpha (0.3f));
             g.drawHorizontalLine ((r + 1) * rowHeight - 1, 0.0f, (float) content.getWidth());
@@ -395,6 +491,7 @@ void ChannelRack::changeListenerCallback (juce::ChangeBroadcaster*)
     {
         auto ch = ctx.project.findChannel (row->uid);
         row->name.setButtonText (ch[ids::name].toString());
+        row->name.selected = (row->uid == ctx.project.getSelectedChannel());
         row->mute.setToggleState (! (bool) ch[ids::muted], juce::dontSendNotification);
         row->mixerBox.setSelectedId ((int) ch[ids::mixer] + 1, juce::dontSendNotification);
     }
@@ -450,6 +547,10 @@ void ChannelRack::rebuildRows()
 
         content.addAndMakeVisible (row->name);
         row->name.setButtonText (ch[ids::name].toString());
+        row->name.colour = Colours::forChannelType (ch[ids::type].toString());
+        row->name.typeName = Colours::channelTypeName (ch[ids::type].toString());
+        if (ch[ids::type].toString() == "sampler" && ch[ids::sample].toString().startsWith ("builtin:"))
+            row->name.typeName = txt ("Batería");
         row->name.setTooltip (txt ("Clic: seleccionar y escuchar este canal. Clic derecho: más opciones "
                                    "(piano roll, renombrar, cambiar sample, eliminar)."));
         row->name.onClick = [this, uid]
@@ -461,6 +562,8 @@ void ChannelRack::rebuildRows()
         row->name.onRightClick = [this, uid] { showChannelMenu (uid); };
         makeNonFocusing (row->name);
 
+        for (auto* k : { &row->volume, &row->pan })
+            k->getSlider().setColour (juce::Slider::rotarySliderFillColourId, row->name.colour);
         content.addAndMakeVisible (row->volume);
         row->volume.bind (ch, ids::volume, ctx.project.um(), 0.0, 1.0, 0.8);
         content.addAndMakeVisible (row->pan);
@@ -495,6 +598,10 @@ void ChannelRack::timerCallback()
 {
     const bool showPlayhead = ctx.engine.isPlaying() && ! ctx.engine.isSongMode();
     grid.setPlayingStep (showPlayhead ? (int) ctx.engine.getPlayPosition() : -1);
+
+    if (isShowing())
+        for (auto* row : rows)
+            row->name.setActivity (ctx.engine.getChannelActivity (row->uid));
 }
 
 void ChannelRack::paint (juce::Graphics& g)
@@ -548,7 +655,8 @@ void ChannelRack::resized()
     viewport.setBounds (area);
 
     const int width = viewport.getWidth() - viewport.getScrollBarThickness();
-    content.setSize (width, juce::jmax (rows.size() * rowHeight, 10));
+    content.setSize (width, rows.size() * rowHeight + rowHeight + 4);
+    addRow->setBounds (0, rows.size() * rowHeight + 2, controlsWidth - 4, rowHeight);
     grid.setBounds (controlsWidth, 0, width - controlsWidth - 4, rows.size() * rowHeight);
 
     for (int r = 0; r < rows.size(); ++r)

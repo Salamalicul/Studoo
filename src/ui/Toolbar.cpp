@@ -156,6 +156,15 @@ void Toolbar::timerCallback()
 
     undoButton.setEnabled (ctx.project.getUndo().canUndo());
     redoButton.setEnabled (ctx.project.getUndo().canRedo());
+
+    // Medidor del volumen general (Master)
+    const float l = ctx.engine.getTrackPeak (0, 0), r = ctx.engine.getTrackPeak (0, 1);
+    if (std::abs (l - meterL) > 0.003f || std::abs (r - meterR) > 0.003f)
+    {
+        meterL = l;
+        meterR = r;
+        repaint (meterArea);
+    }
 }
 
 void Toolbar::paint (juce::Graphics& g)
@@ -193,6 +202,34 @@ void Toolbar::paint (juce::Graphics& g)
     g.setColour (Colours::textDim.withAlpha (0.7f));
     g.setFont (Fonts::regular (9.0f));
     g.drawText (txt ("COMPÁS . TIEMPO"), positionLabel.getBounds().removeFromBottom (11), juce::Justification::centred);
+
+    // Medidor Master: dos barras LED (izquierda y derecha)
+    if (! meterArea.isEmpty())
+    {
+        auto m = meterArea.toFloat();
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillRoundedRectangle (m, 4.0f);
+        g.setColour (Colours::outline.withAlpha (0.8f));
+        g.drawRoundedRectangle (m.reduced (0.5f), 4.0f, 1.0f);
+        auto inner = m.reduced (3.0f);
+        const float barW = (inner.getWidth() - 2.0f) * 0.5f;
+        const int segments = 14;
+        const float segH = inner.getHeight() / (float) segments;
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const float level = juce::jlimit (0.0f, 1.0f, std::sqrt (ch == 0 ? meterL : meterR));
+            const int lit = juce::roundToInt (level * (float) segments);
+            for (int sIdx = 0; sIdx < segments; ++sIdx)
+            {
+                auto seg = juce::Rectangle<float> (inner.getX() + (float) ch * (barW + 2.0f),
+                                                   inner.getBottom() - (float) (sIdx + 1) * segH, barW, segH - 1.0f);
+                const juce::Colour c = sIdx >= segments - 2 ? Colours::red
+                                     : sIdx >= segments - 5 ? juce::Colour (0xffffd24a) : Colours::green;
+                g.setColour (sIdx < lit ? c : c.withAlpha (0.12f));
+                g.fillRect (seg);
+            }
+        }
+    }
 }
 
 void Toolbar::resized()
@@ -233,6 +270,8 @@ void Toolbar::resized()
     area.removeFromRight (6);
     audioButton.setBounds (area.removeFromRight (60));
     area.removeFromRight (8);
+    meterArea = area.removeFromRight (16).withSizeKeepingCentre (16, 40);
+    area.removeFromRight (2);
     volumeKnob.setBounds (area.removeFromRight (52).withTrimmedTop (-6).withTrimmedBottom (-6));
 }
 }

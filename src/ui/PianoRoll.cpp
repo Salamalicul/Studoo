@@ -79,6 +79,13 @@ void PianoRollGrid::paint (juce::Graphics& g)
         }
     }
 
+    // Compases alternos un poco más claros (ayuda a orientarse)
+    for (int bar = 1; bar * 16 < length; bar += 2)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.018f));
+        g.fillRect (juce::Rectangle<float> (stepsToX (bar * 16), 0.0f, (float) (16.0 * sw), (float) getHeight()));
+    }
+
     // Líneas verticales: pasos, tiempos y compases
     for (int s = 0; s <= length; ++s)
     {
@@ -97,7 +104,11 @@ void PianoRollGrid::paint (juce::Graphics& g)
                                     (float) ((double) n[ids::length] * sw), (float) rowHeight - 2.0f, 3.0f);
         }
 
-    // Notas del canal
+    // Notas del canal (con el color de su tipo: naranja, azul, morado...)
+    const auto channelType = roll.getChannelType();
+    const auto colour = Colours::forChannelType (channelType);
+    const bool orange = colour == Colours::accent;
+    int ownNotes = 0;
     for (auto n : pattern)
     {
         if (! n.hasType (ids::NOTE) || (int) n[ids::channel] != uid)
@@ -105,21 +116,23 @@ void PianoRollGrid::paint (juce::Graphics& g)
         auto r = juce::Rectangle<float> (stepsToX (n[ids::start]), (float) yForNote (n[ids::pitch]),
                                          (float) ((double) n[ids::length] * sw), (float) rowHeight).reduced (0.5f, 0.5f);
         const float vel = n.getProperty (ids::velocity, 0.8f);
-        Draw::glow (g, r, Colours::accent, 4.0f, 3.5f);
-        Draw::accentFill (g, r, 3.5f);
+        ++ownNotes;
+        Draw::glow (g, r, colour, 4.0f, 3.5f);
+        if (orange) Draw::accentFill (g, r, 3.5f);
+        else        Draw::colourFill (g, r, colour, 3.5f);
         if (vel < 0.7f)
         {
             g.setColour (juce::Colours::black.withAlpha ((0.7f - vel) * 0.8f));
             g.fillRoundedRectangle (r, 3.5f);
         }
-        g.setColour (Colours::accentDeep.darker (0.5f));
+        g.setColour ((orange ? Colours::accentDeep : colour).darker (0.7f));
         g.drawRoundedRectangle (r, 3.5f, 1.0f);
         // Asa para alargar
         g.setColour (juce::Colours::black.withAlpha (0.3f));
         g.fillRoundedRectangle (r.withLeft (r.getRight() - 4.0f).reduced (1.0f, 2.5f), 1.0f);
         if (r.getWidth() > 30.0f)
         {
-            g.setColour (juce::Colour (0xff2a1500));
+            g.setColour (colour.darker (0.9f).withMultipliedSaturation (0.6f).darker (0.6f));
             g.setFont (Fonts::bold (10.0f));
             g.drawText (noteName (n[ids::pitch]), r.reduced (4.0f, 0.0f), juce::Justification::centredLeft);
         }
@@ -161,6 +174,28 @@ void PianoRollGrid::paint (juce::Graphics& g)
     g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.5f), (float) keyboardWidth, 0.0f,
                                              juce::Colours::transparentBlack, (float) keyboardWidth + 8.0f, 0.0f, false));
     g.fillRect ((float) keyboardWidth, 0.0f, 8.0f, (float) getHeight());
+
+    // Sin notas: un pequeño cartel que explica qué hacer
+    if (ownNotes == 0)
+        if (auto* vp = findParentComponentOfClass<juce::Viewport>())
+        {
+            auto view = vp->getViewArea().toFloat().withTrimmedLeft ((float) keyboardWidth);
+            auto card = view.withSizeKeepingCentre (380.0f, 92.0f);
+            Draw::shadow (g, card, 12.0f, 16);
+            g.setColour (Colours::panel.withAlpha (0.94f));
+            g.fillRoundedRectangle (card, 12.0f);
+            g.setColour (colour.withAlpha (0.6f));
+            g.drawRoundedRectangle (card.reduced (0.5f), 12.0f, 1.2f);
+            auto inner = card.reduced (18.0f, 14.0f);
+            g.setColour (Colours::text);
+            g.setFont (Fonts::bold (15.0f));
+            g.drawText (txt ("Haz clic en la cuadrícula para poner notas"), inner.removeFromTop (24.0f), juce::Justification::centred);
+            g.setColour (Colours::textDim);
+            g.setFont (Fonts::regular (12.5f));
+            g.drawFittedText (txt ("Arrastra una nota para moverla y su borde derecho para alargarla. "
+                                   "Clic derecho la borra. Usa \"Acorde\" para poner varias a la vez."),
+                              inner.toNearestInt(), juce::Justification::centred, 3, 1.0f);
+        }
 
     // Cursor de reproducción
     if (playhead >= 0.0)
@@ -347,6 +382,11 @@ int PianoRoll::getChannelUid() const
 {
     const int uid = ctx.project.getSelectedChannel();
     return channelUids.contains (uid) ? uid : (channelUids.isEmpty() ? 0 : channelUids[0]);
+}
+
+juce::String PianoRoll::getChannelType() const
+{
+    return ctx.project.findChannel (getChannelUid())[ids::type].toString();
 }
 
 juce::ValueTree PianoRoll::getPattern()
