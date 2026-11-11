@@ -38,7 +38,8 @@
 | 🎹 | Piano roll con ayudante de acordes, ideal para el 808 | **Piano roll** (F7) |
 | 🧩 | Playlist para montar la canción completa | **Playlist** (F5) |
 | 📂 | Tus samples (WAV, MP3, AIFF, FLAC, OGG) y kits de batería, arrastrando archivos | **+ Añadir** |
-| 🥁 | **6 kits de batería incluidos**: Trap, Drill, Boom Bap, Reggaetón, House y Lo-fi (cambia de kit sin perder tu ritmo) | **+ Añadir** |
+| 🥁 | **18 kits de batería incluidos** (más de 200 sonidos): Trap, Drill, Boom Bap, Reggaetón, House, Lo-fi, Phonk, Afrobeat, Dancehall, R&B, Techno, Jersey Club, Dubstep, Pop, Synthwave, Clásico 808, Clásico 909 y Percusión latina. Cambia de kit sin perder tu ritmo | **+ Añadir** |
+| 💥 | **Efectos FX** (subidas, impactos, caídas de sub...), **14 sonidos de sintetizador** ya preparados y **6 tipos de 808** | **+ Añadir** |
 | 🎸 | Instrumentos: **sampler**, **sintetizador** y **808** con glide | **+ Añadir** |
 | 🎛️ | Mezclador: volumen, panorama, mute/solo, **EQ, compresor, delay y reverb** | **Mezclador** (F9) |
 | 📈 | Automatización de volumen, panorama, efectos y filtro | **Automatización** (F8) |

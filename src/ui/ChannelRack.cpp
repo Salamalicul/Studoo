@@ -612,11 +612,18 @@ void ChannelRack::loadSampleInto (juce::ValueTree channel)
 void ChannelRack::showAddMenu()
 {
     juce::PopupMenu menu;
-    menu.addSectionHeader (txt ("Kits de batería incluidos"));
+    // Kits de batería y efectos incluidos
     const auto& kitList = kits::all();
+    juce::PopupMenu drumKits, effects;
     for (size_t k = 0; k < kitList.size(); ++k)
     {
         const auto& kit = kitList[k];
+        if (kit.isEffects)
+        {
+            for (size_t i = 0; i < kit.sounds.size(); ++i)
+                effects.addItem (1000 + (int) k * 50 + (int) i, txt (kit.sounds[i].name));
+            continue;
+        }
         juce::PopupMenu sub;
         sub.addSectionHeader (txt (kit.description));
         sub.addItem (200 + (int) k * 2, txt ("Usar este kit (cambia los sonidos de tu batería y conserva el ritmo)"));
@@ -624,15 +631,29 @@ void ChannelRack::showAddMenu()
         sub.addSeparator();
         for (size_t i = 0; i < kit.sounds.size(); ++i)
             sub.addItem (1000 + (int) k * 50 + (int) i, txt ("Añadir solo: ") + txt (kit.sounds[i].name));
-        menu.addSubMenu (txt (kit.name), sub);
+        drumKits.addSubMenu (txt (kit.name) + "  (" + juce::String ((int) kit.sounds.size()) + ")", sub);
     }
+
+    juce::PopupMenu synths;
+    synths.addItem (3, txt ("Sintetizador básico"));
+    synths.addSeparator();
+    synths.addSectionHeader (txt ("Sonidos ya preparados"));
+    for (size_t i = 0; i < kits::synthPresets().size(); ++i)
+        synths.addItem (3000 + (int) i, txt (kits::synthPresets()[i].name) + "  -  " + txt (kits::synthPresets()[i].description));
+
+    juce::PopupMenu basses;
+    for (size_t i = 0; i < kits::bass808Presets().size(); ++i)
+        basses.addItem (4000 + (int) i, txt (kits::bass808Presets()[i].name) + "  -  " + txt (kits::bass808Presets()[i].description));
+
+    menu.addSectionHeader (txt ("Sonidos incluidos en Studoo"));
+    menu.addSubMenu (txt ("Kits de batería"), drumKits);
+    menu.addSubMenu ("808", basses);
+    menu.addSubMenu (txt ("Sintetizador"), synths);
+    menu.addSubMenu (txt ("Efectos (FX)"), effects);
     menu.addSeparator();
-    menu.addSectionHeader (txt ("Añadir canal"));
+    menu.addSectionHeader (txt ("Tus propios sonidos"));
     menu.addItem (1, txt ("Sample (WAV, MP3...)"));
     menu.addItem (2, txt ("Kit de batería (todos los samples de una carpeta)"));
-    menu.addSeparator();
-    menu.addItem (3, txt ("Sintetizador"));
-    menu.addItem (4, "808");
     menu.addSeparator();
 
     juce::PopupMenu plugins;
@@ -686,7 +707,21 @@ void ChannelRack::showAddMenu()
             else
                 ctx.project.addKit (kit);
         }
-        else if (result >= 1000)
+        else if (result >= 3000 && result < 3000 + (int) kits::synthPresets().size())
+        {
+            ctx.project.beginTransaction();
+            auto ch = ctx.project.addSynthPreset (kits::synthPresets()[(size_t) (result - 3000)]);
+            ctx.project.setSelectedChannel (ch[ids::uid]);
+            ctx.engine.previewNote (ch[ids::uid], ch[ids::root], 0.8f, 0.6);
+        }
+        else if (result >= 4000 && result < 4000 + (int) kits::bass808Presets().size())
+        {
+            ctx.project.beginTransaction();
+            auto ch = ctx.project.add808Preset (kits::bass808Presets()[(size_t) (result - 4000)]);
+            ctx.project.setSelectedChannel (ch[ids::uid]);
+            ctx.engine.previewNote (ch[ids::uid], 36, 0.8f, 0.8);
+        }
+        else if (result >= 1000 && result < 3000)
         {
             const auto k = (size_t) (result - 1000) / 50, i = (size_t) (result - 1000) % 50;
             if (k < kits::all().size() && i < kits::all()[k].sounds.size())

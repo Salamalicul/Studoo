@@ -194,7 +194,8 @@ int main (int argc, char* argv[])
                 else
                     std::cout << "    sonido con problemas: " << kit.id << "/" << sound.id << "\n";
             }
-        check (total == ok && total >= 30, "Todos los sonidos de los kits se generan bien");
+        std::cout << "    " << kits::all().size() << " kits, " << total << " sonidos\n";
+        check (total == ok && total >= 200, "Todos los sonidos de los kits se generan bien");
 
         // "Usar este kit" cambia los sonidos y conserva el ritmo
         Project p;
@@ -207,7 +208,9 @@ int main (int argc, char* argv[])
         auto kick = p.findChannel (kickUid);
         check (kick[ids::sample].toString() == "builtin:trap/kick", "Usar el kit Trap cambia el sonido del bombo");
         check (p.getStep (pattern, kickUid, 0) && p.getStep (pattern, kickUid, 8), "El ritmo del bombo se conserva");
-        check (p.channels().getNumChildren() == channelsBefore + 4, "Se añaden los sonidos que faltaban (hi-hat abierto, rim, perc, chasquido)");
+        // Bombo, caja, hi-hat y palmada ya existían: se añaden solo los demás sonidos del kit
+        check (p.channels().getNumChildren() == channelsBefore + (int) kits::find ("trap")->sounds.size() - 4,
+               "Se añaden los sonidos del kit que faltaban");
         check ((float) p.findChannelByType (ChannelType::bass808)[ids::decay] > 2.0f, "El 808 se ajusta al estilo trap");
         p.getUndo().undo();
         check (p.findChannel (kickUid)[ids::sample].toString() == "builtin:kick", "Ctrl+Z deshace el cambio de kit");
@@ -227,6 +230,30 @@ int main (int argc, char* argv[])
         auto audio = renderSeconds (e, 1.0);
         check (audio.getRMSLevel (0, 0, audio.getNumSamples()) > 0.03f && isFinite (audio), "El kit Reggaetón suena en el secuenciador");
 
+        // Sonidos de sintetizador preparados y tipos de 808
+        int presetsOk = 0, presetsTotal = 0;
+        auto testPreset = [&] (std::function<juce::ValueTree (Project&)> add, int note)
+        {
+            ++presetsTotal;
+            Project pp;
+            pp.channels().removeAllChildren (nullptr);
+            auto ch = add (pp);
+            pp.addNote (pp.getCurrentPattern(), ch[ids::uid], 0.0, 8.0, note);
+            AudioEngine pe;
+            pe.prepare (sampleRate, blockSize);
+            pe.updateFromProject (pp.getState(), cache);
+            pe.play();
+            auto out = renderSeconds (pe, 1.0);
+            if (out.getRMSLevel (0, 0, out.getNumSamples()) > 0.005f && isFinite (out) && out.getMagnitude (0, 0, out.getNumSamples()) <= 1.0f)
+                ++presetsOk;
+        };
+        for (auto& sp : kits::synthPresets())
+            testPreset ([&sp] (Project& pp) { return pp.addSynthPreset (sp); }, sp.root);
+        for (auto& bp : kits::bass808Presets())
+            testPreset ([&bp] (Project& pp) { return pp.add808Preset (bp); }, 36);
+        std::cout << "    " << presetsTotal << " sonidos de sintetizador y 808\n";
+        check (presetsOk == presetsTotal, "Todos los sonidos de sintetizador y los tipos de 808 suenan");
+
         // Muestras de cada kit para escucharlas
         for (auto& kit : kits::all())
         {
@@ -240,6 +267,10 @@ int main (int argc, char* argv[])
                     demo.copyFrom (0, pos, sample->buffer, 0, 0, juce::jmin (sample->buffer.getNumSamples(), (int) (sampleRate * 0.5)));
                 pos += (int) (sampleRate * 0.5);
             }
+            juce::StringArray soundIds;
+            for (auto& sound : kit.sounds)
+                soundIds.add (sound.id);
+            outDir.getChildFile (juce::String ("kit_") + kit.id + ".txt").replaceWithText (soundIds.joinIntoString (","));
             auto f = outDir.getChildFile (juce::String ("kit_") + kit.id + ".wav");
             f.deleteFile();
             juce::WavAudioFormat wav;
