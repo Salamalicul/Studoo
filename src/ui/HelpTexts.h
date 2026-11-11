@@ -36,7 +36,8 @@ namespace studoo::help
         "- Número: a qué pista del mezclador va su sonido.\n\n"
         "Arriba puedes cambiar de patrón, crear patrones nuevos, elegir la duración (16, 32 o 64 pasos) "
         "y añadir canales: samples, kits de batería, sintetizador, 808 o plugins VST3.\n\n"
-        "KITS INCLUIDOS: en \"+ Añadir\" tienes 6 kits (Trap, Drill, Boom Bap, Reggaetón, House y Lo-fi). "
+        "SONIDOS INCLUIDOS: en \"+ Añadir\" tienes 18 kits de batería (Trap, Drill, Reggaetón, Phonk, Afrobeat, House, Lo-fi...), "
+        "efectos FX, 14 sonidos de sintetizador ya preparados y 6 tipos de 808. "
         "\"Usar este kit\" cambia los sonidos de tu batería por los del kit SIN perder el ritmo que ya has escrito.\n\n"
         "TRUCO: arrastra archivos WAV o MP3 desde tu explorador de archivos hasta aquí para añadirlos como canales.";
 

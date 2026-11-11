@@ -104,6 +104,8 @@ namespace studoo
         juce::ValueTree addKitSound (const kits::KitInfo&, const kits::SoundInfo&);
         void addKit (const kits::KitInfo&);       // añade todos sus sonidos como canales nuevos
         void useKit (const kits::KitInfo&);       // cambia los sonidos de la batería actual (conserva los pasos)
+        juce::ValueTree addSynthPreset (const kits::SynthPreset&);
+        juce::ValueTree add808Preset (const kits::Bass808Named&);
 
         int  getSelectedChannel();
         void setSelectedChannel (int uid);

@@ -521,6 +521,38 @@ void Project::useKit (const kits::KitInfo& kit)
     }
 }
 
+juce::ValueTree Project::addSynthPreset (const kits::SynthPreset& p)
+{
+    const auto name = juce::String::fromUTF8 (p.name);
+    const int track = findFreeMixerTrack();
+    auto ch = addChannel (ChannelType::synth, name, track);
+    ch.setProperty (ids::wave, p.wave, &undoManager);
+    ch.setProperty (ids::attack, p.attack, &undoManager);
+    ch.setProperty (ids::decay, p.decay, &undoManager);
+    ch.setProperty (ids::sustain, p.sustain, &undoManager);
+    ch.setProperty (ids::release, p.release, &undoManager);
+    ch.setProperty (ids::cutoff, p.cutoff, &undoManager);
+    ch.setProperty (ids::resonance, p.resonance, &undoManager);
+    ch.setProperty (ids::detune, p.detune, &undoManager);
+    ch.setProperty (ids::root, p.root, &undoManager);
+    if (track > 0)
+        getMixerTrack (track).setProperty (ids::name, name.substring (0, 12), &undoManager);
+    return ch;
+}
+
+juce::ValueTree Project::add808Preset (const kits::Bass808Named& p)
+{
+    const auto name = juce::String::fromUTF8 (p.name);
+    const int track = findFreeMixerTrack();
+    auto ch = addChannel (ChannelType::bass808, name, track);
+    ch.setProperty (ids::decay, p.decay, &undoManager);
+    ch.setProperty (ids::glide, p.glide, &undoManager);
+    ch.setProperty (ids::drive, p.drive, &undoManager);
+    if (track > 0)
+        getMixerTrack (track).setProperty (ids::name, "808", &undoManager);
+    return ch;
+}
+
 int Project::getSelectedChannel()
 {
     return (int) state[ids::selectedChannel];
