@@ -148,7 +148,10 @@ void InstrumentPanel::refresh()
     if (type == ChannelType::sampler || type == ChannelType::audio)
     {
         const auto path = channel[ids::sample].toString();
-        juce::String text = path.startsWith ("builtin:") ? txt ("Sonido incluido en Studoo")
+        juce::String text = path.startsWith ("builtin:")
+                              ? (path.containsChar ('/') && kits::find (path.fromFirstOccurrenceOf ("builtin:", false, false).upToFirstOccurrenceOf ("/", false, false)) != nullptr
+                                     ? txt ("Sonido incluido · kit ") + txt (kits::find (path.fromFirstOccurrenceOf ("builtin:", false, false).upToFirstOccurrenceOf ("/", false, false))->name)
+                                     : txt ("Sonido incluido en Studoo"))
                           : path.isEmpty()                ? txt ("Sin sample: pulsa \"Cargar sample...\"")
                                                           : juce::File (path).getFileName();
         if (type == ChannelType::audio)

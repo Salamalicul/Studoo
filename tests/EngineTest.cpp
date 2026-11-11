@@ -178,6 +178,77 @@ int main (int argc, char* argv[])
         engine.updateFromProject (project.getState(), cache);
     }
 
+    // --- Kits incluidos -------------------------------------------------------------------
+    std::cout << "Kits incluidos\n";
+    {
+        int total = 0, ok = 0;
+        for (auto& kit : kits::all())
+            for (auto& sound : kit.sounds)
+            {
+                ++total;
+                auto sample = cache.get (kits::samplePath (kit, sound));
+                if (sample != nullptr && sample->buffer.getNumSamples() > 100 && isFinite (sample->buffer)
+                    && sample->buffer.getMagnitude (0, sample->buffer.getNumSamples()) > 0.5f
+                    && sample->buffer.getMagnitude (0, sample->buffer.getNumSamples()) <= 1.0f)
+                    ++ok;
+                else
+                    std::cout << "    sonido con problemas: " << kit.id << "/" << sound.id << "\n";
+            }
+        check (total == ok && total >= 30, "Todos los sonidos de los kits se generan bien");
+
+        // "Usar este kit" cambia los sonidos y conserva el ritmo
+        Project p;
+        auto pattern = p.getCurrentPattern();
+        p.loadExampleBeat (pattern);
+        const int channelsBefore = p.channels().getNumChildren();
+        const int kickUid = p.findChannelByBuiltin ("builtin:kick")[ids::uid];
+        p.beginTransaction();
+        p.useKit (*kits::find ("trap"));
+        auto kick = p.findChannel (kickUid);
+        check (kick[ids::sample].toString() == "builtin:trap/kick", "Usar el kit Trap cambia el sonido del bombo");
+        check (p.getStep (pattern, kickUid, 0) && p.getStep (pattern, kickUid, 8), "El ritmo del bombo se conserva");
+        check (p.channels().getNumChildren() == channelsBefore + 4, "Se añaden los sonidos que faltaban (hi-hat abierto, rim, perc, chasquido)");
+        check ((float) p.findChannelByType (ChannelType::bass808)[ids::decay] > 2.0f, "El 808 se ajusta al estilo trap");
+        p.getUndo().undo();
+        check (p.findChannel (kickUid)[ids::sample].toString() == "builtin:kick", "Ctrl+Z deshace el cambio de kit");
+
+        // El kit suena
+        Project q;
+        q.channels().removeAllChildren (nullptr);
+        q.addKit (*kits::find ("reggaeton"));
+        auto qp = q.getCurrentPattern();
+        for (auto ch : q.channels())
+            for (int st : { 0, 4, 8, 12 })
+                q.setStep (qp, ch[ids::uid], st, true);
+        AudioEngine e;
+        e.prepare (sampleRate, blockSize);
+        e.updateFromProject (q.getState(), cache);
+        e.play();
+        auto audio = renderSeconds (e, 1.0);
+        check (audio.getRMSLevel (0, 0, audio.getNumSamples()) > 0.03f && isFinite (audio), "El kit Reggaetón suena en el secuenciador");
+
+        // Muestras de cada kit para escucharlas
+        for (auto& kit : kits::all())
+        {
+            juce::AudioBuffer<float> demo (1, (int) (sampleRate * 0.5) * (int) kit.sounds.size());
+            demo.clear();
+            int pos = 0;
+            for (auto& sound : kit.sounds)
+            {
+                auto sample = cache.get (kits::samplePath (kit, sound));
+                if (sample != nullptr)
+                    demo.copyFrom (0, pos, sample->buffer, 0, 0, juce::jmin (sample->buffer.getNumSamples(), (int) (sampleRate * 0.5)));
+                pos += (int) (sampleRate * 0.5);
+            }
+            auto f = outDir.getChildFile (juce::String ("kit_") + kit.id + ".wav");
+            f.deleteFile();
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::OutputStream> stream (f.createOutputStream());
+            if (auto w = wav.createWriterFor (stream, juce::AudioFormatWriterOptions{}.withSampleRate (sampleRate).withNumChannels (1).withBitsPerSample (16)))
+                w->writeFromAudioSampleBuffer (demo, 0, demo.getNumSamples());
+        }
+    }
+
     // --- Exportar ------------------------------------------------------------------------------
     std::cout << "Exportar\n";
     {

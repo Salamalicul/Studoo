@@ -43,6 +43,7 @@ set(STUDOO_ENGINE_SOURCES
     src/audio/AudioEngine.cpp
     src/audio/DrumSounds.cpp
     src/audio/Instruments.cpp
+    src/audio/Kits.cpp
     src/audio/MixerTrack.cpp
     src/audio/PluginHost.cpp
     src/audio/SampleCache.cpp

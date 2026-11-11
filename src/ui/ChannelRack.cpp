@@ -572,15 +572,7 @@ void ChannelRack::resized()
 // ----------------------------------------------------------------------------
 int ChannelRack::findFreeMixerTrack()
 {
-    for (int t = 1; t < numMixerTracks; ++t)
-    {
-        bool used = false;
-        for (auto ch : ctx.project.channels())
-            used = used || (int) ch[ids::mixer] == t;
-        if (! used)
-            return t;
-    }
-    return 0;
+    return ctx.project.findFreeMixerTrack();
 }
 
 void ChannelRack::addSampleChannels (const juce::Array<juce::File>& files)
@@ -620,6 +612,21 @@ void ChannelRack::loadSampleInto (juce::ValueTree channel)
 void ChannelRack::showAddMenu()
 {
     juce::PopupMenu menu;
+    menu.addSectionHeader (txt ("Kits de batería incluidos"));
+    const auto& kitList = kits::all();
+    for (size_t k = 0; k < kitList.size(); ++k)
+    {
+        const auto& kit = kitList[k];
+        juce::PopupMenu sub;
+        sub.addSectionHeader (txt (kit.description));
+        sub.addItem (200 + (int) k * 2, txt ("Usar este kit (cambia los sonidos de tu batería y conserva el ritmo)"));
+        sub.addItem (201 + (int) k * 2, txt ("Añadir todos sus sonidos como canales nuevos"));
+        sub.addSeparator();
+        for (size_t i = 0; i < kit.sounds.size(); ++i)
+            sub.addItem (1000 + (int) k * 50 + (int) i, txt ("Añadir solo: ") + txt (kit.sounds[i].name));
+        menu.addSubMenu (txt (kit.name), sub);
+    }
+    menu.addSeparator();
     menu.addSectionHeader (txt ("Añadir canal"));
     menu.addItem (1, txt ("Sample (WAV, MP3...)"));
     menu.addItem (2, txt ("Kit de batería (todos los samples de una carpeta)"));
@@ -669,6 +676,26 @@ void ChannelRack::showAddMenu()
             auto ch = ctx.project.addChannel (result == 3 ? ChannelType::synth : ChannelType::bass808,
                                               result == 3 ? "Sintetizador" : "808", track);
             ctx.project.setSelectedChannel (ch[ids::uid]);
+        }
+        else if (result >= 200 && result < 200 + (int) kits::all().size() * 2)
+        {
+            const auto& kit = kits::all()[(size_t) (result - 200) / 2];
+            ctx.project.beginTransaction();
+            if ((result - 200) % 2 == 0)
+                ctx.project.useKit (kit);
+            else
+                ctx.project.addKit (kit);
+        }
+        else if (result >= 1000)
+        {
+            const auto k = (size_t) (result - 1000) / 50, i = (size_t) (result - 1000) % 50;
+            if (k < kits::all().size() && i < kits::all()[k].sounds.size())
+            {
+                ctx.project.beginTransaction();
+                auto ch = ctx.project.addKitSound (kits::all()[k], kits::all()[k].sounds[i]);
+                ctx.project.setSelectedChannel (ch[ids::uid]);
+                ctx.engine.previewNote (ch[ids::uid], 60, 0.85f, 0.4);
+            }
         }
         else if (result >= 100 && result - 100 < instruments.size())
         {

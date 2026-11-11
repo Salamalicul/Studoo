@@ -38,7 +38,8 @@
 | 🎹 | Piano roll con ayudante de acordes, ideal para el 808 | **Piano roll** (F7) |
 | 🧩 | Playlist para montar la canción completa | **Playlist** (F5) |
 | 📂 | Tus samples (WAV, MP3, AIFF, FLAC, OGG) y kits de batería, arrastrando archivos | **+ Añadir** |
-| 🎸 | Instrumentos: batería incluida, **sampler**, **sintetizador** y **808** con glide | **+ Añadir** |
+| 🥁 | **6 kits de batería incluidos**: Trap, Drill, Boom Bap, Reggaetón, House y Lo-fi (cambia de kit sin perder tu ritmo) | **+ Añadir** |
+| 🎸 | Instrumentos: **sampler**, **sintetizador** y **808** con glide | **+ Añadir** |
 | 🎛️ | Mezclador: volumen, panorama, mute/solo, **EQ, compresor, delay y reverb** | **Mezclador** (F9) |
 | 📈 | Automatización de volumen, panorama, efectos y filtro | **Automatización** (F8) |
 | 🎙️ | Grabación de voz con el micrófono | Botón rojo o tecla **R** |

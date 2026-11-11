@@ -433,6 +433,94 @@ int Project::getChannelIndex (int uid)
     return channels().indexOf (findChannel (uid));
 }
 
+int Project::findFreeMixerTrack()
+{
+    for (int t = 1; t < numMixerTracks; ++t)
+    {
+        bool used = false;
+        for (auto ch : channels())
+            used = used || (int) ch[ids::mixer] == t;
+        if (! used)
+            return t;
+    }
+    return 0;
+}
+
+// ----------------------------------------------------------------------------
+//  Kits incluidos
+// ----------------------------------------------------------------------------
+juce::ValueTree Project::addKitSound (const kits::KitInfo& kit, const kits::SoundInfo& sound)
+{
+    const int track = findFreeMixerTrack();
+    const auto name = juce::String::fromUTF8 (sound.name);
+    auto ch = addChannel (ChannelType::sampler, name, track);
+    ch.setProperty (ids::sample, kits::samplePath (kit, sound), &undoManager);
+    if (track > 0)
+        getMixerTrack (track).setProperty (ids::name, name.substring (0, 12), &undoManager);
+    return ch;
+}
+
+static void apply808Preset (juce::ValueTree ch, const kits::Bass808Preset& p, juce::UndoManager* um)
+{
+    ch.setProperty (ids::decay, p.decay, um);
+    ch.setProperty (ids::glide, p.glide, um);
+    ch.setProperty (ids::drive, p.drive, um);
+}
+
+void Project::addKit (const kits::KitInfo& kit)
+{
+    int last = 0;
+    for (auto& sound : kit.sounds)
+        last = addKitSound (kit, sound)[ids::uid];
+
+    if (kit.bass.present)
+    {
+        auto bass = addChannel (ChannelType::bass808, "808 " + juce::String::fromUTF8 (kit.name).upToFirstOccurrenceOf (" ", false, false),
+                                findFreeMixerTrack());
+        apply808Preset (bass, kit.bass, &undoManager);
+    }
+
+    if (last != 0)
+        setSelectedChannel (last);
+}
+
+void Project::useKit (const kits::KitInfo& kit)
+{
+    // 1) Los canales de batería incluida que ya tienes cambian de sonido (los pasos se quedan)
+    juce::StringArray covered;
+    for (auto ch : channels())
+    {
+        if (channelTypeFromString (ch[ids::type].toString()) != ChannelType::sampler)
+            continue;
+        const auto role = kits::roleOf (ch[ids::sample].toString());
+        if (role.isEmpty() || covered.contains (role))
+            continue;
+
+        for (auto& sound : kit.sounds)
+            if (role == sound.id)
+            {
+                ch.setProperty (ids::sample, kits::samplePath (kit, sound), &undoManager);
+                ch.setProperty (ids::name, juce::String::fromUTF8 (sound.name), &undoManager);
+                covered.add (role);
+                break;
+            }
+    }
+
+    // 2) Los sonidos del kit que no tenías se añaden como canales nuevos
+    for (auto& sound : kit.sounds)
+        if (! covered.contains (sound.id))
+            addKitSound (kit, sound);
+
+    // 3) El 808 se ajusta al estilo del kit
+    if (kit.bass.present)
+    {
+        auto bass = findChannelByType (ChannelType::bass808);
+        if (! bass.isValid())
+            bass = addChannel (ChannelType::bass808, "808", findFreeMixerTrack());
+        apply808Preset (bass, kit.bass, &undoManager);
+    }
+}
+
 int Project::getSelectedChannel()
 {
     return (int) state[ids::selectedChannel];

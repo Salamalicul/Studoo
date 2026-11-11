@@ -1,5 +1,6 @@
 #include "SampleCache.h"
 #include "DrumSounds.h"
+#include "Kits.h"
 
 namespace studoo
 {
@@ -45,6 +46,17 @@ SamplePtr SampleCache::load (const juce::String& path)
     if (path.startsWith ("builtin:"))
     {
         const auto which = path.fromFirstOccurrenceOf ("builtin:", false, false);
+
+        // Sonido de un kit incluido: "builtin:trap/kick"
+        if (which.containsChar ('/'))
+        {
+            data->sampleRate = 44100.0;
+            data->buffer = kits::render (which.upToFirstOccurrenceOf ("/", false, false),
+                                         which.fromFirstOccurrenceOf ("/", false, false), data->sampleRate);
+            data->name = which;
+            return data->buffer.getNumSamples() > 0 ? data : nullptr;
+        }
+
         DrumSound sound = DrumSound::kick;
         if (which == "snare")      sound = DrumSound::snare;
         else if (which == "hihat") sound = DrumSound::hihat;
