@@ -15,6 +15,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_events/juce_events.h>
 #include "Ids.h"
+#include "audio/Kits.h"
 
 namespace studoo
 {
@@ -96,6 +97,13 @@ namespace studoo
         int getChannelIndex (int uid);
         juce::ValueTree findChannelByBuiltin (const juce::String& builtinName);
         juce::ValueTree findChannelByType (ChannelType);
+
+        int  findFreeMixerTrack();
+
+        // --- Kits incluidos ------------------------------------------------------
+        juce::ValueTree addKitSound (const kits::KitInfo&, const kits::SoundInfo&);
+        void addKit (const kits::KitInfo&);       // añade todos sus sonidos como canales nuevos
+        void useKit (const kits::KitInfo&);       // cambia los sonidos de la batería actual (conserva los pasos)
 
         int  getSelectedChannel();
         void setSelectedChannel (int uid);

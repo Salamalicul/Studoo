@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # instalar nada extra para abrir la app.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-project(Studoo VERSION 1.1.0 LANGUAGES C CXX)
+project(Studoo VERSION 1.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,6 +43,7 @@ set(STUDOO_ENGINE_SOURCES
     src/audio/AudioEngine.cpp
     src/audio/DrumSounds.cpp
     src/audio/Instruments.cpp
+    src/audio/Kits.cpp
     src/audio/MixerTrack.cpp
     src/audio/PluginHost.cpp
     src/audio/SampleCache.cpp

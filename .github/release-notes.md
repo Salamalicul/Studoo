@@ -1,6 +1,10 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.1
+### 🆕 Novedades de la versión 1.2
+- 🥁 **6 kits de batería incluidos**: Trap, Drill, Boom Bap, Reggaetón, House y Lo-fi. "Usar este kit" cambia los sonidos de tu batería **sin perder el ritmo**.
+- 📦 **Instaladores**: instalador para Windows (menú Inicio, escritorio y desinstalador) y paquete `.deb` para Ubuntu / Linux Mint / Debian.
+
+### Novedades de la versión 1.1
 - 🎨 **Diseño totalmente renovado**: fuente moderna, botones y ruedas con relieve, pasos que brillan como LEDs, pantallas LCD para el BPM y la posición, medidores de LEDs en el mezclador, teclado de piano realista y bloques de playlist con sombra.
 - ☀️ **Logo nuevo** en la app, en la barra de tareas y en Studoo.exe.
 - 🎓 Apartado **Aprende** más bonito y fácil de leer.
@@ -8,20 +12,27 @@
 
 ### 📥 Cómo instalarlo
 
-**Windows**
-1. Descarga **`Studoo-...-Windows.zip`** (aquí abajo, en *Assets*).
-2. Clic derecho en el archivo → **Extraer todo**.
-3. Abre la carpeta y haz doble clic en **`Studoo.exe`**.
-4. Si aparece *"Windows protegió su PC"*: pulsa **Más información** → **Ejecutar de todas formas** (sale porque la app es nueva y no está firmada).
+**Windows** (recomendado: el instalador)
+1. Descarga **`Studoo-...-Instalador-Windows.exe`** (aquí abajo, en *Assets*).
+2. Haz doble clic y sigue el asistente (en español). No hace falta ser administrador.
+3. Si aparece *"Windows protegió su PC"*: pulsa **Más información** → **Ejecutar de todas formas** (sale porque la app es nueva y no está firmada).
+4. ¡Listo! Studoo aparece en el **menú Inicio** (y en el escritorio si lo eliges). Se desinstala desde *Configuración → Aplicaciones*.
 
-**Linux (Ubuntu, Mint, Fedora, Arch...)**
+> ¿Prefieres no instalar nada? Descarga `Studoo-...-Windows.zip`, descomprímelo y abre `Studoo.exe`.
+
+**Ubuntu, Linux Mint, Debian** (recomendado: el `.deb`)
+1. Descarga **`Studoo-...-Linux.deb`**.
+2. Haz doble clic: se abre la tienda de aplicaciones. Pulsa **Instalar** (te pedirá tu contraseña).
+   - Si no se abre, en una terminal: `sudo apt install ./Studoo-*-Linux.deb`
+3. ¡Listo! Studoo aparece en el **menú de aplicaciones** con su icono. También instala LAME para exportar a MP3.
+
+**Otras distribuciones de Linux** (Fedora, Arch...)
 1. Descarga **`Studoo-...-Linux.tar.gz`**.
-2. Abre una terminal en la carpeta de descargas y escribe:
+2. En una terminal, en la carpeta de descargas:
    ```bash
    tar -xzf Studoo-*-Linux.tar.gz
    ./Studoo-Linux/instalar.sh
    ```
-3. ¡Listo! Studoo aparece en tu **menú de aplicaciones** (y en el escritorio) con su icono. No pide contraseña.
 
 La primera vez se abre el **tutorial "Tu primer beat"**. ¡Síguelo para hacer tu primer ritmo en 5 minutos!
 

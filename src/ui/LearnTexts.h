@@ -64,7 +64,8 @@ namespace studoo::learn
           "Un SAMPLER es un instrumento que reproduce samples. Si le das una nota más aguda, el sample suena más "
           "agudo (y más rápido); si es más grave, suena más grave.\n\n"
           "En Studoo:\n"
-          "- Añade samples desde \"Añadir\" > \"Sample\", o arrastrando archivos WAV o MP3.\n"
+          "- Studoo trae 6 kits de batería incluidos: \"+ Añadir\" > Trap, Drill, Boom Bap, Reggaetón, House o Lo-fi.\n"
+          "- Añade tus propios samples desde \"Añadir\" > \"Sample\", o arrastrando archivos WAV o MP3.\n"
           "- \"Kit de batería\" carga todos los samples de una carpeta a la vez.\n\n"
           "Usa solo samples gratuitos o con licencia (\"royalty free\") si vas a publicar tu música." },
 

@@ -32,6 +32,7 @@ Icon=$DESTINO/studoo.png
 Terminal=false
 Categories=AudioVideo;Audio;Music;
 Keywords=música;beats;daw;808;
+StartupWMClass=Studoo
 DESKTOP
 chmod +x "$HOME/.local/share/applications/studoo.desktop"
 update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
