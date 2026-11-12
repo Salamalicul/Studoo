@@ -1,6 +1,11 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.4
+### 🆕 Novedades de la versión 1.5
+- 🔄 **Actualizaciones automáticas**: al abrir, Studoo mira si hay una versión nueva y te ofrece instalarla con un clic. En Windows se cierra un momento, se instala y se vuelve a abrir solo. En Linux te pide la contraseña.
+- ☰ En el menú: **Buscar actualizaciones** y una casilla para desactivar el aviso al abrir. También puedes saltarte una versión.
+- 🐧 El instalador de Linux (`instalar.sh`) funciona aunque Studoo esté abierto.
+
+### Novedades de la versión 1.4
 - 🎨 **Cada tipo de sonido tiene su color**: batería naranja, sintetizador azul, 808 morado, plugins verde y grabaciones turquesa (en el secuenciador, el piano roll, el mezclador y el panel del instrumento).
 - 💡 **Luces de actividad**: cada canal se ilumina cuando suena.
 - 🧭 **Iconos en las pestañas**, nuevas flechas de deshacer/rehacer y **medidor de volumen Master** en la barra superior.

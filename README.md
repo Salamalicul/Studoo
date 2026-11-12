@@ -47,6 +47,7 @@
 | 🔌 | Plugins **VST3** (instrumentos y efectos) | Botón **Plugins** |
 | 🎹 | Teclados y controladores **MIDI** | Botón **Audio** |
 | 💾 | Guardar y abrir proyectos, con **autoguardado** cada minuto | Menú ☰ |
+| 🔄 | **Se actualiza solo**: avisa cuando hay una versión nueva y la instala con un clic | Al abrir, o menú ☰ |
 | ↩️ | Deshacer y rehacer (**Ctrl+Z / Ctrl+Y**) | Barra superior |
 | 💿 | Exportar a **WAV** y **MP3** | Menú ☰ |
 | ⏱️ | BPM, metrónomo, modos PATRÓN/CANCIÓN y atajos de teclado | Barra superior |
