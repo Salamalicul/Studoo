@@ -75,7 +75,7 @@ namespace studoo
         void timerCallback() override;
 
         StudooLookAndFeel lookAndFeel;
-        juce::TooltipWindow tooltipWindow { this, 700 };
+        juce::TooltipWindow tooltipWindow { this, 900 };
 
         std::unique_ptr<juce::PropertiesFile> settings;
         Project project;
