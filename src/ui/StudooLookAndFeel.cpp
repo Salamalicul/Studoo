@@ -137,7 +137,7 @@ StudooLookAndFeel::StudooLookAndFeel()
     setColour (juce::Slider::textBoxOutlineColourId,   juce::Colours::transparentBlack);
     setColour (juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
     setColour (juce::Label::textColourId,              Colours::text);
-    setColour (juce::TooltipWindow::backgroundColourId, juce::Colour (0xf20b0d10));
+    setColour (juce::TooltipWindow::backgroundColourId, juce::Colour (0xff20242b));
     setColour (juce::TooltipWindow::textColourId,      Colours::text);
     setColour (juce::TooltipWindow::outlineColourId,   Colours::accent);
     setColour (juce::AlertWindow::backgroundColourId,  Colours::panel);
@@ -612,36 +612,47 @@ void StudooLookAndFeel::drawScrollbar (juce::Graphics& g, juce::ScrollBar&, int 
 // ----------------------------------------------------------------------------
 //  Mensajes de ayuda (tooltips) y ventanas de aviso
 // ----------------------------------------------------------------------------
+// Los mensajes de ayuda (tooltips): una tarjeta limpia, debajo del ratón,
+// sin tapar el botón que estás señalando.
+static juce::TextLayout tooltipLayout (const juce::String& text)
+{
+    juce::AttributedString s;
+    s.append (text.trimEnd(), juce::Font (Fonts::regular (13.5f)), Colours::text);
+    s.setLineSpacing (2.0f);
+    juce::TextLayout tl;
+    tl.createLayoutWithBalancedLineLengths (s, 300.0f);
+    return tl;
+}
+
 juce::Rectangle<int> StudooLookAndFeel::getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
                                                           juce::Rectangle<int> parentArea)
 {
-    juce::TextLayout tl;
-    juce::AttributedString s;
-    s.append (tipText, juce::Font (Fonts::regular (14.0f)), Colours::text);
-    tl.createLayoutWithBalancedLineLengths (s, 320.0f);
+    const auto tl = tooltipLayout (tipText);
+    const int w = (int) std::ceil (tl.getWidth()) + 28;
+    const int h = (int) std::ceil (tl.getHeight()) + 18;
 
-    const int w = (int) tl.getWidth() + 26;
-    const int h = (int) tl.getHeight() + 18;
-
-    return juce::Rectangle<int> (screenPos.x > parentArea.getCentreX() ? screenPos.x - (w + 12) : screenPos.x + 24,
-                                 screenPos.y > parentArea.getCentreY() ? screenPos.y - (h + 6)  : screenPos.y + 6,
-                                 w, h).constrainedWithin (parentArea);
+    // Centrado bajo el puntero; si no cabe abajo, encima
+    int x = screenPos.x - w / 2;
+    int y = screenPos.y + 24;
+    if (y + h > parentArea.getBottom())
+        y = screenPos.y - h - 14;
+    return juce::Rectangle<int> (x, y, w, h).constrainedWithin (parentArea.reduced (6));
 }
 
 void StudooLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text, int width, int height)
 {
     auto bounds = juce::Rectangle<int> (width, height).toFloat();
-    g.setColour (findColour (juce::TooltipWindow::backgroundColourId));
-    g.fillRoundedRectangle (bounds, 7.0f);
-    g.setColour (Colours::accent.withAlpha (0.8f));
-    g.drawRoundedRectangle (bounds.reduced (0.5f), 7.0f, 1.0f);
-    g.fillRoundedRectangle (bounds.withWidth (3.0f).reduced (0.0f, 6.0f), 1.5f);
+    const float corner = 8.0f;
 
-    juce::AttributedString s;
-    s.append (text, juce::Font (Fonts::regular (14.0f)), Colours::text);
-    juce::TextLayout tl;
-    tl.createLayoutWithBalancedLineLengths (s, 320.0f);
-    tl.draw (g, bounds.reduced (14.0f, 9.0f));
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff272c34), 0.0f, 0.0f,
+                                             juce::Colour (0xff1c2026), 0.0f, bounds.getBottom(), false));
+    g.fillRoundedRectangle (bounds, corner);
+    g.setColour (juce::Colours::white.withAlpha (0.07f));
+    g.drawHorizontalLine (1, corner, bounds.getRight() - corner);
+    g.setColour (Colours::outline.brighter (0.45f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), corner, 1.0f);
+
+    tooltipLayout (text).draw (g, bounds.reduced (14.0f, 9.0f));
 }
 
 void StudooLookAndFeel::drawAlertBox (juce::Graphics& g, juce::AlertWindow& alert,
