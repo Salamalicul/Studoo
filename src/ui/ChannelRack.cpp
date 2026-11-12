@@ -91,14 +91,14 @@ public:
         g.setColour (juce::Colours::white.withAlpha (0.06f));
         g.drawHorizontalLine ((int) r.getY() + 1, r.getX() + corner, r.getRight() - corner);
 
-        auto text = r.withTrimmedLeft (14.0f).withTrimmedRight (6.0f);
+        auto textArea = r.withTrimmedLeft (14.0f).withTrimmedRight (6.0f);
         g.setColour (selected ? Colours::text : Colours::text.withAlpha (0.88f));
         g.setFont (Fonts::bold (13.0f));
-        g.drawFittedText (getButtonText(), text.removeFromTop (r.getHeight() * 0.62f).toNearestInt(),
+        g.drawFittedText (getButtonText(), textArea.removeFromTop (r.getHeight() * 0.62f).toNearestInt(),
                           juce::Justification::bottomLeft, 1, 0.8f);
         g.setColour (colour.withAlpha (0.75f));
         g.setFont (Fonts::regular (9.5f));
-        g.drawText (typeName.toUpperCase(), text, juce::Justification::topLeft);
+        g.drawText (typeName.toUpperCase(), textArea, juce::Justification::topLeft);
     }
 
     void mouseDown (const juce::MouseEvent& e) override
@@ -431,13 +431,13 @@ ChannelRack::ChannelRack (AppContext& c)
             }
             if (rows[r]->uid == selected)
             {
-                const auto c = rows[r]->name.colour;
-                g.setGradientFill (juce::ColourGradient (c.withAlpha (0.16f), 0.0f, 0.0f,
-                                                         c.withAlpha (0.0f), (float) controlsWidth + 120.0f, 0.0f, false));
+                const auto rowColour = rows[r]->name.colour;
+                g.setGradientFill (juce::ColourGradient (rowColour.withAlpha (0.16f), 0.0f, 0.0f,
+                                                         rowColour.withAlpha (0.0f), (float) controlsWidth + 120.0f, 0.0f, false));
                 g.fillRect (rowArea);
                 auto bar = rowArea.removeFromLeft (3).toFloat().reduced (0.0f, 6.0f);
-                Draw::glow (g, bar, c, 5.0f, 1.5f);
-                Draw::colourFill (g, bar, c, 1.5f);
+                Draw::glow (g, bar, rowColour, 5.0f, 1.5f);
+                Draw::colourFill (g, bar, rowColour, 1.5f);
             }
             g.setColour (juce::Colours::black.withAlpha (0.3f));
             g.drawHorizontalLine ((r + 1) * rowHeight - 1, 0.0f, (float) content.getWidth());

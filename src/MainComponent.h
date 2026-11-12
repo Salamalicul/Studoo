@@ -20,6 +20,7 @@
 #include "ui/StudooLookAndFeel.h"
 #include "ui/Toolbar.h"
 #include "ui/Tutorial.h"
+#include "Updater.h"
 
 namespace studoo
 {
@@ -65,6 +66,11 @@ namespace studoo
         void setStatus (const juce::String&);
         juce::File getAutosaveFile() const;
 
+        // --- Actualizaciones automáticas ----------------------------------------
+        void checkForUpdates (bool userAsked);
+        void offerUpdate (const updater::ReleaseInfo&);
+        void downloadAndInstall (const updater::ReleaseInfo&);
+
         void changeListenerCallback (juce::ChangeBroadcaster*) override;
         void timerCallback() override;
 
@@ -97,6 +103,7 @@ namespace studoo
         int autosaveCounter = 0;
         juce::String statusMessage;
         int statusTimeout = 0;
+        bool updateBusy = false;
         juce::Rectangle<int> statusArea, viewBarArea;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
