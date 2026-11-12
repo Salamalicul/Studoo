@@ -58,9 +58,52 @@ void AutomationEditor::paint (juce::Graphics& g)
     auto lane = view.getLane();
     if (! lane.isValid())
     {
+        // Cartel de bienvenida con una curva de ejemplo
+        auto card = getLocalBounds().toFloat().withSizeKeepingCentre (460.0f, 214.0f);
+        Draw::shadow (g, card, 14.0f, 18);
+        g.setGradientFill (juce::ColourGradient (Colours::panelLight, 0.0f, card.getY(), Colours::panel, 0.0f, card.getBottom(), false));
+        g.fillRoundedRectangle (card, 14.0f);
+        g.setColour (Colours::outline.brighter (0.2f));
+        g.drawRoundedRectangle (card.reduced (0.5f), 14.0f, 1.0f);
+
+        auto inner = card.reduced (24.0f, 20.0f);
+        auto curveArea = inner.removeFromTop (86.0f).reduced (30.0f, 8.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.3f));
+        g.fillRoundedRectangle (curveArea.expanded (12.0f, 6.0f), 8.0f);
+        const juce::Point<float> pts[] = {
+            { curveArea.getX(), curveArea.getBottom() },
+            { curveArea.getX() + curveArea.getWidth() * 0.35f, curveArea.getBottom() - curveArea.getHeight() * 0.3f },
+            { curveArea.getX() + curveArea.getWidth() * 0.6f, curveArea.getY() },
+            { curveArea.getRight(), curveArea.getY() + curveArea.getHeight() * 0.45f } };
+        juce::Path curve, fill;
+        curve.startNewSubPath (pts[0]);
+        for (int i = 1; i < 4; ++i) curve.lineTo (pts[i]);
+        fill = curve;
+        fill.lineTo (curveArea.getBottomRight());
+        fill.lineTo (curveArea.getBottomLeft());
+        fill.closeSubPath();
+        g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.3f), 0.0f, curveArea.getY(),
+                                                 Colours::accent.withAlpha (0.0f), 0.0f, curveArea.getBottom(), false));
+        g.fillPath (fill);
+        g.setColour (Colours::accent);
+        g.strokePath (curve, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        for (auto p : pts)
+        {
+            g.setColour (Colours::accentLight);
+            g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (p));
+            g.setColour (juce::Colours::black.withAlpha (0.6f));
+            g.drawEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre (p), 1.0f);
+        }
+
+        inner.removeFromTop (12.0f);
+        g.setColour (Colours::text);
+        g.setFont (Fonts::bold (17.0f));
+        g.drawText (txt ("Aún no hay automatizaciones"), inner.removeFromTop (26.0f), juce::Justification::centred);
         g.setColour (Colours::textDim);
-        g.setFont (juce::FontOptions (16.0f));
-        g.drawText (txt ("Pulsa \"Nueva\" para crear una automatización"), getLocalBounds(), juce::Justification::centred);
+        g.setFont (Fonts::regular (13.0f));
+        g.drawFittedText (txt ("Pulsa \"+ Nueva\" y elige un control (volumen, filtro, reverb...) "
+                               "para que se mueva solo a lo largo de la canción."),
+                          inner.toNearestInt(), juce::Justification::centredTop, 3, 1.0f);
         return;
     }
 

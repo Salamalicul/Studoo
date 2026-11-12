@@ -72,6 +72,7 @@ namespace studoo
     private:
         struct Row;
         class NameButton;
+        class AddRow;
 
         void changeListenerCallback (juce::ChangeBroadcaster*) override;
         void timerCallback() override;
@@ -91,6 +92,7 @@ namespace studoo
         CallbackComponent content;
         StepGrid grid;
         juce::OwnedArray<Row> rows;
+        std::unique_ptr<AddRow> addRow;
         InstrumentPanel instrumentPanel;
 
         juce::String structureKey;

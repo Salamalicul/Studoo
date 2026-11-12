@@ -65,6 +65,8 @@ namespace studoo
 
         // --- Medidores del mezclador -------------------------------------------------
         float getTrackPeak (int track, int channel) const;
+        // Nivel de sonido de un canal (para las luces de actividad del secuenciador)
+        float getChannelActivity (int channelUid) const { return channelActivity[(size_t) (channelUid & 255)].load(); }
         void decayMeters();
 
         // --- Plugins VST3 --------------------------------------------------------------
@@ -140,6 +142,7 @@ namespace studoo
         std::atomic<double> requestedPosition { -1.0 };
         std::atomic<double> currentBpm { 140.0 };
         std::atomic<int> liveChannelUid { 0 };
+        std::array<std::atomic<float>, 256> channelActivity {};
 
         juce::AbstractFifo previewFifo { 64 };
         std::array<PreviewEvent, 64> previewEvents;

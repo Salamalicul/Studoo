@@ -176,6 +176,15 @@ void InstrumentPanel::paint (juce::Graphics& g)
     g.setColour (Colours::outline);
     g.drawRoundedRectangle (bounds.reduced (0.5f), 10.0f, 1.0f);
 
+    const auto colour = Colours::forChannelType (channel[ids::type].toString());
+    if (channel.isValid())
+    {
+        // Franja superior con el color del tipo de canal
+        auto stripe = bounds.withHeight (3.0f).reduced (14.0f, 0.0f).translated (0.0f, 1.0f);
+        Draw::glow (g, stripe, colour, 6.0f, 1.5f);
+        Draw::colourFill (g, stripe, colour, 1.5f);
+    }
+
     auto top = getLocalBounds().reduced (10, 6).removeFromTop (24).withTrimmedLeft (34);
     g.setFont (Fonts::bold (15.0f));
     g.setColour (Colours::text);
@@ -185,9 +194,9 @@ void InstrumentPanel::paint (juce::Graphics& g)
         const int w = juce::GlyphArrangement::getStringWidthInt (Fonts::bold (15.0f), title);
         auto chip = juce::Rectangle<float> ((float) (top.getX() + w + 12), (float) top.getY() + 3.0f,
                                             (float) juce::GlyphArrangement::getStringWidthInt (Fonts::bold (11.0f), typeName) + 16.0f, 18.0f);
-        g.setColour (Colours::accent.withAlpha (0.18f));
+        g.setColour (colour.withAlpha (0.18f));
         g.fillRoundedRectangle (chip, 9.0f);
-        g.setColour (Colours::accentLight);
+        g.setColour (colour.brighter (0.3f));
         g.setFont (Fonts::bold (11.0f));
         g.drawText (typeName, chip, juce::Justification::centred);
     }
@@ -205,6 +214,11 @@ void InstrumentPanel::resized()
     infoLabel.setBounds (top.removeFromRight (juce::jmax (200, top.getWidth() / 2)));
 
     area.removeFromTop (4);
+    const auto colour = Colours::forChannelType (channel[ids::type].toString());
+    for (auto* c : controls)
+        if (auto* k = dynamic_cast<Knob*> (c))
+            k->getSlider().setColour (juce::Slider::rotarySliderFillColourId, colour);
+
     for (auto* c : controls)
     {
         int w = 60;

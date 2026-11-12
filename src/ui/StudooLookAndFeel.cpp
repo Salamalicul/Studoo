@@ -82,6 +82,15 @@ namespace Draw
         g.fillRoundedRectangle (r.withHeight (juce::jmin (r.getHeight() * 0.45f, 10.0f)).reduced (1.0f, 0.0f).translated (0.0f, 1.0f), corner);
     }
 
+    void colourFill (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c, float corner)
+    {
+        g.setGradientFill (juce::ColourGradient (c.brighter (0.35f), 0.0f, r.getY(),
+                                                 c.darker (0.25f), 0.0f, r.getBottom(), false));
+        g.fillRoundedRectangle (r, corner);
+        g.setColour (juce::Colours::white.withAlpha (0.18f));
+        g.fillRoundedRectangle (r.withHeight (juce::jmin (r.getHeight() * 0.45f, 10.0f)).reduced (1.0f, 0.0f).translated (0.0f, 1.0f), corner);
+    }
+
     void lcd (juce::Graphics& g, juce::Rectangle<float> r)
     {
         g.setGradientFill (juce::ColourGradient (juce::Colour (0xff07090b), 0.0f, r.getY(),
@@ -233,6 +242,79 @@ juce::Font StudooLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHe
     return Fonts::bold (juce::jlimit (11.0f, 15.0f, (float) buttonHeight * 0.48f));
 }
 
+// Iconos pequeños de las pestañas (secuenciador, piano roll, playlist...)
+static void drawTabIcon (juce::Graphics& g, int icon, juce::Rectangle<float> r, juce::Colour c)
+{
+    g.setColour (c);
+    const float s = r.getWidth();
+    juce::Path p;
+    switch (icon)
+    {
+        case 0: // secuenciador: cuadrícula de pasos
+            for (int y = 0; y < 3; ++y)
+                for (int x = 0; x < 4; ++x)
+                {
+                    auto cell = juce::Rectangle<float> (r.getX() + (float) x * s * 0.26f, r.getY() + s * 0.12f + (float) y * s * 0.27f,
+                                                        s * 0.2f, s * 0.2f);
+                    if ((x + y * 2) % 3 == 0) g.fillRoundedRectangle (cell, 1.0f);
+                    else { g.setOpacity (0.45f); g.fillRoundedRectangle (cell, 1.0f); g.setOpacity (1.0f); g.setColour (c); }
+                }
+            return;
+        case 1: // piano roll: teclas
+            g.drawRoundedRectangle (r.reduced (0.5f, s * 0.12f), 1.5f, 1.2f);
+            for (int i = 1; i < 4; ++i)
+                g.fillRect (r.getX() + (float) i * s * 0.25f - 0.5f, r.getY() + s * 0.12f, 1.0f, s * 0.76f);
+            for (int i : { 1, 2 })
+                g.fillRect (r.getX() + (float) i * s * 0.25f + s * 0.06f, r.getY() + s * 0.12f, s * 0.14f, s * 0.42f);
+            g.fillRect (r.getX() + s * 0.06f + s * 0.0f, r.getY() + s * 0.12f, s * 0.12f, s * 0.42f);
+            return;
+        case 2: // playlist: bloques en pistas
+            g.fillRoundedRectangle (r.getX(), r.getY() + s * 0.1f, s * 0.55f, s * 0.22f, 1.5f);
+            g.fillRoundedRectangle (r.getX() + s * 0.3f, r.getY() + s * 0.4f, s * 0.7f, s * 0.22f, 1.5f);
+            g.fillRoundedRectangle (r.getX() + s * 0.12f, r.getY() + s * 0.7f, s * 0.45f, s * 0.22f, 1.5f);
+            return;
+        case 3: // mezclador: faders
+            for (int i = 0; i < 3; ++i)
+            {
+                const float x = r.getX() + s * (0.17f + 0.33f * (float) i);
+                g.fillRect (x - 0.75f, r.getY() + s * 0.05f, 1.5f, s * 0.9f);
+                const float y = r.getY() + s * (i == 0 ? 0.55f : i == 1 ? 0.2f : 0.65f);
+                g.fillRoundedRectangle (x - s * 0.13f, y, s * 0.26f, s * 0.16f, 1.0f);
+            }
+            return;
+        case 4: // automatización: línea con puntos
+        {
+            const juce::Point<float> pts[] = { { r.getX() + s * 0.05f, r.getY() + s * 0.8f }, { r.getX() + s * 0.38f, r.getY() + s * 0.3f },
+                                               { r.getX() + s * 0.62f, r.getY() + s * 0.6f }, { r.getX() + s * 0.95f, r.getY() + s * 0.15f } };
+            p.startNewSubPath (pts[0]);
+            for (int i = 1; i < 4; ++i) p.lineTo (pts[i]);
+            g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            for (auto pt : pts)
+                g.fillEllipse (juce::Rectangle<float> (s * 0.22f, s * 0.22f).withCentre (pt));
+            return;
+        }
+        case 5: // aprende: birrete
+        {
+            const float cx = r.getCentreX(), top = r.getY() + s * 0.15f;
+            p.startNewSubPath (r.getX(), top + s * 0.25f);
+            p.lineTo (cx, top);
+            p.lineTo (r.getRight(), top + s * 0.25f);
+            p.lineTo (cx, top + s * 0.5f);
+            p.closeSubPath();
+            g.fillPath (p);
+            juce::Path base;
+            base.startNewSubPath (r.getX() + s * 0.22f, top + s * 0.4f);
+            base.lineTo (r.getX() + s * 0.22f, top + s * 0.62f);
+            base.quadraticTo (cx, top + s * 0.85f, r.getRight() - s * 0.22f, top + s * 0.62f);
+            base.lineTo (r.getRight() - s * 0.22f, top + s * 0.4f);
+            g.strokePath (base, juce::PathStrokeType (1.4f));
+            g.fillRect (r.getRight() - s * 0.08f, top + s * 0.25f, 1.2f, s * 0.4f);
+            return;
+        }
+        default: break;
+    }
+}
+
 void StudooLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, bool, bool)
 {
     const bool on = button.getToggleState();
@@ -247,6 +329,24 @@ void StudooLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& but
         c = c.withMultipliedAlpha (0.4f);
 
     g.setFont (getTextButtonFont (button, button.getHeight()));
+
+    const auto iconVar = button.getProperties()["tabIcon"];
+    if (tab && ! iconVar.isVoid())
+    {
+        // Icono + texto centrados juntos
+        const auto font = getTextButtonFont (button, button.getHeight());
+        const float iconSize = 14.0f, gap = 8.0f;
+        const float textW = juce::GlyphArrangement::getStringWidth (font, button.getButtonText());
+        const float total = juce::jmin ((float) button.getWidth() - 12.0f, iconSize + gap + textW);
+        auto area = button.getLocalBounds().toFloat().withSizeKeepingCentre (total, (float) button.getHeight());
+        auto iconArea = area.removeFromLeft (iconSize).withSizeKeepingCentre (iconSize, iconSize).translated (0.0f, -1.0f);
+        drawTabIcon (g, (int) iconVar, iconArea, on ? Colours::accent : c.withAlpha (0.8f));
+        area.removeFromLeft (gap);
+        g.setColour (c);
+        g.drawFittedText (button.getButtonText(), area.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+        return;
+    }
+
     g.setColour (c);
     g.drawFittedText (button.getButtonText(), button.getLocalBounds().reduced (6, 2), juce::Justification::centred, 1, 0.8f);
 }
@@ -311,13 +411,16 @@ void StudooLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w
         juce::Path value;
         value.addCentredArc (centre.x, centre.y, arcRadius, arcRadius, 0.0f,
                              juce::jmin (zeroAngle, angle), juce::jmax (zeroAngle, angle), true);
+        // Color propio de la rueda (por ejemplo, el del tipo de canal) o naranja
+        const bool custom = slider.isColourSpecified (juce::Slider::rotarySliderFillColourId);
+        const auto arcColour = custom ? slider.findColour (juce::Slider::rotarySliderFillColourId) : Colours::accent;
         if (enabled)
         {
-            g.setColour (Colours::accent.withAlpha (hover ? 0.35f : 0.22f));
+            g.setColour (arcColour.withAlpha (hover ? 0.35f : 0.22f));
             g.strokePath (value, juce::PathStrokeType (arcWidth * 2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
-        g.setGradientFill (juce::ColourGradient (Colours::accentLight, centre.x, centre.y - radius,
-                                                 Colours::accentDeep, centre.x, centre.y + radius, false));
+        g.setGradientFill (juce::ColourGradient (custom ? arcColour.brighter (0.3f) : Colours::accentLight, centre.x, centre.y - radius,
+                                                 custom ? arcColour.darker (0.2f) : Colours::accentDeep, centre.x, centre.y + radius, false));
         if (! enabled)
             g.setColour (Colours::textDim);
         g.strokePath (value, juce::PathStrokeType (arcWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));

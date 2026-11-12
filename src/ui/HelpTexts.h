@@ -30,6 +30,8 @@ namespace studoo::help
         "- Clic: encender/apagar. Arrastra para pintar varios. Clic derecho: borrar.\n\n"
         "Cada canal tiene:\n"
         "- Luz verde: silenciar (mute).\n"
+        "- Franja de color: el tipo de canal (naranja = batería o sample, azul = sintetizador, morado = 808, "
+        "verde = plugin, turquesa = grabación). Se ilumina cuando el canal suena.\n"
         "- Nombre: clic para seleccionarlo y escucharlo. Clic derecho: más opciones "
         "(piano roll, renombrar, cambiar sample, eliminar).\n"
         "- Rueda VOL: volumen. Rueda PAN: izquierda/derecha.\n"

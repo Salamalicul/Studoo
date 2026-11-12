@@ -30,6 +30,29 @@ namespace studoo
         const juce::Colour stepOffA     { 0xff272c33 }; // pasos grupo 1 y 3
         const juce::Colour stepOffB     { 0xff302a2c }; // pasos grupo 2 y 4 (tono cálido, como FL)
         const juce::Colour stepOn       { 0xffff8a1f };
+        const juce::Colour purple       { 0xffb47cff };
+        const juce::Colour teal         { 0xff2ee6c5 };
+        const juce::Colour red          { 0xffff4f5e };
+
+        // Color de cada tipo de canal: batería/samples naranja, sintetizador azul,
+        // 808 morado, plugins verde y grabaciones turquesa.
+        inline juce::Colour forChannelType (const juce::String& type)
+        {
+            if (type == "synth")  return blue;
+            if (type == "808")    return purple;
+            if (type == "plugin") return green;
+            if (type == "audio")  return teal;
+            return accent;
+        }
+
+        inline juce::String channelTypeName (const juce::String& type)
+        {
+            if (type == "synth")  return "Sinte";
+            if (type == "808")    return "808";
+            if (type == "plugin") return "Plugin";
+            if (type == "audio")  return "Audio";
+            return "Sampler";
+        }
     }
 
     // Fuentes incluidas en la app (Inter)
@@ -49,6 +72,8 @@ namespace studoo
         void shadow (juce::Graphics&, juce::Rectangle<float>, float corner, int radius = 14);
         // Relleno naranja con degradado
         void accentFill (juce::Graphics&, juce::Rectangle<float>, float corner);
+        // Relleno con degradado de cualquier color (como accentFill)
+        void colourFill (juce::Graphics&, juce::Rectangle<float>, juce::Colour, float corner);
         // Pantalla LCD (BPM, posición)
         void lcd (juce::Graphics&, juce::Rectangle<float>);
     }

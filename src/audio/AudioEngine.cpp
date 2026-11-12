@@ -251,6 +251,8 @@ void AudioEngine::decayMeters()
 {
     for (auto& t : mixer)
         t.decayPeaks();
+    for (auto& a : channelActivity)
+        a.store (a.load() * 0.8f);
 }
 
 // ============================================================================
@@ -805,6 +807,12 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
                 rt.instrument->setParameters (ch);
             }
             rt.instrument->render (rt.buffer, rt.midi, n);
+
+            const float level = juce::jmax (rt.buffer.getMagnitude (0, 0, n),
+                                            rt.buffer.getNumChannels() > 1 ? rt.buffer.getMagnitude (1, 0, n) : 0.0f);
+            auto& activity = channelActivity[(size_t) (ch.uid & 255)];
+            if (level > activity.load())
+                activity.store (level);
         }
 
         if (automate)
