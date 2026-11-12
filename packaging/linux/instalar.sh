@@ -11,8 +11,10 @@ DESTINO="$HOME/.local/share/studoo"
 
 echo "Instalando Studoo..."
 mkdir -p "$DESTINO" "$HOME/.local/bin" "$HOME/.local/share/applications"
-cp "$ORIGEN/Studoo" "$DESTINO/Studoo"
-chmod +x "$DESTINO/Studoo"
+# Se copia con otro nombre y luego se cambia (funciona aunque Studoo esté abierto)
+cp "$ORIGEN/Studoo" "$DESTINO/Studoo.nuevo"
+chmod +x "$DESTINO/Studoo.nuevo"
+mv -f "$DESTINO/Studoo.nuevo" "$DESTINO/Studoo"
 cp "$ORIGEN/studoo.png" "$DESTINO/studoo.png"
 cp "$ORIGEN/desinstalar.sh" "$DESTINO/desinstalar.sh"
 chmod +x "$DESTINO/desinstalar.sh"

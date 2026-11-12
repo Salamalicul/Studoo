@@ -185,6 +185,13 @@ MainComponent::MainComponent()
 
     juce::Component::SafePointer<MainComponent> safe (this);
     juce::Timer::callAfterDelay (700, [safe] { if (safe != nullptr) safe->checkAutosaveRecovery(); });
+
+    // Buscar una versión nueva de Studoo unos segundos después de abrir
+    juce::Timer::callAfterDelay (6000, [safe]
+    {
+        if (safe != nullptr && safe->settings->getBoolValue ("autoUpdate", true) && ! safe->tutorial.isRunning())
+            safe->checkForUpdates (false);
+    });
 }
 
 MainComponent::~MainComponent()
@@ -395,6 +402,9 @@ void MainComponent::showFileMenu()
     menu.addItem (8, txt ("Atajos de teclado"));
     menu.addItem (9, txt ("Abrir la carpeta de proyectos"));
     menu.addSeparator();
+    menu.addItem (11, txt ("Buscar actualizaciones"));
+    menu.addItem (12, txt ("Buscar actualizaciones al abrir Studoo"), true, settings->getBoolValue ("autoUpdate", true));
+    menu.addSeparator();
     menu.addItem (10, txt ("Salir"));
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&toolbar->getFileButton()), [this] (int r)
@@ -411,6 +421,11 @@ void MainComponent::showFileMenu()
             case 8:  showMessage (txt (help::shortcutsTitle), txt (help::shortcutsText)); break;
             case 9:  getStudooFolder ("Proyectos").startAsProcess(); break;
             case 10: juce::JUCEApplication::getInstance()->systemRequestedQuit(); break;
+            case 11: checkForUpdates (true); break;
+            case 12:
+                settings->setValue ("autoUpdate", ! settings->getBoolValue ("autoUpdate", true));
+                settings->saveIfNeeded();
+                break;
             default: break;
         }
     });
@@ -830,6 +845,182 @@ void MainComponent::updateTitle()
 {
     if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
         window->setName ("Studoo - " + project.getDisplayName() + (project.hasUnsavedChanges() ? " *" : ""));
+}
+
+// ============================================================================
+//  Actualizaciones automáticas
+// ============================================================================
+void MainComponent::checkForUpdates (bool userAsked)
+{
+    if (updateBusy)
+    {
+        if (userAsked)
+            setStatus (txt ("Ya se está buscando o instalando una actualización..."));
+        return;
+    }
+
+    updateBusy = true;
+    if (userAsked)
+        setStatus (txt ("Buscando actualizaciones..."));
+
+    juce::Component::SafePointer<MainComponent> safe (this);
+    juce::Thread::launch ([safe, userAsked]
+    {
+        updater::ReleaseInfo info;
+        juce::String error;
+        const bool ok = updater::fetchLatest (info, error);
+
+        juce::MessageManager::callAsync ([safe, userAsked, ok, info, error]
+        {
+            if (safe == nullptr)
+                return;
+            safe->updateBusy = false;
+            if (userAsked)
+                safe->setStatus ({});
+
+            if (! ok)
+            {
+                if (userAsked)
+                    showMessage (txt ("Buscar actualizaciones"), error);
+                return;
+            }
+            if (! updater::isNewer (info.version, STUDOO_VERSION))
+            {
+                if (userAsked)
+                    showMessage (txt ("Studoo está al día"),
+                                 txt ("Ya tienes la última versión de Studoo (") + juce::String (STUDOO_VERSION) + ").");
+                return;
+            }
+            if (! userAsked && safe->settings->getValue ("skipVersion") == info.version)
+                return;
+            safe->offerUpdate (info);
+        });
+    });
+}
+
+void MainComponent::offerUpdate (const updater::ReleaseInfo& info)
+{
+    const auto kind = updater::detectInstallKind();
+    const bool automatic = kind != updater::InstallKind::manual && info.assetUrl.isNotEmpty();
+
+    juce::String message = txt ("Hay una versión nueva: Studoo ") + info.version
+                         + txt (" (tú tienes la ") + juce::String (STUDOO_VERSION) + ").";
+    if (info.notes.isNotEmpty())
+        message << "\n\n" << txt ("Novedades:") << "\n" << info.notes;
+    message << "\n\n";
+    if (! automatic)
+        message << txt ("Se abrirá la página de descargas para que bajes la versión nueva.");
+    else if (kind == updater::InstallKind::windowsInstaller)
+        message << txt ("Studoo la descargará, se cerrará un momento para instalarla y se volverá a abrir solo. "
+                        "Tus proyectos no se tocan.");
+    else if (kind == updater::InstallKind::linuxDeb)
+        message << txt ("Studoo la descargará y la instalará. Te pedirá tu contraseña. Tus proyectos no se tocan.");
+    else
+        message << txt ("Studoo la descargará y la instalará. Tus proyectos no se tocan.");
+
+    juce::Component::SafePointer<MainComponent> safe (this);
+    juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                      .withIconType (juce::MessageBoxIconType::NoIcon)
+                                      .withTitle (txt ("¡Studoo se puede actualizar!"))
+                                      .withMessage (message)
+                                      .withButton (automatic ? txt ("Actualizar ahora") : txt ("Ir a descargas"))
+                                      .withButton (txt ("Saltar esta versión"))
+                                      .withButton (txt ("Más tarde")),
+                                  [safe, info, automatic] (int result)
+    {
+        if (safe == nullptr)
+            return;
+        if (result == 1)
+        {
+            if (automatic) safe->downloadAndInstall (info);
+            else           juce::URL (updater::releasesPage).launchInDefaultBrowser();
+        }
+        else if (result == 2)
+        {
+            safe->settings->setValue ("skipVersion", info.version);
+            safe->settings->saveIfNeeded();
+        }
+    });
+}
+
+void MainComponent::downloadAndInstall (const updater::ReleaseInfo& info)
+{
+    if (updateBusy)
+        return;
+    updateBusy = true;
+    setStatus (txt ("Descargando Studoo ") + info.version + txt ("... puedes seguir usando la app."));
+    statusTimeout = 100000;
+
+    const auto kind = updater::detectInstallKind();
+    juce::Component::SafePointer<MainComponent> safe (this);
+    juce::Thread::launch ([safe, info, kind]
+    {
+        auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("StudooActualizacion");
+        dir.deleteRecursively();
+        dir.createDirectory();
+        const auto file = dir.getChildFile (info.assetName);
+
+        juce::String error;
+        bool ok = updater::download (info.assetUrl, file, error);
+        if (ok && kind != updater::InstallKind::windowsInstaller)
+        {
+            juce::MessageManager::callAsync ([safe]
+            {
+                if (safe != nullptr)
+                {
+                    safe->setStatus (txt ("Instalando la actualización..."));
+                    safe->statusTimeout = 100000;
+                }
+            });
+            ok = updater::installOnLinux (kind, file, error);
+        }
+
+        juce::MessageManager::callAsync ([safe, info, kind, file, ok, error]
+        {
+            if (safe == nullptr)
+                return;
+            safe->updateBusy = false;
+            safe->setStatus ({});
+            safe->statusTimeout = 0;
+
+            if (! ok)
+            {
+                showMessage (txt ("No se pudo actualizar"),
+                             error + txt ("\n\nPuedes descargar la versión nueva a mano desde la página de descargas "
+                                          "(menú Archivo → Buscar actualizaciones → Ir a descargas)."));
+                return;
+            }
+
+            if (kind == updater::InstallKind::windowsInstaller)
+            {
+                // Pregunta si hay que guardar, lanza el instalador y cierra Studoo
+                safe->requestQuit ([file]
+                {
+                    if (updater::launchWindowsInstaller (file))
+                        juce::JUCEApplication::getInstance()->quit();
+                    else
+                        showMessage (txt ("No se pudo actualizar"), txt ("No se pudo abrir el instalador."));
+                });
+                return;
+            }
+
+            juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                              .withIconType (juce::MessageBoxIconType::NoIcon)
+                                              .withTitle (txt ("¡Studoo ") + info.version + txt (" instalado!"))
+                                              .withMessage (txt ("Reinicia Studoo para usar la versión nueva."))
+                                              .withButton (txt ("Reiniciar ahora"))
+                                              .withButton (txt ("Más tarde")),
+                                          [safe] (int result)
+            {
+                if (safe != nullptr && result == 1)
+                    safe->requestQuit ([]
+                    {
+                        updater::relaunch();
+                        juce::JUCEApplication::getInstance()->quit();
+                    });
+            });
+        });
+    });
 }
 
 void MainComponent::setStatus (const juce::String& text)

@@ -49,3 +49,5 @@ Name: "{autodesktop}\Studoo"; Filename: "{app}\Studoo.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Studoo.exe"; Description: "{cm:LaunchProgram,Studoo}"; Flags: nowait postinstall skipifsilent
+; Al actualizar desde la app (modo silencioso), volver a abrir Studoo
+Filename: "{app}\Studoo.exe"; Flags: nowait; Check: WizardSilent
