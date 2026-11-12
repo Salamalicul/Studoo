@@ -1,6 +1,9 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.5
+### 🆕 Novedades de la versión 1.5.1
+- 💬 **Mensajes de ayuda más limpios**: tarjeta gris con bordes suaves que sale debajo del ratón sin tapar el botón, y tarda un poco más en aparecer.
+
+### Novedades de la versión 1.5
 - 🔄 **Actualizaciones automáticas**: al abrir, Studoo mira si hay una versión nueva y te ofrece instalarla con un clic. En Windows se cierra un momento, se instala y se vuelve a abrir solo. En Linux te pide la contraseña.
 - ☰ En el menú: **Buscar actualizaciones** y una casilla para desactivar el aviso al abrir. También puedes saltarte una versión.
 - 🐧 El instalador de Linux (`instalar.sh`) funciona aunque Studoo esté abierto.
