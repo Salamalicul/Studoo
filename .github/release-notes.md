@@ -1,6 +1,12 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.3
+### 🆕 Novedades de la versión 1.4
+- 🎨 **Cada tipo de sonido tiene su color**: batería naranja, sintetizador azul, 808 morado, plugins verde y grabaciones turquesa (en el secuenciador, el piano roll, el mezclador y el panel del instrumento).
+- 💡 **Luces de actividad**: cada canal se ilumina cuando suena.
+- 🧭 **Iconos en las pestañas**, nuevas flechas de deshacer/rehacer y **medidor de volumen Master** en la barra superior.
+- ➕ Botón **"+ Añadir canal"** debajo de los canales y carteles de ayuda cuando el piano roll o la automatización están vacíos.
+
+### Novedades de la versión 1.3
 - 🥁 **18 kits de batería** con **más de 200 sonidos**. Nuevos: Phonk, Afrobeat, Dancehall, R&B, Techno, Jersey Club, Dubstep, Pop, Synthwave (80s), Clásico 808, Clásico 909 y Percusión latina. Los kits anteriores tienen ahora muchos más sonidos (varios bombos y cajas, ride, toms, congas, pandereta...).
 - 💥 **Efectos (FX)**: subida (riser), bajada, impacto, caída de sub, platillo al revés, barrido, láser y ruido de vinilo.
 - 🎹 **14 sonidos de sintetizador ya preparados**: pad, lead, pluck, bajos, piano eléctrico, campanas, cuerdas, órgano, metales...
