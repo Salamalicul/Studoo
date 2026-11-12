@@ -40,15 +40,18 @@ namespace
 
     bool httpGet (const juce::String& url, const juce::File* toFile, juce::String* text, int timeoutSecs)
     {
+        // Los archivos se piden a la API de GitHub como datos binarios
+        const juce::String accept = toFile != nullptr ? "Accept: application/octet-stream" : "Accept: application/vnd.github+json";
         juce::StringArray args;
         if (hasCommand ("curl"))
         {
-            args = { "curl", "-sSfL", "--max-time", juce::String (timeoutSecs), "-A", userAgent };
+            args = { "curl", "-sSfL", "--max-time", juce::String (timeoutSecs), "-A", userAgent, "-H", accept };
             if (toFile != nullptr) args.addArray ({ "-o", toFile->getFullPathName() });
         }
         else if (hasCommand ("wget"))
         {
             args = { "wget", "-q", "--timeout=" + juce::String (timeoutSecs), "--user-agent=" + juce::String (userAgent),
+                     "--header=" + accept,
                      "-O", toFile != nullptr ? toFile->getFullPathName() : juce::String ("-") };
         }
         else
@@ -65,7 +68,8 @@ namespace
     {
         auto stream = juce::URL (url).createInputStream (
             juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
-                .withExtraHeaders (juce::String ("User-Agent: ") + userAgent)
+                .withExtraHeaders (juce::String ("User-Agent: ") + userAgent + "\r\n"
+                                  + (toFile != nullptr ? "Accept: application/octet-stream" : "Accept: application/vnd.github+json"))
                 .withConnectionTimeoutMs (timeoutSecs * 1000)
                 .withNumRedirectsToFollow (8));
         if (stream == nullptr)
@@ -101,7 +105,15 @@ namespace
                 if (line.containsIgnoreCase ("Novedades")) { inside = true; continue; }
             }
             if (inside && line.trim().isNotEmpty())
-                result.add (line.replace ("**", "").replace ("`", "").replaceFirstOccurrenceOf ("- ", juce::String::fromUTF8 ("• ")));
+            {
+                // Quitamos los emojis (la fuente de la app no los tiene)
+                juce::String clean;
+                for (auto c : line)
+                    if (c < 0x2190 || (c >= 0x2200 && c < 0x2300))
+                        clean += juce::String::charToString (c);
+                line = clean.replace ("  ", " ");
+                result.add (line.replace ("**", "").replace ("`", "").replaceFirstOccurrenceOf ("- ", juce::String::fromUTF8 ("• ")).trimEnd());
+            }
         }
         auto text = result.joinIntoString ("\n");
         if (text.length() > 900)
@@ -179,7 +191,7 @@ bool fetchLatest (ReleaseInfo& info, juce::String& error)
                 if (asset["name"].toString().endsWith (suffix))
                 {
                     info.assetName = asset["name"].toString();
-                    info.assetUrl = asset["browser_download_url"].toString();
+                    info.assetUrl = asset["url"].toString(); // API: sirve el archivo con "Accept: application/octet-stream"
                 }
     return true;
 }
@@ -222,9 +234,23 @@ bool installOnLinux (InstallKind kind, const juce::File& downloaded, juce::Strin
             && exitCode == 0)
         {
             auto script = dir.getChildFile ("Studoo-Linux").getChildFile ("instalar.sh");
+
+            // Studoo está abierto: no se puede sobrescribir, pero sí apartarlo.
+            // instalar.sh copiará el nuevo en su sitio.
+            auto installed = juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile (".local/share/studoo/Studoo");
+            auto old = installed.getSiblingFile ("Studoo.antiguo");
+            old.deleteFile();
+            if (installed.existsAsFile())
+                installed.moveFileTo (old);
+
             if (script.existsAsFile()
                 && runCommand ({ "bash", script.getFullPathName() }, nullptr, 120000, exitCode) && exitCode == 0)
+            {
+                old.deleteFile();
                 return true;
+            }
+            if (! installed.existsAsFile())
+                old.moveFileTo (installed); // si algo falla, dejamos la versión de antes
         }
         error = juce::String::fromUTF8 ("No se pudo instalar la actualización.");
         return false;
