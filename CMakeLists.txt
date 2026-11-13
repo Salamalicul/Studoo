@@ -73,6 +73,7 @@ target_sources(Studoo PRIVATE
     src/ui/MixerView.cpp
     src/ui/AutomationView.cpp
     src/ui/LearnView.cpp
+    src/ui/Illustrations.cpp
     src/ui/Tutorial.cpp
     ${STUDOO_ENGINE_SOURCES})
 

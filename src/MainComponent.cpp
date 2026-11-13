@@ -125,6 +125,8 @@ MainComponent::MainComponent()
     automationView = std::make_unique<AutomationView> (*ctx);
     learnView = std::make_unique<LearnView>();
     learnView->onStartTutorial = [this] { startTutorial(); };
+    learnView->onGoToView = [this] (View v) { showView (v); };
+    learnView->setSettings (settings.get());
 
     views = { channelRack.get(), pianoRoll.get(), playlist.get(), mixerView.get(), automationView.get(), learnView.get() };
     for (auto* v : views)

@@ -109,9 +109,13 @@ namespace studoo::help
 
     inline constexpr const char* learnTitle = "Aprende";
     inline constexpr const char* learnText =
-        "Aquí tienes explicaciones sencillas de los conceptos básicos de producción musical. "
-        "Elige un tema en la lista de la izquierda.\n\n"
-        "También puedes repetir el tutorial \"Tu primer beat\" desde el menú Archivo.";
+        "Una ruta completa para aprender a producir, de cero a terminar canciones, en 7 niveles y 39 lecciones.\n\n"
+        "- Elige una lección en la lista de la izquierda (mejor en orden la primera vez).\n"
+        "- Cada lección tiene explicaciones, ilustraciones animadas, pasos y un ejercicio para practicar.\n"
+        "- Los botones naranjas te llevan a la parte de Studoo donde se practica.\n"
+        "- \"Ver vídeos en YouTube\" abre vídeos en español sobre ese tema.\n"
+        "- \"Marcar como aprendida\" guarda tu progreso (lo ves arriba).\n\n"
+        "El botón \"Tutorial guiado\" te lleva paso a paso por Studoo para hacer tu primer beat.";
 
     inline constexpr const char* shortcutsTitle = "Atajos de teclado";
     inline constexpr const char* shortcutsText =

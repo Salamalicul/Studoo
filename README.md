@@ -26,7 +26,7 @@
   </tr>
   <tr>
     <td><img src="docs/images/tutorial.png" alt="Tutorial"><p align="center"><b>🧭 Tutorial guiado</b><br>Tu primer beat, paso a paso</p></td>
-    <td><img src="docs/images/aprende.png" alt="Aprende"><p align="center"><b>🎓 Aprende</b><br>BPM, 808, acordes, mezcla y más, explicados fácil</p></td>
+    <td><img src="docs/images/aprende.png" alt="Aprende"><p align="center"><b>🎓 Aprende</b><br>39 lecciones con ilustraciones animadas, de cero a terminar canciones</p></td>
   </tr>
 </table>
 
@@ -51,7 +51,7 @@
 | ↩️ | Deshacer y rehacer (**Ctrl+Z / Ctrl+Y**) | Barra superior |
 | 💿 | Exportar a **WAV** y **MP3** | Menú ☰ |
 | ⏱️ | BPM, metrónomo, modos PATRÓN/CANCIÓN y atajos de teclado | Barra superior |
-| 🎓 | Tutorial, botón **?** en cada sección, mensajes de ayuda y apartado **Aprende** | **Aprende** (F1) |
+| 🎓 | **Aprende**: ruta de 39 lecciones en 7 niveles con ilustraciones animadas, pasos, ejercicios, vídeos y progreso. Además, tutorial guiado, botón **?** en cada sección y mensajes de ayuda | **Aprende** (F1) |
 
 ## ⌨️ Atajos principales
 
