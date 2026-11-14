@@ -66,6 +66,12 @@ namespace studoo
         void setStatus (const juce::String&);
         juce::File getAutosaveFile() const;
 
+        // --- Tablets (Android) ------------------------------------------------------
+        void shareFile (const juce::File&);
+        void importProject();
+        LongPressRightClick longPress;          // mantener pulsado = clic derecho
+        juce::ScopedMessageBox shareBox;
+
         // --- Actualizaciones automáticas ----------------------------------------
         void checkForUpdates (bool userAsked);
         void offerUpdate (const updater::ReleaseInfo&);

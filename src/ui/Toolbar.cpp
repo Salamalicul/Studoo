@@ -266,8 +266,12 @@ void Toolbar::resized()
 
     helpButton.setBounds (area.removeFromRight (28).withSizeKeepingCentre (26, 26));
     area.removeFromRight (8);
+   #if JUCE_ANDROID
+    pluginsButton.setVisible (false); // en los tablets no hay plugins VST3
+   #else
     pluginsButton.setBounds (area.removeFromRight (70));
     area.removeFromRight (6);
+   #endif
     audioButton.setBounds (area.removeFromRight (60));
     area.removeFromRight (8);
     meterArea = area.removeFromRight (16).withSizeKeepingCentre (16, 40);

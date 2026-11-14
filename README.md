@@ -5,6 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Windows-listo-ff8a1f?style=for-the-badge&logo=windows&logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/Linux-listo-ff8a1f?style=for-the-badge&logo=linux&logoColor=white" alt="Linux">
+  <img src="https://img.shields.io/badge/Android-tablets_(prueba)-ff8a1f?style=for-the-badge&logo=android&logoColor=white" alt="Android">
   <img src="https://img.shields.io/badge/Idioma-español-5fd35a?style=for-the-badge" alt="Español">
   <img src="https://img.shields.io/badge/Hecho_con-JUCE_+_C++-4fc3f7?style=for-the-badge" alt="JUCE + C++">
 </p>
@@ -26,7 +27,7 @@
   </tr>
   <tr>
     <td><img src="docs/images/tutorial.png" alt="Tutorial"><p align="center"><b>🧭 Tutorial guiado</b><br>Tu primer beat, paso a paso</p></td>
-    <td><img src="docs/images/aprende.png" alt="Aprende"><p align="center"><b>🎓 Aprende</b><br>BPM, 808, acordes, mezcla y más, explicados fácil</p></td>
+    <td><img src="docs/images/aprende.png" alt="Aprende"><p align="center"><b>🎓 Aprende</b><br>39 lecciones con ilustraciones animadas, de cero a terminar canciones</p></td>
   </tr>
 </table>
 
@@ -51,7 +52,7 @@
 | ↩️ | Deshacer y rehacer (**Ctrl+Z / Ctrl+Y**) | Barra superior |
 | 💿 | Exportar a **WAV** y **MP3** | Menú ☰ |
 | ⏱️ | BPM, metrónomo, modos PATRÓN/CANCIÓN y atajos de teclado | Barra superior |
-| 🎓 | Tutorial, botón **?** en cada sección, mensajes de ayuda y apartado **Aprende** | **Aprende** (F1) |
+| 🎓 | **Aprende**: ruta de 39 lecciones en 7 niveles con ilustraciones animadas, pasos, ejercicios, vídeos y progreso. Además, tutorial guiado, botón **?** en cada sección y mensajes de ayuda | **Aprende** (F1) |
 
 ## ⌨️ Atajos principales
 
@@ -76,6 +77,7 @@
 | 🐧 **Ubuntu / Linux Mint / Debian** | `Studoo-...-Linux.deb` | Doble clic → **Instalar**. Aparece en el menú de aplicaciones. |
 | 🐧 **Otras distribuciones** | `Studoo-...-Linux.tar.gz` | `tar -xzf Studoo-*-Linux.tar.gz` y `./Studoo-Linux/instalar.sh` |
 | 🪟 Windows sin instalar | `Studoo-...-Windows.zip` | Descomprimir y abrir `Studoo.exe` |
+| 📱 **Android (tablet)** | `Studoo-...-Android.apk` | Ábrelo en el tablet, permite "instalar apps de origen desconocido" y pulsa **Instalar**. (Versión de prueba) |
 
 - En Windows, si aparece *"Windows protegió su PC"*, pulsa **Más información** → **Ejecutar de todas formas** (sale porque la app es nueva y no está "firmada").
 - Si el `.deb` no se abre con doble clic: `sudo apt install ./Studoo-*-Linux.deb`

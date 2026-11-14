@@ -175,6 +175,12 @@ bool fetchLatest (ReleaseInfo& info, juce::String& error)
 
     const auto json = juce::JSON::parse (text);
     const auto tag = json["tag_name"].toString();
+    if (tag.isEmpty() && json["message"].toString() == "Not Found")
+    {
+        error = juce::String::fromUTF8 ("No se encuentra Studoo en GitHub. Puede que el proyecto sea privado: "
+                                        "para que las actualizaciones funcionen, tiene que ser público.");
+        return false;
+    }
     if (tag.isEmpty())
     {
         error = juce::String::fromUTF8 ("GitHub no ha devuelto la información de la última versión.");

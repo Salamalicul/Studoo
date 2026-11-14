@@ -8,6 +8,7 @@ namespace studoo
 // ============================================================================
 PianoRollGrid::PianoRollGrid (AppContext& c, PianoRoll& r) : ctx (c), roll (r)
 {
+    enableLongPressMenu (*this); // en tablets: mantener pulsado = clic derecho
     setTooltip (txt ("Clic en un hueco: añadir nota. Arrastra una nota: moverla. Arrastra su borde derecho: "
                      "cambiar la duración. Clic derecho: borrar. Teclas del piano: escuchar."));
     makeNonFocusing (*this);

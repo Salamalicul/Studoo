@@ -7,6 +7,7 @@
 // ============================================================================
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "StudooLookAndFeel.h"
+#include <optional>
 
 namespace studoo
 {
@@ -66,6 +67,35 @@ namespace studoo
     // Nombres de notas en español: 60 -> "Do4"
     juce::String noteName (int midiNote, bool withOctave = true);
     bool isBlackKey (int midiNote);
+
+    // ------------------------------------------------------------------------
+    //  Pantallas táctiles (tablets Android)
+    // ------------------------------------------------------------------------
+    // Marca un componente para que "mantener pulsado" funcione como clic derecho
+    inline void enableLongPressMenu (juce::Component& c) { c.getProperties().set ("longPressMenu", true); }
+
+    // Escucha todos los toques: si mantienes el dedo quieto medio segundo sobre un
+    // componente marcado, le manda un "clic derecho" (borrar nota, menú del canal...).
+    class LongPressRightClick : private juce::MouseListener, private juce::Timer
+    {
+    public:
+        LongPressRightClick();
+        ~LongPressRightClick() override;
+
+    private:
+        void mouseDown (const juce::MouseEvent&) override;
+        void mouseDrag (const juce::MouseEvent&) override;
+        void mouseUp (const juce::MouseEvent&) override;
+        void timerCallback() override;
+
+        juce::Component::SafePointer<juce::Component> target;
+        std::optional<juce::MouseInputSource> source;
+        juce::Point<float> position;
+    };
+
+    // Archivos elegidos en un FileChooser. En Android los archivos no tienen una
+    // ruta normal: se copian a 'importFolder' para que Studoo pueda usarlos siempre.
+    juce::Array<juce::File> chosenFiles (const juce::FileChooser&, const juce::File& importFolder);
 
     // Ventana para escribir un texto (por ejemplo, renombrar). Llama a onOk si se acepta.
     void askForText (const juce::String& title, const juce::String& message, const juce::String& initial,
