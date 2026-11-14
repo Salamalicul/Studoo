@@ -3,3 +3,9 @@ build-*/
 out/
 .vs/
 .vscode/
+
+# Android: JUCE descargado y proyecto generado
+packaging/android/JUCE
+packaging/android/Builds/
+packaging/android/JuceLibraryCode/
+packaging/android/Studoo.jucer

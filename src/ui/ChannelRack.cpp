@@ -560,6 +560,7 @@ void ChannelRack::rebuildRows()
             ctx.engine.previewNote (uid, c.getProperty (ids::root, 60), 0.8f, 0.4);
         };
         row->name.onRightClick = [this, uid] { showChannelMenu (uid); };
+        enableLongPressMenu (row->name);
         makeNonFocusing (row->name);
 
         for (auto* k : { &row->volume, &row->pan })
@@ -708,9 +709,11 @@ void ChannelRack::loadSampleInto (juce::ValueTree channel)
     chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                           [this, channel] (const juce::FileChooser& fc) mutable
     {
-        auto f = fc.getResult();
-        if (! f.existsAsFile())
+        auto chosen = chosenFiles (fc, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                                           .getChildFile ("Studoo").getChildFile ("Samples"));
+        if (chosen.isEmpty())
             return;
+        auto f = chosen[0];
         ctx.project.beginTransaction();
         channel.setProperty (ids::sample, f.getFullPathName(), ctx.project.um());
         channel.setProperty (ids::name, f.getFileNameWithoutExtension(), ctx.project.um());
@@ -761,16 +764,19 @@ void ChannelRack::showAddMenu()
     menu.addSeparator();
     menu.addSectionHeader (txt ("Tus propios sonidos"));
     menu.addItem (1, txt ("Sample (WAV, MP3...)"));
+    const auto instruments = ctx.plugins.getInstruments();
+   #if ! JUCE_ANDROID
+    // (En los tablets no hay carpetas normales ni plugins VST3)
     menu.addItem (2, txt ("Kit de batería (todos los samples de una carpeta)"));
     menu.addSeparator();
 
     juce::PopupMenu plugins;
-    const auto instruments = ctx.plugins.getInstruments();
     for (int i = 0; i < instruments.size(); ++i)
         plugins.addItem (100 + i, instruments[i].name + "  (" + instruments[i].manufacturerName + ")");
     if (instruments.isEmpty())
         plugins.addItem (-1, txt ("No hay plugins: pulsa \"Plugins\" arriba para buscarlos"), false);
     menu.addSubMenu ("Plugin VST3", plugins);
+   #endif
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addButton), [this, instruments] (int result)
     {
@@ -780,7 +786,11 @@ void ChannelRack::showAddMenu()
                                                            ctx.samples.getSupportedWildcard());
             chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                                       | juce::FileBrowserComponent::canSelectMultipleItems,
-                                  [this] (const juce::FileChooser& fc) { addSampleChannels (fc.getResults()); });
+                                  [this] (const juce::FileChooser& fc)
+            {
+                addSampleChannels (chosenFiles (fc, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                                                        .getChildFile ("Studoo").getChildFile ("Samples")));
+            });
         }
         else if (result == 2)
         {

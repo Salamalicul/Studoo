@@ -1,3 +1,4 @@
+#include "Version.h"
 #include "MainComponent.h"
 #include "ui/HelpTexts.h"
 
@@ -397,17 +398,27 @@ void MainComponent::showFileMenu()
     menu.addItem (3, txt ("Guardar"));
     menu.addItem (4, txt ("Guardar como..."));
     menu.addSeparator();
+   #if JUCE_ANDROID
+    menu.addItem (5, txt ("Exportar canción (WAV) y compartir..."));
+    menu.addItem (13, txt ("Compartir este proyecto..."));
+    menu.addItem (14, txt ("Importar un proyecto..."));
+    menu.addSeparator();
+    menu.addItem (7, txt ("Tutorial: tu primer beat"));
+   #else
     menu.addItem (5, txt ("Exportar a WAV..."));
     menu.addItem (6, txt ("Exportar a MP3..."));
     menu.addSeparator();
     menu.addItem (7, txt ("Tutorial: tu primer beat"));
     menu.addItem (8, txt ("Atajos de teclado"));
     menu.addItem (9, txt ("Abrir la carpeta de proyectos"));
+   #endif
     menu.addSeparator();
     menu.addItem (11, txt ("Buscar actualizaciones"));
     menu.addItem (12, txt ("Buscar actualizaciones al abrir Studoo"), true, settings->getBoolValue ("autoUpdate", true));
+   #if ! JUCE_ANDROID
     menu.addSeparator();
     menu.addItem (10, txt ("Salir"));
+   #endif
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&toolbar->getFileButton()), [this] (int r)
     {
@@ -424,6 +435,10 @@ void MainComponent::showFileMenu()
             case 9:  getStudooFolder ("Proyectos").startAsProcess(); break;
             case 10: juce::JUCEApplication::getInstance()->systemRequestedQuit(); break;
             case 11: checkForUpdates (true); break;
+            case 13:
+                saveProject ([this] { shareFile (project.getFile()); });
+                break;
+            case 14: importProject(); break;
             case 12:
                 settings->setValue ("autoUpdate", ! settings->getBoolValue ("autoUpdate", true));
                 settings->saveIfNeeded();
@@ -474,6 +489,39 @@ void MainComponent::newProject()
 
 void MainComponent::openProject()
 {
+   #if JUCE_ANDROID
+    // En el tablet: lista de los proyectos guardados en Studoo
+    checkUnsavedThen ([this]
+    {
+        auto files = getStudooFolder ("Proyectos").findChildFiles (juce::File::findFiles, false, "*.studoo");
+        std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b)
+                   { return a.getLastModificationTime() > b.getLastModificationTime(); });
+        juce::PopupMenu menu;
+        menu.addSectionHeader (txt ("Tus proyectos"));
+        for (int i = 0; i < files.size(); ++i)
+            menu.addItem (i + 1, files[i].getFileNameWithoutExtension() + "   ("
+                                     + files[i].getLastModificationTime().formatted ("%d/%m/%Y %H:%M") + ")");
+        if (files.isEmpty())
+            menu.addItem (-1, txt ("Todavía no has guardado ningún proyecto"), false);
+        menu.addSeparator();
+        menu.addItem (1000, txt ("Importar un proyecto desde el tablet..."));
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&toolbar->getFileButton()), [this, files] (int r)
+        {
+            if (r == 1000) { importProject(); return; }
+            if (! juce::isPositiveAndBelow (r - 1, files.size()))
+                return;
+            engine.stop();
+            juce::String error;
+            if (project.loadFromFile (files[r - 1], error))
+                setStatus (txt ("Proyecto abierto: ") + files[r - 1].getFileNameWithoutExtension());
+            else
+                showMessage (txt ("No se pudo abrir"), error);
+            updateTitle();
+        });
+    });
+    return;
+   #endif
+
     checkUnsavedThen ([this]
     {
         chooser = std::make_unique<juce::FileChooser> (txt ("Abrir proyecto de Studoo"), getStudooFolder ("Proyectos"), "*.studoo");
@@ -520,6 +568,21 @@ void MainComponent::saveProject (std::function<void()> then)
 
 void MainComponent::saveProjectAs (std::function<void()> then)
 {
+   #if JUCE_ANDROID
+    // En el tablet: solo pedimos el nombre; se guarda en la carpeta de Studoo
+    askForText (txt ("Guardar proyecto"), txt ("Nombre del proyecto:"),
+                project.getFile() != juce::File() ? project.getFile().getFileNameWithoutExtension() : txt ("Mi beat"),
+                [this, then] (const juce::String& name)
+    {
+        auto clean = juce::File::createLegalFileName (name.trim());
+        if (clean.isEmpty())
+            clean = "Mi beat";
+        project.setFile (getStudooFolder ("Proyectos").getChildFile (clean + ".studoo"));
+        saveProject (then);
+    });
+    return;
+   #endif
+
     auto initial = project.getFile() != juce::File() ? project.getFile()
                                                      : getStudooFolder ("Proyectos").getChildFile ("Mi beat.studoo");
     chooser = std::make_unique<juce::FileChooser> (txt ("Guardar proyecto"), initial, "*.studoo");
@@ -591,6 +654,36 @@ void MainComponent::exportSong (bool mp3)
             return;
         }
     }
+
+   #if JUCE_ANDROID
+    {
+        // En el tablet: se exporta a la carpeta de Studoo y luego se puede compartir
+        auto f = getStudooFolder ("Exportados").getChildFile (juce::File::createLegalFileName (project.getDisplayName()) + ".wav");
+        engine.stop();
+        juce::Component::SafePointer<MainComponent> safe (this);
+        auto* job = new ExportJob (engine, deviceManager, f, {}, [safe, f] (bool ok, const juce::String& error)
+        {
+            if (safe == nullptr)
+                return;
+            if (! ok)
+            {
+                showMessage (txt ("No se pudo exportar"), error);
+                return;
+            }
+            safe->setStatus (txt ("Exportado: ") + f.getFileName());
+            juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                              .withIconType (juce::MessageBoxIconType::NoIcon)
+                                              .withTitle (txt ("¡Canción exportada!"))
+                                              .withMessage (txt ("Pulsa \"Compartir\" para guardarla en tus archivos, "
+                                                                 "mandarla por WhatsApp, subirla a Drive..."))
+                                              .withButton (txt ("Compartir"))
+                                              .withButton (txt ("Cerrar")),
+                                          [safe, f] (int r) { if (safe != nullptr && r == 1) safe->shareFile (f); });
+        });
+        job->launchThread();
+        return;
+    }
+   #endif
 
     const auto ext = mp3 ? juce::String (".mp3") : juce::String (".wav");
     chooser = std::make_unique<juce::FileChooser> (mp3 ? txt ("Exportar a MP3") : txt ("Exportar a WAV"),
@@ -664,6 +757,31 @@ void MainComponent::toggleRecording()
         showView (View::playlist);
         return;
     }
+
+   #if JUCE_ANDROID || JUCE_IOS
+    // El tablet pide permiso para usar el micrófono la primera vez
+    if (! juce::RuntimePermissions::isGranted (juce::RuntimePermissions::recordAudio))
+    {
+        juce::Component::SafePointer<MainComponent> safe (this);
+        juce::RuntimePermissions::request (juce::RuntimePermissions::recordAudio, [safe] (bool granted)
+        {
+            if (safe == nullptr)
+                return;
+            if (! granted)
+            {
+                showMessage (txt ("Sin permiso para el micrófono"),
+                             txt ("Para grabar, Studoo necesita usar el micrófono. Puedes darle permiso en "
+                                  "Ajustes del tablet > Aplicaciones > Studoo > Permisos."));
+                return;
+            }
+            auto setup = safe->deviceManager.getAudioDeviceSetup();
+            setup.useDefaultInputChannels = true;
+            safe->deviceManager.setAudioDeviceSetup (setup, true);
+            safe->toggleRecording();
+        });
+        return;
+    }
+   #endif
 
     auto folder = project.getFile() != juce::File() ? project.getFile().getParentDirectory().getChildFile ("Grabaciones")
                                                     : getStudooFolder ("Grabaciones");
@@ -847,6 +965,42 @@ void MainComponent::updateTitle()
 {
     if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
         window->setName ("Studoo - " + project.getDisplayName() + (project.hasUnsavedChanges() ? " *" : ""));
+}
+
+// ============================================================================
+//  Tablets: compartir e importar
+// ============================================================================
+void MainComponent::shareFile (const juce::File& file)
+{
+    if (! file.existsAsFile())
+        return;
+   #if JUCE_CONTENT_SHARING
+    shareBox = juce::ContentSharer::shareFilesScoped ({ juce::URL (file) }, [] (bool, const juce::String&) {}, this);
+   #else
+    file.revealToUser();
+   #endif
+}
+
+void MainComponent::importProject()
+{
+    chooser = std::make_unique<juce::FileChooser> (txt ("Importar un proyecto de Studoo"), juce::File(), "*.studoo");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                          [this] (const juce::FileChooser& fc)
+    {
+        auto files = chosenFiles (fc, getStudooFolder ("Proyectos"));
+        if (files.isEmpty())
+            return;
+        checkUnsavedThen ([this, f = files[0]]
+        {
+            engine.stop();
+            juce::String error;
+            if (project.loadFromFile (f, error))
+                setStatus (txt ("Proyecto importado: ") + f.getFileNameWithoutExtension());
+            else
+                showMessage (txt ("No se pudo abrir"), error);
+            updateTitle();
+        });
+    });
 }
 
 // ============================================================================

@@ -8,6 +8,7 @@ namespace studoo
 // ============================================================================
 AutomationEditor::AutomationEditor (AppContext& c, AutomationView& v) : ctx (c), view (v)
 {
+    enableLongPressMenu (*this); // en tablets: mantener pulsado = clic derecho
     setTooltip (txt ("Clic en un hueco: añadir un punto. Arrastra un punto: moverlo. Clic derecho: borrarlo. "
                      "Arriba = valor máximo, abajo = mínimo."));
     makeNonFocusing (*this);

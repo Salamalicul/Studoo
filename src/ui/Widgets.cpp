@@ -192,4 +192,93 @@ void askForText (const juce::String& title, const juce::String& message, const j
             onOk (text);
     }), true);
 }
+
+// ============================================================================
+//  Pantallas táctiles
+// ============================================================================
+LongPressRightClick::LongPressRightClick()
+{
+    juce::Desktop::getInstance().addGlobalMouseListener (this);
+}
+
+LongPressRightClick::~LongPressRightClick()
+{
+    juce::Desktop::getInstance().removeGlobalMouseListener (this);
+}
+
+void LongPressRightClick::mouseDown (const juce::MouseEvent& e)
+{
+    stopTimer();
+    if (! e.source.isTouch() || e.mods.isPopupMenu() || e.eventComponent == nullptr
+        || ! (bool) e.eventComponent->getProperties()["longPressMenu"])
+        return;
+    target = e.eventComponent;
+    source = e.source;
+    position = e.position;
+    startTimer (550);
+}
+
+void LongPressRightClick::mouseDrag (const juce::MouseEvent& e)
+{
+    if (e.getDistanceFromDragStart() > 12)
+        stopTimer();
+}
+
+void LongPressRightClick::mouseUp (const juce::MouseEvent&)
+{
+    stopTimer();
+}
+
+void LongPressRightClick::timerCallback()
+{
+    stopTimer();
+    auto* c = target.getComponent();
+    if (c == nullptr || ! source.has_value())
+        return;
+    const auto now = juce::Time::getCurrentTime();
+    const juce::MouseEvent fake (*source, position, juce::ModifierKeys (juce::ModifierKeys::rightButtonModifier),
+                                 juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation,
+                                 juce::MouseInputSource::defaultRotation, juce::MouseInputSource::defaultTiltX,
+                                 juce::MouseInputSource::defaultTiltY, c, c, now, position, now, 1, false);
+    c->mouseDown (fake);
+    if (target != nullptr)
+        c->mouseUp (fake);
+}
+
+juce::Array<juce::File> chosenFiles (const juce::FileChooser& fc, const juce::File& importFolder)
+{
+    juce::Array<juce::File> files;
+    for (auto& url : fc.getURLResults())
+    {
+        if (url.isLocalFile())
+        {
+            if (url.getLocalFile().exists())
+                files.add (url.getLocalFile());
+            continue;
+        }
+       #if JUCE_ANDROID
+        // Documento de Android (content://...): lo copiamos a la carpeta de Studoo
+        const auto doc = juce::AndroidDocument::fromDocument (url);
+        auto name = doc.getInfo().getName();
+        if (name.isEmpty())
+            name = "sonido.wav";
+        importFolder.createDirectory();
+        auto dest = importFolder.getChildFile (juce::File::createLegalFileName (name));
+        if (auto in = doc.createInputStream())
+        {
+            dest.deleteFile();
+            juce::FileOutputStream out (dest);
+            if (out.openedOk())
+            {
+                out.writeFromInputStream (*in, -1);
+                out.flush();
+                files.add (dest);
+            }
+        }
+       #else
+        juce::ignoreUnused (importFolder);
+       #endif
+    }
+    return files;
+}
 }

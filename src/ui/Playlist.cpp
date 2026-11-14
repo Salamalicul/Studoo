@@ -8,6 +8,7 @@ namespace studoo
 // ============================================================================
 PlaylistGrid::PlaylistGrid (AppContext& c, Playlist& p) : ctx (c), playlist (p)
 {
+    enableLongPressMenu (*this); // en tablets: mantener pulsado = clic derecho
     setTooltip (txt ("Clic en un hueco: colocar el patrón elegido arriba. Arrastra un bloque: moverlo. Borde derecho: "
                      "alargarlo. Clic derecho: borrar. Doble clic: editar el patrón. Clic en la regla: mover el cursor."));
     makeNonFocusing (*this);
