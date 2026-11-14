@@ -5,6 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Windows-listo-ff8a1f?style=for-the-badge&logo=windows&logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/Linux-listo-ff8a1f?style=for-the-badge&logo=linux&logoColor=white" alt="Linux">
+  <img src="https://img.shields.io/badge/Android-tablets_(prueba)-ff8a1f?style=for-the-badge&logo=android&logoColor=white" alt="Android">
   <img src="https://img.shields.io/badge/Idioma-español-5fd35a?style=for-the-badge" alt="Español">
   <img src="https://img.shields.io/badge/Hecho_con-JUCE_+_C++-4fc3f7?style=for-the-badge" alt="JUCE + C++">
 </p>
@@ -76,6 +77,7 @@
 | 🐧 **Ubuntu / Linux Mint / Debian** | `Studoo-...-Linux.deb` | Doble clic → **Instalar**. Aparece en el menú de aplicaciones. |
 | 🐧 **Otras distribuciones** | `Studoo-...-Linux.tar.gz` | `tar -xzf Studoo-*-Linux.tar.gz` y `./Studoo-Linux/instalar.sh` |
 | 🪟 Windows sin instalar | `Studoo-...-Windows.zip` | Descomprimir y abrir `Studoo.exe` |
+| 📱 **Android (tablet)** | `Studoo-...-Android.apk` | Ábrelo en el tablet, permite "instalar apps de origen desconocido" y pulsa **Instalar**. (Versión de prueba) |
 
 - En Windows, si aparece *"Windows protegió su PC"*, pulsa **Más información** → **Ejecutar de todas formas** (sale porque la app es nueva y no está "firmada").
 - Si el `.deb` no se abre con doble clic: `sudo apt install ./Studoo-*-Linux.deb`

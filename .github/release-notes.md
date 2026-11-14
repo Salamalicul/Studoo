@@ -1,6 +1,11 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.5.1
+### 🆕 Novedades de la versión 1.6
+- 📱 **Studoo para Android (tablets)**, primera versión de prueba: secuenciador, piano roll, playlist, mezclador, Aprende, grabar con el micrófono y exportar la canción para compartirla. **Mantén pulsado** donde en el ordenador harías clic derecho (menú del canal, borrar notas...).
+- 🎓 **Aprende, totalmente nuevo**: una ruta de **39 lecciones en 7 niveles** (de cero a terminar canciones), con **ilustraciones animadas**, pasos, trucos, ejercicios para practicar, botón para ver **vídeos en YouTube** y tu **progreso guardado**.
+- 🔄 Si el proyecto de GitHub es privado, el buscador de actualizaciones ahora lo explica claramente.
+
+### Novedades de la versión 1.5.1
 - 💬 **Mensajes de ayuda más limpios**: tarjeta gris con bordes suaves que sale debajo del ratón sin tapar el botón, y tarda un poco más en aparecer.
 
 ### Novedades de la versión 1.5
@@ -45,6 +50,12 @@
 2. Haz doble clic: se abre la tienda de aplicaciones. Pulsa **Instalar** (te pedirá tu contraseña).
    - Si no se abre, en una terminal: `sudo apt install ./Studoo-*-Linux.deb`
 3. ¡Listo! Studoo aparece en el **menú de aplicaciones** con su icono. También instala LAME para exportar a MP3.
+
+**Android (tablets)** — versión de prueba
+1. Descarga **`Studoo-...-Android.apk`** desde el tablet.
+2. Ábrelo. Android te pedirá permiso para **instalar aplicaciones de origen desconocido**: permítelo para tu navegador o tu gestor de archivos.
+3. Pulsa **Instalar**. Studoo aparece con su icono.
+   - Si ya tenías una versión anterior y no deja instalar, desinstala la anterior primero.
 
 **Otras distribuciones de Linux** (Fedora, Arch...)
 1. Descarga **`Studoo-...-Linux.tar.gz`**.
