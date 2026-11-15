@@ -411,6 +411,16 @@ ChannelRack::ChannelRack (AppContext& c)
     };
     makeNonFocusing (clearButton);
 
+    addChildComponent (soundButton);
+    soundButton.setButtonText (txt ("Sonido"));
+    soundButton.setTooltip (txt ("Abre o cierra los ajustes del sonido del canal seleccionado."));
+    soundButton.onClick = [this]
+    {
+        panelOpen = ! panelOpen;
+        resized();
+    };
+    makeNonFocusing (soundButton);
+
     addAndMakeVisible (viewport);
     viewport.setViewedComponent (&content, false);
     viewport.setScrollBarsShown (true, false);
@@ -607,8 +617,8 @@ void ChannelRack::timerCallback()
 
 void ChannelRack::paint (juce::Graphics& g)
 {
-    auto area = getLocalBounds().withTrimmedBottom (panelHeight + 8);
-    drawPanel (g, area, headerArea, txt ("Secuenciador de patrones"));
+    auto area = Layout::compact() ? getLocalBounds() : getLocalBounds().withTrimmedBottom (panelHeight + 8);
+    drawPanel (g, area, headerArea, Layout::compact() ? juce::String() : txt ("Secuenciador de patrones"));
 
     // Números de los pasos encima de la cuadrícula
     const int length = getPatternLength();
@@ -633,21 +643,39 @@ void ChannelRack::paint (juce::Graphics& g)
 void ChannelRack::resized()
 {
     auto area = getLocalBounds();
-    auto panel = area.removeFromBottom (panelHeight);
-    instrumentPanel.setBounds (panel);
-    area.removeFromBottom (8);
+    const bool compact = Layout::compact();
+    if (compact)
+    {
+        // Modo móvil: el panel del sonido se abre encima, con el botón "Sonido"
+        instrumentPanel.setBounds (area.withTop (area.getBottom() - panelHeight));
+        instrumentPanel.setVisible (panelOpen);
+        soundButton.setVisible (true);
+        soundButton.setToggleState (panelOpen, juce::dontSendNotification);
+    }
+    else
+    {
+        auto panel = area.removeFromBottom (panelHeight);
+        instrumentPanel.setBounds (panel);
+        area.removeFromBottom (8);
+        soundButton.setVisible (false);
+    }
 
     headerArea = area.removeFromTop (headerHeight);
     {
         auto h = headerArea.reduced (8, 7);
         helpButton.setBounds (h.removeFromLeft (26));
-        h.removeFromLeft (230);
+        h.removeFromLeft (compact ? 8 : 230);
         patternBox.setBounds (h.removeFromLeft (150)); h.removeFromLeft (4);
         patternMenuButton.setBounds (h.removeFromLeft (84)); h.removeFromLeft (8);
         lengthBox.setBounds (h.removeFromLeft (170));
         clearButton.setBounds (h.removeFromRight (80)); h.removeFromRight (6);
         exampleButton.setBounds (h.removeFromRight (130)); h.removeFromRight (6);
         addButton.setBounds (h.removeFromRight (100));
+        if (compact)
+        {
+            h.removeFromRight (6);
+            soundButton.setBounds (h.removeFromRight (90));
+        }
     }
 
     area.removeFromTop (numbersHeight + 2);

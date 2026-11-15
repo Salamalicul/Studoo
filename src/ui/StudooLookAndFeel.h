@@ -55,6 +55,13 @@ namespace studoo
         }
     }
 
+    // Modo móvil: pantallas pequeñas (móviles en horizontal). Se decide al arrancar.
+    namespace Layout
+    {
+        inline bool& compactFlag() { static bool compact = false; return compact; }
+        inline bool compact()      { return compactFlag(); }
+    }
+
     // Fuentes incluidas en la app (Inter)
     namespace Fonts
     {

@@ -54,8 +54,10 @@ namespace studoo
         void initialise (const juce::String&) override
         {
            #if JUCE_ANDROID || JUCE_IOS
-            // Studoo está diseñado para una pantalla de unos 1320 x 820 puntos. Si la
-            // pantalla del tablet es más pequeña, lo encogemos todo para que quepa.
+            // Studoo está diseñado para una pantalla de unos 1320 x 820 puntos.
+            //  - Tablet: si la pantalla es más pequeña, lo encogemos un poco para que quepa.
+            //  - Móvil (pantalla baja): "modo móvil", con pestañas grandes abajo y la
+            //    interfaz reorganizada, encogida solo lo justo.
             auto& desktop = juce::Desktop::getInstance();
             desktop.setOrientationsEnabled (juce::Desktop::rotatedClockwise | juce::Desktop::rotatedAntiClockwise);
             if (auto* display = desktop.getDisplays().getPrimaryDisplay())
@@ -63,10 +65,22 @@ namespace studoo
                 const auto area = display->userArea;
                 const float w = (float) juce::jmax (area.getWidth(), area.getHeight());
                 const float h = (float) juce::jmin (area.getWidth(), area.getHeight());
-                const float scale = juce::jmin (1.0f, w / 1320.0f, h / 800.0f);
-                if (scale < 0.99f)
-                    desktop.setGlobalScaleFactor (scale);
+                if (h < 600.0f)
+                {
+                    Layout::compactFlag() = true;
+                    desktop.setGlobalScaleFactor (juce::jlimit (0.6f, 1.0f, juce::jmin (h / 500.0f, w / 1000.0f)));
+                }
+                else
+                {
+                    const float scale = juce::jmin (1.0f, w / 1320.0f, h / 800.0f);
+                    if (scale < 0.99f)
+                        desktop.setGlobalScaleFactor (scale);
+                }
             }
+           #else
+            // Para probar el modo móvil en el ordenador: STUDOO_MOVIL=1 ./Studoo
+            if (juce::SystemStats::getEnvironmentVariable ("STUDOO_MOVIL", {}).isNotEmpty())
+                Layout::compactFlag() = true;
            #endif
             mainWindow = std::make_unique<MainWindow> ("Studoo");
         }

@@ -86,7 +86,8 @@ namespace studoo
         AppContext& ctx;
         HelpButton helpButton;
         juce::ComboBox patternBox, lengthBox;
-        juce::TextButton patternMenuButton, addButton, exampleButton, clearButton;
+        juce::TextButton patternMenuButton, addButton, exampleButton, clearButton, soundButton;
+        bool panelOpen = false; // modo móvil: panel del sonido abierto
 
         juce::Viewport viewport;
         CallbackComponent content;

@@ -187,10 +187,13 @@ void Toolbar::paint (juce::Graphics& g)
     g.setOpacity (1.0f);
     g.drawImage (logo, iconArea, juce::RectanglePlacement::centred);
     area.removeFromLeft (8);
-    g.setFont (Fonts::display (24.0f));
-    g.setGradientFill (juce::ColourGradient (Colours::accentLight, 0.0f, (float) area.getY(),
-                                             Colours::accentDeep, 0.0f, (float) area.getBottom(), false));
-    g.drawText ("STUDOO", area, juce::Justification::centredLeft);
+    if (! Layout::compact()) // en el móvil solo cabe el icono
+    {
+        g.setFont (Fonts::display (24.0f));
+        g.setGradientFill (juce::ColourGradient (Colours::accentLight, 0.0f, (float) area.getY(),
+                                                 Colours::accentDeep, 0.0f, (float) area.getBottom(), false));
+        g.drawText ("STUDOO", area, juce::Justification::centredLeft);
+    }
 
     // Cápsula de reproducción y pantalla de posición
     auto pill = transportArea.toFloat().expanded (5.0f, 4.0f);
@@ -237,7 +240,8 @@ void Toolbar::resized()
     auto area = getLocalBounds().reduced (10, 9);
     auto gap = [&area] (int w) { area.removeFromLeft (w); };
 
-    logoArea = area.removeFromLeft (142);
+    const bool compact = Layout::compact();
+    logoArea = area.removeFromLeft (compact ? 40 : 142);
     fileButton.setBounds (area.removeFromLeft (38)); gap (10);
     undoButton.setBounds (area.removeFromLeft (34)); gap (4);
     redoButton.setBounds (area.removeFromLeft (34)); gap (14);
@@ -259,7 +263,8 @@ void Toolbar::resized()
     }
     gap (16);
 
-    bpmLabel.setBounds (area.removeFromLeft (36)); gap (4);
+    bpmLabel.setVisible (! compact);
+    if (! compact) { bpmLabel.setBounds (area.removeFromLeft (36)); gap (4); }
     bpmSlider.setBounds (area.removeFromLeft (84)); gap (10);
     positionLabel.setBounds (area.removeFromLeft (100)); gap (10);
     metronomeButton.setBounds (area.removeFromLeft (96));

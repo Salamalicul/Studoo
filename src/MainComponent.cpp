@@ -143,11 +143,14 @@ MainComponent::MainComponent()
                                "Aprende: explicaciones sencillas de producción musical y el tutorial." };
     for (int i = 0; i < (int) View::numViews; ++i)
     {
-        auto* b = viewButtons.add (new juce::TextButton (txt (viewNames[i])));
+        const char* shortNames[] = { "Ritmo", "Piano", "Canción", "Mezcla", "Automat.", "Aprende" };
+        auto* b = viewButtons.add (new juce::TextButton (txt (Layout::compact() ? shortNames[i] : viewNames[i])));
         b->setTooltip (txt (viewTips[i]));
         b->setClickingTogglesState (false);
         b->getProperties().set ("tab", true);
         b->getProperties().set ("tabIcon", i);
+        if (Layout::compact())
+            b->getProperties().set ("bottomTab", true);
         b->onClick = [this, i] { showView ((View) i); };
         makeNonFocusing (*b);
         addAndMakeVisible (b);
@@ -1284,6 +1287,16 @@ void MainComponent::paint (juce::Graphics& g)
     g.fillAll();
 
     // Barra de pestañas
+    if (Layout::compact())
+    {
+        // Modo móvil: barra de pestañas abajo, como en las apps del móvil
+        g.setGradientFill (juce::ColourGradient (Colours::header, 0.0f, (float) viewBarArea.getY(),
+                                                 Colours::panelDark, 0.0f, (float) getHeight(), false));
+        g.fillRect (viewBarArea.withBottom (getHeight()).withX (0).withWidth (getWidth()));
+        g.setColour (Colours::outline);
+        g.drawHorizontalLine (viewBarArea.getY(), 0.0f, (float) getWidth());
+        return;
+    }
     g.setColour (Colours::panelDark.withAlpha (0.7f));
     g.fillRoundedRectangle (viewBarArea.toFloat().expanded (4.0f, 3.0f), 10.0f);
 
@@ -1331,6 +1344,24 @@ void MainComponent::resized()
 {
     auto area = getLocalBounds();
     toolbar->setBounds (area.removeFromTop (58));
+
+    if (Layout::compact())
+    {
+        // Modo móvil: pestañas grandes abajo y sin barra de estado
+        statusArea = {};
+        viewBarArea = area.removeFromBottom (58);
+        auto bar = viewBarArea.reduced (6, 4);
+        const int w = bar.getWidth() / (int) View::numViews;
+        for (auto* b : viewButtons)
+            b->setBounds (bar.removeFromLeft (w).reduced (2, 0));
+
+        auto content = area.reduced (6, 4);
+        for (auto* v : views)
+            v->setBounds (content);
+        tutorial.setBounds (getLocalBounds());
+        return;
+    }
+
     statusArea = area.removeFromBottom (26);
 
     viewBarArea = area.removeFromTop (40).reduced (10, 6);
