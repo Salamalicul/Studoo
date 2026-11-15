@@ -331,6 +331,17 @@ void StudooLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& but
     g.setFont (getTextButtonFont (button, button.getHeight()));
 
     const auto iconVar = button.getProperties()["tabIcon"];
+    if (tab && ! iconVar.isVoid() && (bool) button.getProperties()["bottomTab"])
+    {
+        // Pestaña del modo móvil: icono grande arriba y nombre corto debajo
+        auto area = button.getLocalBounds().toFloat().reduced (2.0f, 4.0f);
+        auto iconArea = area.removeFromTop (area.getHeight() * 0.55f).withSizeKeepingCentre (20.0f, 20.0f);
+        drawTabIcon (g, (int) iconVar, iconArea, on ? Colours::accent : c.withAlpha (0.8f));
+        g.setColour (c);
+        g.setFont (Fonts::bold (12.5f));
+        g.drawFittedText (button.getButtonText(), area.toNearestInt(), juce::Justification::centred, 1, 0.8f);
+        return;
+    }
     if (tab && ! iconVar.isVoid())
     {
         // Icono + texto centrados juntos

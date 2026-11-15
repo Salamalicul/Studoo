@@ -1,6 +1,9 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.6
+### 🆕 Novedades de la versión 1.6.1
+- 📱 **Modo móvil**: en los móviles, Studoo se reorganiza para la pantalla pequeña. Las pestañas pasan abajo, grandes y con iconos (Ritmo, Piano, Canción, Mezcla, Automat., Aprende). La barra de arriba es más compacta y en el secuenciador el botón **Sonido** abre y cierra los ajustes del instrumento. En el mezclador, desliza hacia abajo para ver los faders.
+
+### Novedades de la versión 1.6
 - 📱 **Studoo para Android (tablets)**, primera versión de prueba: secuenciador, piano roll, playlist, mezclador, Aprende, grabar con el micrófono y exportar la canción para compartirla. **Mantén pulsado** donde en el ordenador harías clic derecho (menú del canal, borrar notas...).
 - 🎓 **Aprende, totalmente nuevo**: una ruta de **39 lecciones en 7 niveles** (de cero a terminar canciones), con **ilustraciones animadas**, pasos, trucos, ejercicios para practicar, botón para ver **vídeos en YouTube** y tu **progreso guardado**.
 - 🔄 Si el proyecto de GitHub es privado, el buscador de actualizaciones ahora lo explica claramente.
