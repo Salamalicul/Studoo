@@ -12,6 +12,8 @@
 //    [anim:id|Pie]      -> ilustración animada (ver Illustrations.cpp)
 //    [ir:vista|Texto]   -> botón que abre una parte de Studoo
 //                          (secuenciador, pianoroll, playlist, mezclador, automatizacion)
+//    [base:genero|Texto] -> botón que carga la base de un género en un patrón
+//                          nuevo (ver model/GenreBeats.cpp) y abre el secuenciador
 //    **texto**          -> negrita, dentro de cualquier línea
 //    Línea vacía        -> separa párrafos
 // ============================================================================
@@ -35,6 +37,7 @@ namespace studoo::learn
         "Nivel 5 · Mezcla",
         "Nivel 6 · De beat a canción",
         "Nivel 7 · Seguir mejorando",
+        "Nivel 8 · Géneros musicales",
     };
 
     inline constexpr Lesson lessons[] = {
@@ -43,10 +46,10 @@ namespace studoo::learn
       "como empezar a producir musica desde cero",
 R"TXT(Bienvenido a **Aprende**. Aquí tienes todo lo necesario para pasar de no saber nada a terminar tus propias canciones, en orden y sin prisas.
 
-[anim:ruta|La ruta: 7 niveles, de lo más básico a seguir mejorando]
+[anim:ruta|La ruta: 8 niveles, de lo más básico a los géneros musicales]
 
 ## Cómo funciona este apartado
-1. Las lecciones están ordenadas en **7 niveles**. Hazlas en orden la primera vez.
+1. Las lecciones están ordenadas en **8 niveles**. Hazlas en orden la primera vez. El último, **Géneros musicales**, explica cada estilo y trae una base para cargar y cambiar.
 2. Cada lección tiene explicaciones, **ilustraciones que se mueven** y pasos para hacerlo en Studoo.
 3. Al final de cada lección hay un cuadro verde **Practica**: hazlo de verdad, es lo que más enseña.
 4. Pulsa **Marcar como aprendida** cuando la termines. Verás tu progreso en la lista de la izquierda.
@@ -817,9 +820,9 @@ R"TXT(Es muy normal quedarse atascado con un bucle de 8 compases que suena bien 
 
     { "Nivel 7 · Seguir mejorando", "Tus siguientes pasos", "4 min",
       "teoria musical para productores curso gratis",
-R"TXT(¡Has llegado al final de la ruta! Ya conoces lo necesario para hacer canciones completas. A partir de aquí, todo es practicar y profundizar.
+R"TXT(¡Has terminado la ruta principal! Ya conoces lo necesario para hacer canciones completas. A partir de aquí, todo es practicar y profundizar.
 
-[anim:ruta|Has recorrido los 7 niveles. Ahora: practicar, practicar y practicar]
+[anim:ruta|Ya tienes lo básico. En el Nivel 8 te esperan los géneros musicales]
 
 ## Qué aprender después
 - **Más teoría**: los grados de la escala, acordes de séptima e inversiones. Hacen tus progresiones más ricas.
@@ -835,5 +838,334 @@ R"TXT(¡Has llegado al final de la ruta! Ya conoces lo necesario para hacer canc
 > El mejor productor no es el que tiene más plugins, es el que más ha practicado. ¡A por ello!
 
 ? Repasa la lista de la izquierda. ¿Hay alguna lección sin marcar? Hazla, y después empieza tu próxima canción.)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Los géneros y cómo usar las bases", "4 min",
+      "generos de musica urbana y electronica explicados",
+R"TXT(Cada género musical es como una **receta**: tiene su tempo, su forma de tocar la batería, su tipo de bajo y sus sonidos. Si conoces la receta, puedes cocinarla tú mismo... y luego inventarte tu propio plato.
+
+## Qué hace diferente a cada género
+- **El tempo (BPM)**: el reggaetón va a unos 95, el house a 124 y el trap a 140.
+- **El ritmo de la batería**: dónde caen el bombo y la caja. Es lo que más se reconoce.
+- **El bajo**: un 808 largo y grave (trap), un bajo a contratiempo (house), un sub suave (lo-fi)...
+- **Los acordes y sonidos**: piano, campanas, cuerdas, pads...
+
+## Cómo funcionan las bases de este nivel
+1. En cada lección hay un botón **Cargar la base**. Al pulsarlo, Studoo crea un **patrón nuevo** con esa base (no se borra nada de lo que tenías).
+2. Studoo cambia el **tempo** al típico del género y añade los **canales** que hagan falta: la batería de su kit, el bajo y los acordes.
+3. Se abre el **Secuenciador**. Pulsa **Espacio** (o el botón ▶) para escucharla.
+4. Después, sigue los pasos de **Experimenta** de cada lección: quita y pon pasos, cambia notas, sube o baja el tempo... Así entenderás para qué sirve cada parte.
+
+> También puedes cargar las bases sin pasar por aquí: en el Secuenciador, botón **Beat de ejemplo**.
+
+! Las bases son un punto de partida para aprender. Cuando hagas tus canciones, cámbialas tanto como quieras: así serán tuyas.
+
+? Elige el género que más te guste de la lista de la izquierda y carga su base.)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Trap", "8 min",
+      "como hacer un beat de trap desde cero",
+R"TXT(El trap nació en **Atlanta (Estados Unidos)** a principios de los 2000 y hoy está en todas partes: rap, música urbana en español, pop... Se reconoce por sus **hi-hats rapidísimos** y un **808** muy grave que hace temblar los altavoces.
+
+[anim:beat_trap|Trap a medio tiempo: la palmada cae en el tiempo 3]
+
+## La receta
+- **Tempo**: entre 130 y 150 BPM, pero se siente **a medio tiempo** (como si fuera la mitad de rápido).
+- **Palmada o caja**: solo una vez por compás, en el **tiempo 3** (paso 9).
+- **Hi-hats**: en corcheas (uno sí, uno no) y con **rolls** ("trrrr") de vez en cuando.
+- **808**: largo y grave, toca casi siempre a la vez que el bombo.
+- **Melodía**: oscura, en escala **menor**, con campanas, pianos o flautas.
+
+[base:trap|Cargar la base de Trap]
+
+## Experimenta con la base
+1. Escucha el **compás 2 y el 4**: los hi-hats hacen un roll al final. Quita esos pasos y escucha la diferencia.
+2. Haz tu propio roll: enciende 3 o 4 pasos seguidos de hi-hat en otro sitio.
+3. Abre el **Piano roll**, elige el canal **808** y alarga o mueve sus notas. El 808 es la "segunda melodía" del trap.
+4. Prueba a cambiar el tempo a 150: suena más agresivo. A 130 suena más relajado.
+5. En el canal **Campanas trap**, cambia alguna nota del acorde por otra de la escala.
+
+> Mueve el bombo a otros pasos: en trap el bombo es libre, lo importante es que el 808 lo siga.
+
+? Crea un segundo patrón con la misma base y cambia solo los hi-hats y el 808. Ya tienes una estrofa y un estribillo.)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Reggaetón", "8 min",
+      "como hacer un beat de reggaeton dembow",
+R"TXT(El reggaetón nació en **Puerto Rico y Panamá** en los años 90. Su ritmo, el **dembow**, viene del dancehall de Jamaica. Hoy es uno de los géneros más escuchados del mundo.
+
+[anim:beat_reggaeton|El dembow: bombo en cada tiempo y la caja que "contesta"]
+
+## La receta
+- **Tempo**: entre 88 y 100 BPM. La base va a 95.
+- **Bombo**: en cada tiempo (pasos 1, 5, 9 y 13).
+- **Caja**: el famoso patrón **3 + 3 + 2** (pasos 4, 7, 12 y 15). Es lo que hace "pum-ch-pum-ch".
+- **Percusión**: shaker, bongós, timbales... dan el sabor latino.
+- **Bajo**: un 808 corto que sigue el ritmo del dembow.
+- **Acordes**: muchas veces 4 acordes que se repiten, como **La menor – Fa – Do – Sol**.
+
+[base:reggaeton|Cargar la base de Reggaetón]
+
+## Experimenta con la base
+1. **Silencia** (botón verde) todo menos el **Bombo** y la **Caja**: ese es el dembow puro.
+2. Mueve un paso de la caja una posición a la derecha. ¿Notas que ya no suena a reggaetón? Así de importante es su sitio.
+3. Escucha el **Bongó**: solo toca al final de algunos compases. Es un **relleno** para que no sea siempre igual.
+4. Abre el **Piano roll** con el canal **Pluck reggaetón** y cambia el ritmo de los acordes.
+5. Prueba el tempo a 90 (más romántico) o a 100 (más para bailar).
+
+> En el reggaetón actual se suele quitar la batería unos compases antes del estribillo y volver con todo. ¡Pruébalo en la Playlist!
+
+? Cambia el sonido de los acordes por **Piano eléctrico** o **Cuerdas** (menú + Añadir → Sintetizador) y copia las mismas notas.)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "House", "8 min",
+      "como hacer house music desde cero",
+R"TXT(El house nació en **Chicago** a mediados de los años 80, en clubs como **The Warehouse** (de ahí su nombre). Es música para bailar: alegre, constante y con mucho groove. De él salen el deep house, el tech house, el afro house y muchos más.
+
+[anim:beat_house|Four on the floor: el bombo en cada tiempo]
+
+## La receta
+- **Tempo**: entre 118 y 128 BPM. La base va a 124.
+- **Bombo "four on the floor"**: en **cada tiempo**, siempre (pasos 1, 5, 9 y 13).
+- **Palmada**: en los tiempos **2 y 4** (pasos 5 y 13).
+- **Hi-hat abierto a contratiempo**: justo **entre** los bombos (pasos 3, 7, 11 y 15). Es el famoso "pum-tss-pum-tss".
+- **Shaker o hi-hat cerrado** rellenando para dar movimiento.
+- **Bajo**: también a contratiempo, rebotando entre los bombos.
+- **Acordes**: piano u órgano tocando acordes cortos y rítmicos (**stabs**). La base usa La menor 7 – Re menor 7 – Fa 7 – Mi menor 7.
+
+[base:house|Cargar la base de House]
+
+## Experimenta con la base
+1. Silencia todo menos el **Bombo**: así de simple es la base del house.
+2. Activa el **Hi-hat abierto**. ¿Notas que de repente dan ganas de moverse? Es el contratiempo.
+3. Abre el **Piano roll** con el canal **Piano house** y haz las notas más cortas o más largas. Cambia mucho el estilo.
+4. En el **Bajo house**, prueba a poner notas en otros sitios: siempre que no caigan encima del bombo, sonará bien.
+5. Sube el tempo a 128 (más fiestero) o bájalo a 120 (más deep house).
+
+> En house las canciones son largas y cambian poco a poco: cada 8 o 16 compases entra o sale un elemento (el shaker, el piano, el bajo...).
+
+? Haz 3 patrones: uno solo con batería, otro con batería y bajo, y otro con todo. Colócalos en la Playlist uno detrás de otro y escucha cómo la canción "crece".)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Boom bap (hip-hop clásico)", "7 min",
+      "como hacer un beat boom bap",
+R"TXT(El boom bap es el sonido del **hip-hop de Nueva York** de finales de los 80 y los 90. Su nombre imita el sonido de la batería: **"boom"** (bombo) y **"bap"** (caja). Muchos raperos en español siguen usándolo.
+
+[anim:beat_boombap|Boom (bombo) y bap (caja en los tiempos 2 y 4)]
+
+## La receta
+- **Tempo**: entre 85 y 95 BPM.
+- **Caja**: fuerte y gorda en los tiempos **2 y 4** (pasos 5 y 13).
+- **Bombo**: libre, con algún golpe extra antes de la caja.
+- **Hi-hats**: en corcheas, a menudo con **swing** (un poco "cojos", que dan groove).
+- **Acordes**: samples de discos antiguos de jazz o soul. La base imita ese sonido con un **piano eléctrico** y acordes de séptima.
+- **Bajo**: sencillo, siguiendo al bombo.
+
+[base:boombap|Cargar la base de Boom bap]
+
+## Experimenta con la base
+1. Silencia el **Piano jazz** y escucha solo la batería: es lo que más importa en boom bap.
+2. Pon y quita golpes de bombo entre los pasos 9 y 12. Cada cambio da otro "rebote".
+3. Haz que los hi-hats no toquen todos igual: quita alguno para que respiren.
+4. En el Piano roll, haz los acordes más cortos para que suenen "cortados" como un sample.
+5. Baja el tempo a 85 para un rap más tranquilo.
+
+> Si tienes samples de vinilo (de forma legal), cárgalos en un canal sampler: es la esencia del boom bap.
+
+? Escribe un verso de rap de 8 líneas encima de tu base y grábalo con el micrófono (lección **Grabar tu voz**).)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Lo-fi", "7 min",
+      "como hacer musica lofi hip hop",
+R"TXT(El **lo-fi hip-hop** es la música tranquila que se usa para estudiar o relajarse. "Lo-fi" significa **baja fidelidad**: suena un poco "viejo", suave y cálido, como un casete. Le influyeron mucho productores como **J Dilla** y **Nujabes**.
+
+[anim:beat_lofi|Lo-fi: batería sencilla y relajada a 80 BPM]
+
+## La receta
+- **Tempo**: lento, entre 70 y 90 BPM.
+- **Batería suave**: bombo y caja sin mucha pegada, hi-hats discretos.
+- **Acordes de jazz**: acordes de **séptima** (maj7, m7) con piano eléctrico o guitarra. Largos y suaves.
+- **Bajo**: un sub suave, que casi no se oye pero se siente.
+- **Ambiente**: ruido de vinilo, lluvia, sonidos de la calle...
+- **Nada demasiado brillante**: los agudos se cortan con un filtro.
+
+[base:lofi|Cargar la base de Lo-fi]
+
+## Experimenta con la base
+1. Selecciona el canal **Piano lo-fi** y baja su **filtro (cutoff)**: suena más apagado y "lo-fi".
+2. Sube un poco la **Reverb** del piano en el Mezclador para que suene lejano.
+3. Abre el Piano roll y cambia una nota de cada acorde, un semitono arriba o abajo. Algunos cambios suenan "jazz" y otros no: entrena tu oído.
+4. Baja el volumen de la batería: en lo-fi los acordes son los protagonistas.
+5. Prueba el tempo a 72 para algo aún más tranquilo.
+
+> Añade una melodía muy sencilla de 3 o 4 notas con el preset **Campanas**. Menos es más.
+
+? Haz una base lo-fi de 4 compases que podrías escuchar mientras estudias. Si no te cansa después de escucharla 5 minutos seguidos, ¡lo has conseguido!)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Drill", "8 min",
+      "como hacer un beat de drill",
+R"TXT(El drill nació en **Chicago** hacia 2011 y después se transformó en **Londres** (UK drill), que es el sonido que más se escucha hoy, también en España y Latinoamérica. Es oscuro, agresivo y muy rítmico.
+
+[anim:beat_drill|Drill: caja desplazada y hi-hats que "saltan"]
+
+## La receta
+- **Tempo**: entre 138 y 145 BPM, a medio tiempo (como el trap).
+- **Caja**: en el **tiempo 3** y con golpes extra **desplazados** (por ejemplo, el paso 15). Eso le da su balanceo raro.
+- **Hi-hats**: patrones que "saltan" (grupos de 3) en vez de ir siempre iguales.
+- **808 con glide**: las notas se **deslizan** de una a otra. Es lo más característico del drill.
+- **Melodía**: oscura, en **menor**, con cuerdas, pianos o coros.
+
+[base:drill|Cargar la base de Drill]
+
+## Experimenta con la base
+1. Escucha solo la **Caja** y los **Hi-hats**: así se reconoce un drill.
+2. Abre el **Piano roll** con el **808 drill** y pon dos notas muy seguidas con distinta altura: escucharás el **deslizamiento**.
+3. En el panel del 808, sube o baja el **Glide** para que deslice más o menos.
+4. Mueve el golpe extra de la caja (paso 15) a otro sitio y escucha cómo cambia el balanceo.
+5. Silencia las **Cuerdas drill** y escribe tu propia melodía oscura en escala menor.
+
+! El 808 del drill puede tapar a todo lo demás. Si suena "embarrado", baja un poco su volumen o el del bombo.
+
+? Haz dos versiones del 808: una que siga al bombo y otra con más notas y deslizamientos. ¿Cuál te gusta más?)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Techno", "7 min",
+      "como hacer techno desde cero",
+R"TXT(El techno nació en **Detroit** a mediados de los 80, más o menos a la vez que el house. Es más **mecánico, oscuro y repetitivo**: busca que la gente entre en trance bailando durante horas. Berlín es hoy su gran capital.
+
+[anim:beat_techno|Techno: bombo constante y hi-hats que corren]
+
+## La receta
+- **Tempo**: entre 125 y 140 BPM. La base va a 130.
+- **Bombo**: en cada tiempo, **fuerte y largo**. Es el corazón de todo.
+- **Hi-hats y percusiones metálicas**: rápidos, a veces en todos los pasos.
+- **Bajo "rolling"**: notas cortas en los huecos entre bombos, que hacen que la música "ruede".
+- **Pocos acordes**: a veces ninguno. Mejor un pad o un sonido raro que cambia poco a poco.
+- **Automatización**: el filtro se abre y se cierra para crear tensión.
+
+[base:techno|Cargar la base de Techno]
+
+## Experimenta con la base
+1. Silencia el **Pad techno**: muchos temas de techno solo tienen batería y bajo.
+2. Selecciona el **Bajo techno** (un bajo ácido) y mueve su **cutoff** y **resonancia** mientras suena. ¡Así suena el acid techno!
+3. Graba ese movimiento con la **Automatización** para que se mueva solo.
+4. Quita y pon el **Hi-hat corto** cada 8 compases en la Playlist para crear subidas y bajadas.
+5. Sube el tempo a 135 o 140 para un techno más duro.
+
+> En techno, los cambios son pequeños y lentos. Un solo sonido que entra después de 16 compases ya es un gran momento.
+
+? Haz un bucle de techno de 4 compases y automatiza el filtro del bajo para que se abra poco a poco durante 16 compases.)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Afrobeats", "7 min",
+      "como hacer un beat de afrobeats",
+R"TXT(Los **afrobeats** vienen de **Nigeria y Ghana** y se han hecho famosos en todo el mundo en los últimos años. Mezclan ritmos africanos con pop, dancehall y hip-hop. Suenan alegres, con mucho movimiento y muy bailables.
+
+[anim:beat_afro|Afrobeats: percusiones que se cruzan]
+
+## La receta
+- **Tempo**: entre 95 y 115 BPM. La base va a 105.
+- **Percusión**: shakers, congas y rims que se **cruzan** entre sí. Es lo más importante.
+- **Bombo**: no cae en todos los tiempos; tiene un ritmo que "baila".
+- **Rim o caja**: un patrón parecido al dembow (grupos de 3 + 3 + 2).
+- **Acordes**: alegres, en escala **mayor**, con plucks, guitarras o pianos.
+- **Bajo**: redondo, con pocas notas.
+
+[base:afrobeat|Cargar la base de Afrobeats]
+
+## Experimenta con la base
+1. Silencia todo menos **Shaker**, **Conga** y **Rim**: escucha cómo se mezclan las percusiones.
+2. Añade un golpe de conga en otro paso. En afrobeats las percusiones "conversan" entre ellas.
+3. Abre el Piano roll con el **Pluck afro** y prueba ritmos distintos para los acordes.
+4. Compara esta base con la de reggaetón: ¿qué se parece y qué no?
+5. Usa el kit **Percusión latina** para añadir más sonidos (bongó, claves, güiro...).
+
+> El secreto de los afrobeats es el **espacio**: no llenes todos los pasos, deja huecos para que respire.
+
+? Haz que cada compás de percusión tenga un pequeño cambio respecto al anterior, como si fueran percusionistas de verdad.)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Phonk", "6 min",
+      "como hacer phonk drift phonk",
+R"TXT(El **phonk** viene del rap de **Memphis** de los años 90, con su sonido sucio de casete. Hacia 2020 nació el **drift phonk**, que se hizo viral en TikTok y en vídeos de coches. Se reconoce por el famoso **cencerro** (cowbell) que hace la melodía.
+
+[anim:beat_phonk|Phonk: el cencerro hace la melodía]
+
+## La receta
+- **Tempo**: entre 120 y 160 BPM. La base va a 130.
+- **Cencerro**: toca un patrón rítmico (y a veces melódico) encima de todo.
+- **808 distorsionado**: muy saturado, para que suene fuerte y agresivo.
+- **Batería**: bombo y caja potentes, hi-hats sencillos.
+- **Voces**: samples de voces de rap antiguo, a menudo con efectos.
+
+[base:phonk|Cargar la base de Phonk]
+
+## Experimenta con la base
+1. Silencia el **Cencerro phonk**: ¿a que ya no suena a phonk? Es la clave del género.
+2. Cambia los pasos del cencerro para hacer tu propio patrón.
+3. Abre el **Piano roll** con el canal del cencerro y pon notas de distinta altura: ¡el cencerro también puede tocar melodías!
+4. En el panel del 808, sube la **distorsión (drive)** para un sonido aún más agresivo.
+5. Sube el tempo a 150 para un drift phonk más rápido.
+
+! El 808 distorsionado suena muy fuerte. Vigila que el medidor del Master no llegue al rojo.
+
+? Crea una melodía de cencerro de 2 compases que se te quede en la cabeza.)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "Pop", "7 min",
+      "como producir una cancion pop",
+R"TXT(El **pop** (de "popular") es la música pensada para gustar a mucha gente: canciones con **estribillos pegadizos**, estructuras claras y un sonido limpio. Toma ideas de todos los géneros: urbano, electrónica, rock...
+
+[anim:beat_pop|Pop: una batería clara que deja sitio a la voz]
+
+## La receta
+- **Tempo**: entre 100 y 130 BPM. La base va a 110.
+- **Batería sencilla**: palmada o caja en los tiempos **2 y 4**, bombo marcando el ritmo.
+- **Los 4 acordes mágicos**: **Do – Sol – La menor – Fa**. Esta progresión está en cientos de canciones famosas.
+- **Bajo**: sigue la nota principal de cada acorde.
+- **La voz** es la protagonista: todo lo demás le deja sitio.
+- **Estructura clara**: estrofa, pre-estribillo, estribillo...
+
+[base:pop|Cargar la base de Pop]
+
+## Experimenta con la base
+1. Escucha los acordes del **Piano pop**: seguro que te recuerdan a alguna canción.
+2. Cambia el orden de los acordes en el Piano roll (por ejemplo, La menor – Fa – Do – Sol). Suena más triste, ¿verdad?
+3. Canta o tararea una melodía encima. Con estos acordes casi todo suena bien.
+4. Añade la **Pandereta** en los estribillos para que tengan más energía.
+5. Haz una versión **sin batería** para la intro y otra con todo para el estribillo.
+
+> Truco de pop: en el estribillo, sube el volumen, añade un instrumento más y usa las notas más agudas de la canción.
+
+? Usa estos 4 acordes para hacer una canción completa con la lección **Estructura de una canción**.)TXT" },
+
+    // =========================================================================
+    { "Nivel 8 · Géneros musicales", "R&B", "6 min",
+      "como hacer un beat de rnb",
+R"TXT(El **R&B** (rhythm and blues) es música **suave, sensual y con mucha emoción**. El R&B moderno mezcla acordes de jazz y soul con baterías de hip-hop y trap. Es perfecto para canciones románticas.
+
+[anim:beat_rnb|R&B: lento, con chasquidos y hi-hats con rolls suaves]
+
+## La receta
+- **Tempo**: lento, entre 60 y 90 BPM. La base va a 75.
+- **Chasquidos de dedos (snaps)** o caja suave en los tiempos **2 y 4**.
+- **Hi-hats**: con pequeños rolls, pero más suaves que en el trap.
+- **Acordes ricos**: acordes de **séptima** y novena, con pads, pianos eléctricos o guitarras.
+- **808 limpio**: redondo y grave, sin distorsión.
+- **Voces**: muchas capas de coros y armonías.
+
+[base:rnb|Cargar la base de R&B]
+
+## Experimenta con la base
+1. Escucha el **Pad R&B**: acordes largos que lo envuelven todo.
+2. Cambia el pad por **Piano eléctrico**: R&B más clásico.
+3. Abre el Piano roll con el **808 R&B** y añade notas que "caminen" entre acorde y acorde.
+4. Sube la **Reverb** del chasquido para que suene en una sala grande.
+5. Baja el tempo a 68 para una balada.
+
+> En R&B la voz hace muchos adornos (melismas). Deja huecos en la base para que la voz pueda lucirse.
+
+? Graba una melodía tarareada encima de tu base y luego intenta tocarla en el Piano roll con el preset **Lead brillante**.)TXT" },
     };
 }

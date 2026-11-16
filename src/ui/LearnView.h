@@ -20,6 +20,8 @@ namespace studoo
 
         std::function<void()> onStartTutorial;
         std::function<void (View)> onGoToView;
+        // Cargar la base de un género ("house", "trap"...) en un patrón nuevo
+        std::function<void (const juce::String&)> onLoadGenre;
 
         // Dónde se guarda qué lecciones están aprendidas
         void setSettings (juce::PropertiesFile*);
