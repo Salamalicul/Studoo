@@ -29,7 +29,11 @@ namespace studoo
         double getPixelsPerStep() const;
         int getTotalBars();
 
+        // Redibuja solo la franja de la raya verde (donde estaba y donde está)
+        void updatePlayhead();
+
     private:
+        int lastPlayheadX = -1000;
         double xToSteps (float x) const;
         float stepsToX (double s) const;
         int yToTrack (float y) const;

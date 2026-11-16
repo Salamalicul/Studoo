@@ -1,6 +1,11 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.7
+### 🆕 Novedades de la versión 1.7.1
+- ⚡ **Mucho más fluido**: mientras suena la música, Studoo ya no redibuja la pantalla entera 30 veces por segundo, solo lo que se mueve. En el piano roll y la playlist gasta unas **8 veces menos** procesador. Se nota sobre todo en ordenadores y móviles sencillos.
+- 📲 **Android: dibuja con la tarjeta gráfica** (OpenGL), así va más suave.
+- 📱 **Android: pantalla completa de verdad**: se esconde la barra de arriba (hora, batería, wifi) y la de abajo. Desliza desde el borde si las necesitas.
+
+### Novedades de la versión 1.7
 - 📲 **Actualizaciones automáticas también en Android**: cuando haya una versión nueva, Studoo te avisa al abrirlo. Pulsas **"Actualizar ahora"** y luego **"Actualizar"** en la pantalla de Android. Tus proyectos se conservan. La primera vez, Android te pedirá permitir que Studoo instale aplicaciones.
 - 🔑 **Android: la app se firma siempre con la misma clave**, así que las próximas versiones se instalan encima de la anterior.
 - ⚠️ **Importante en Android:** para instalar esta versión tienes que **desinstalar antes la que tengas**. Comparte antes tus proyectos si quieres conservarlos. Solo hace falta esta vez.

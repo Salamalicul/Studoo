@@ -20,8 +20,12 @@ namespace studoo
         void mouseDrag (const juce::MouseEvent&) override;
         void mouseUp (const juce::MouseEvent&) override;
 
+        // Redibuja solo la franja de la raya verde (donde estaba y donde está)
+        void updatePlayhead();
+
     private:
         static constexpr int ruler = 22;
+        int lastPlayheadX = -1000;
         double totalSteps();
         float timeToX (double t);
         double xToTime (float x);

@@ -173,6 +173,16 @@ void AutomationEditor::paint (juce::Graphics& g)
     }
 }
 
+void AutomationEditor::updatePlayhead()
+{
+    const int x = ctx.engine.isSongMode() ? (int) timeToX (ctx.engine.getPlayPosition()) : -1000;
+    if (x == lastPlayheadX)
+        return;
+    repaint (lastPlayheadX - 4, 0, 10, getHeight());
+    repaint (x - 4, 0, 10, getHeight());
+    lastPlayheadX = x;
+}
+
 void AutomationEditor::mouseDown (const juce::MouseEvent& e)
 {
     auto lane = view.getLane();
@@ -290,8 +300,8 @@ void AutomationView::refresh()
 
 void AutomationView::timerCallback()
 {
-    if (ctx.engine.isPlaying() && isShowing())
-        editor.repaint();
+    if (isShowing())
+        editor.updatePlayhead();
 }
 
 void AutomationView::showNewLaneMenu()

@@ -175,8 +175,19 @@ void StepGrid::setPlayingStep (int step)
 {
     if (step != playingStep)
     {
+        // Solo se redibujan las dos columnas que cambian (la que se apaga y la
+        // que se enciende), no toda la cuadrícula: así va mucho más fluido.
+        auto column = [this] (int s)
+        {
+            if (s < 0 || s >= rack.getPatternLength())
+                return juce::Rectangle<int>();
+            return getCellBounds (0, s).withY (0.0f).withBottom ((float) getHeight())
+                                       .expanded (12.0f, 0.0f).getSmallestIntegerContainer();
+        };
+        const auto oldColumn = column (playingStep);
         playingStep = step;
-        repaint();
+        repaint (oldColumn);
+        repaint (column (playingStep));
     }
 }
 
@@ -220,8 +231,15 @@ void StepGrid::paint (juce::Graphics& g)
         g.fillRoundedRectangle (col, 5.0f);
     }
 
+    // Zona que hay que redibujar: lo que quede fuera no se pinta
+    const auto clip = g.getClipBounds().toFloat();
+
     for (int row = 0; row < rack.getNumRows(); ++row)
     {
+        if ((float) ((row + 1) * ChannelRack::rowHeight) < clip.getY() - 12.0f
+            || (float) (row * ChannelRack::rowHeight) > clip.getBottom() + 12.0f)
+            continue;
+
         const int uid = rack.getRowUid (row);
         auto channel = ctx.project.findChannel (uid);
         const bool muted = channel[ids::muted];
@@ -237,6 +255,8 @@ void StepGrid::paint (juce::Graphics& g)
         for (int s = 0; s < length; ++s)
         {
             auto cell = getCellBounds (row, s);
+            if (! cell.expanded (10.0f).intersects (clip))
+                continue;
             const bool on = s < data.length() && data[s] == '1';
             const bool playing = (s == playingStep);
             const float corner = juce::jmin (6.0f, cell.getWidth() * 0.25f);

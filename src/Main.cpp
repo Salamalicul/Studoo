@@ -28,6 +28,11 @@ namespace studoo
             centreWithSize (getWidth(), getHeight());
            #endif
             setVisible (true);
+           #if JUCE_ANDROID
+            // Oculta la barra de arriba (hora, batería, wifi...) y la de abajo.
+            // Si deslizas desde el borde aparecen un momento y se vuelven a esconder.
+            juce::Desktop::getInstance().setKioskModeComponent (this, false);
+           #endif
         }
 
         void closeButtonPressed() override
@@ -84,7 +89,12 @@ namespace studoo
             }
             if (mainWindow != nullptr)
                 if (auto* display = desktop.getDisplays().getPrimaryDisplay())
+                {
+                    // Vuelve a ponerla a pantalla completa, sin las barras del sistema
+                    desktop.setKioskModeComponent (nullptr);
                     mainWindow->setBounds (display->userArea);
+                    desktop.setKioskModeComponent (mainWindow.get(), false);
+                }
            #else
             // En el ordenador: modo móvil solo si se elige (o con STUDOO_MOVIL=1, para probar)
             Layout::compactFlag() = mode == "movil"
