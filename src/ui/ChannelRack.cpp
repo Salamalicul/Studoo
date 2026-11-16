@@ -656,6 +656,7 @@ void ChannelRack::resized()
     {
         auto panel = area.removeFromBottom (panelHeight);
         instrumentPanel.setBounds (panel);
+        instrumentPanel.setVisible (true);
         area.removeFromBottom (8);
         soundButton.setVisible (false);
     }
