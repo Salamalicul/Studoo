@@ -1,6 +1,11 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.6.2
+### 🆕 Novedades de la versión 1.7
+- 📲 **Actualizaciones automáticas también en Android**: cuando haya una versión nueva, Studoo te avisa al abrirlo. Pulsas **"Actualizar ahora"** y luego **"Actualizar"** en la pantalla de Android. Tus proyectos se conservan. La primera vez, Android te pedirá permitir que Studoo instale aplicaciones.
+- 🔑 **Android: la app se firma siempre con la misma clave**, así que las próximas versiones se instalan encima de la anterior.
+- ⚠️ **Importante en Android:** para instalar esta versión tienes que **desinstalar antes la que tengas**. Comparte antes tus proyectos si quieres conservarlos. Solo hace falta esta vez.
+
+### Novedades de la versión 1.6.2
 - 📱 **Una sola app para móvil y tablet**: la primera vez que abres Studoo en Android te pregunta si es un **móvil** o un **tablet**. Puedes cambiarlo cuando quieras en el menú ☰ → **Tamaño de pantalla** y el cambio se aplica al momento.
 - 🛠️ Arreglo: el panel del sonido vuelve a verse al pasar del modo móvil al de tablet.
 
@@ -62,7 +67,7 @@
 1. Descarga **`Studoo-...-Android.apk`** desde el tablet.
 2. Ábrelo. Android te pedirá permiso para **instalar aplicaciones de origen desconocido**: permítelo para tu navegador o tu gestor de archivos.
 3. Pulsa **Instalar**. Studoo aparece con su icono.
-   - Si ya tenías una versión anterior y no deja instalar, desinstala la anterior primero.
+   - Desde la 1.7, Studoo se actualiza solo. Si vienes de la 1.6 o anterior, desinstala la anterior primero (solo una vez).
 
 **Otras distribuciones de Linux** (Fedora, Arch...)
 1. Descarga **`Studoo-...-Linux.tar.gz`**.

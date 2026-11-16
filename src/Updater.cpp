@@ -1,3 +1,6 @@
+// En Android necesitamos las ayudas de JUCE para llamar a Java (JNI).
+// Tienen que activarse antes de incluir JUCE.
+#define JUCE_CORE_INCLUDE_JNI_HELPERS 1
 #include "Updater.h"
 
 namespace studoo::updater
@@ -128,6 +131,7 @@ namespace
             case InstallKind::windowsInstaller: return "-Instalador-Windows.exe";
             case InstallKind::linuxDeb:         return "-Linux.deb";
             case InstallKind::linuxUser:        return "-Linux.tar.gz";
+            case InstallKind::androidApk:       return "-Android.apk";
             case InstallKind::manual:           return {};
         }
         return {};
@@ -137,7 +141,10 @@ namespace
 InstallKind detectInstallKind()
 {
     const auto exe = currentExe();
-   #if JUCE_WINDOWS
+   #if JUCE_ANDROID
+    juce::ignoreUnused (exe);
+    return InstallKind::androidApk;
+   #elif JUCE_WINDOWS
     if (exe.getSiblingFile ("unins000.exe").existsAsFile())
         return InstallKind::windowsInstaller;
    #elif JUCE_LINUX || JUCE_BSD
@@ -265,6 +272,54 @@ bool installOnLinux (InstallKind kind, const juce::File& downloaded, juce::Strin
     juce::ignoreUnused (kind, downloaded);
     error = "Tipo de instalación no compatible.";
     return false;
+}
+
+int launchAndroidInstaller (const juce::File& apk)
+{
+   #if JUCE_ANDROID
+    // Llamamos a StudooUpdater.installApk (packaging/android/java) desde C++.
+    // La clase es de la app, así que se carga con el "class loader" de la app.
+    auto* env = juce::getEnv();
+    auto context = juce::getAppContext();
+    if (env == nullptr || context.get() == nullptr)
+        return -1;
+
+    auto clear = [env] { if (env->ExceptionCheck()) { env->ExceptionClear(); return true; } return false; };
+
+    jclass contextClass = env->GetObjectClass (context.get());
+    jmethodID getClassLoader = env->GetMethodID (contextClass, "getClassLoader", "()Ljava/lang/ClassLoader;");
+    jobject loader = env->CallObjectMethod (context.get(), getClassLoader);
+    env->DeleteLocalRef (contextClass);
+    if (clear() || loader == nullptr)
+        return -1;
+
+    jclass loaderClass = env->FindClass ("java/lang/ClassLoader");
+    jmethodID loadClass = env->GetMethodID (loaderClass, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+    jstring className = env->NewStringUTF ("com.studoo.app.StudooUpdater");
+    auto updaterClass = (jclass) env->CallObjectMethod (loader, loadClass, className);
+    env->DeleteLocalRef (className);
+    env->DeleteLocalRef (loaderClass);
+    env->DeleteLocalRef (loader);
+    if (clear() || updaterClass == nullptr)
+        return -1;
+
+    jmethodID install = env->GetStaticMethodID (updaterClass, "installApk", "(Landroid/content/Context;Ljava/lang/String;)I");
+    if (clear() || install == nullptr)
+    {
+        env->DeleteLocalRef (updaterClass);
+        return -1;
+    }
+    jstring path = env->NewStringUTF (apk.getFullPathName().toRawUTF8());
+    const jint result = env->CallStaticIntMethod (updaterClass, install, context.get(), path);
+    env->DeleteLocalRef (path);
+    env->DeleteLocalRef (updaterClass);
+    if (clear())
+        return -1;
+    return (int) result;
+   #else
+    juce::ignoreUnused (apk);
+    return -1;
+   #endif
 }
 
 bool launchWindowsInstaller (const juce::File& installer)
