@@ -416,6 +416,15 @@ void MainComponent::showFileMenu()
     menu.addItem (9, txt ("Abrir la carpeta de proyectos"));
    #endif
     menu.addSeparator();
+    {
+        const auto mode = settings->getValue ("screenMode", "auto");
+        juce::PopupMenu screen;
+        screen.addItem (20, txt ("Automático (según el tamaño de la pantalla)"), true, mode == "auto");
+        screen.addItem (21, txt ("Móvil: pestañas grandes abajo"), true, mode == "movil");
+        screen.addItem (22, txt ("Tablet / ordenador"), true, mode == "tablet");
+        menu.addSubMenu (txt ("Tamaño de pantalla"), screen);
+        menu.addSeparator();
+    }
     menu.addItem (11, txt ("Buscar actualizaciones"));
     menu.addItem (12, txt ("Buscar actualizaciones al abrir Studoo"), true, settings->getBoolValue ("autoUpdate", true));
    #if ! JUCE_ANDROID
@@ -438,6 +447,15 @@ void MainComponent::showFileMenu()
             case 9:  getStudooFolder ("Proyectos").startAsProcess(); break;
             case 10: juce::JUCEApplication::getInstance()->systemRequestedQuit(); break;
             case 11: checkForUpdates (true); break;
+            case 20: case 21: case 22:
+            {
+                const juce::String mode = r == 20 ? "auto" : r == 21 ? "movil" : "tablet";
+                settings->setValue ("screenMode", mode);
+                settings->saveIfNeeded();
+                if (Layout::applyModeHook())
+                    Layout::applyModeHook() (mode);
+                break;
+            }
             case 13:
                 saveProject ([this] { shareFile (project.getFile()); });
                 break;
@@ -971,6 +989,64 @@ void MainComponent::updateTitle()
 }
 
 // ============================================================================
+//  Tamaño de pantalla: ordenador/tablet o móvil
+// ============================================================================
+void MainComponent::applyStoredScreenMode()
+{
+    const auto mode = settings->getValue ("screenMode", "auto");
+    if (mode != "auto" && Layout::applyModeHook())
+        Layout::applyModeHook() (mode);
+}
+
+void MainComponent::refreshLayout()
+{
+    const char* longNames[] = { "Secuenciador (F6)", "Piano roll (F7)", "Playlist (F5)",
+                                "Mezclador (F9)", "Automatización (F8)", "Aprende (F1)" };
+    const char* shortNames[] = { "Ritmo", "Piano", "Canción", "Mezcla", "Automat.", "Aprende" };
+    for (int i = 0; i < viewButtons.size(); ++i)
+    {
+        viewButtons[i]->setButtonText (txt (Layout::compact() ? shortNames[i] : longNames[i]));
+        viewButtons[i]->getProperties().set ("bottomTab", Layout::compact());
+    }
+    toolbar->resized();
+    toolbar->repaint();
+    for (auto* v : views)
+    {
+        v->resized();
+        v->repaint();
+    }
+    resized();
+    repaint();
+}
+
+void MainComponent::askScreenMode (std::function<void()> then)
+{
+    juce::Component::SafePointer<MainComponent> safe (this);
+    juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                      .withIconType (juce::MessageBoxIconType::NoIcon)
+                                      .withTitle (txt ("¿Dónde vas a usar Studoo?"))
+                                      .withMessage (txt ("Studoo se adapta a tu pantalla.\n\n"
+                                                         "MÓVIL: pestañas grandes abajo y todo reorganizado para una pantalla pequeña.\n"
+                                                         "TABLET: igual que en el ordenador.\n\n"
+                                                         "Puedes cambiarlo cuando quieras en el menú ☰ > Tamaño de pantalla."))
+                                      .withButton (txt ("Móvil"))
+                                      .withButton (txt ("Tablet"))
+                                      .withButton (txt ("Que lo decida Studoo")),
+                                  [safe, then] (int result)
+    {
+        if (safe == nullptr)
+            return;
+        const juce::String mode = result == 1 ? "movil" : result == 2 ? "tablet" : "auto";
+        safe->settings->setValue ("screenMode", mode);
+        safe->settings->saveIfNeeded();
+        if (Layout::applyModeHook())
+            Layout::applyModeHook() (mode);
+        if (then)
+            then();
+    });
+}
+
+// ============================================================================
 //  Tablets: compartir e importar
 // ============================================================================
 void MainComponent::shareFile (const juce::File& file)
@@ -1242,6 +1318,19 @@ void MainComponent::checkAutosaveRecovery()
         return;
     }
 
+   #if JUCE_ANDROID || JUCE_IOS
+    // La primera vez en un móvil o tablet: preguntamos el tipo de pantalla
+    if (! settings->containsKey ("screenMode"))
+    {
+        juce::Component::SafePointer<MainComponent> safe (this);
+        askScreenMode ([safe]
+        {
+            if (safe != nullptr && ! safe->settings->getBoolValue ("tutorialDone", false))
+                safe->startTutorial();
+        });
+        return;
+    }
+   #endif
     if (! settings->getBoolValue ("tutorialDone", false))
         startTutorial();
 }

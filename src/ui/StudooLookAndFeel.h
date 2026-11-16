@@ -60,6 +60,13 @@ namespace studoo
     {
         inline bool& compactFlag() { static bool compact = false; return compact; }
         inline bool compact()      { return compactFlag(); }
+
+        // Cambia el tamaño de pantalla: "auto", "movil" o "tablet" (lo hace Main.cpp)
+        inline std::function<void (const juce::String&)>& applyModeHook()
+        {
+            static std::function<void (const juce::String&)> hook;
+            return hook;
+        }
     }
 
     // Fuentes incluidas en la app (Inter)

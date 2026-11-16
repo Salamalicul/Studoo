@@ -37,6 +37,11 @@ namespace studoo
         bool keyPressed (const juce::KeyPress&) override;
         void parentHierarchyChanged() override;
 
+        // Tamaño de pantalla (ordenador/tablet o móvil)
+        void applyStoredScreenMode();
+        void refreshLayout();
+        void askScreenMode (std::function<void()> then);
+
         // Al cerrar la ventana: pregunta si quieres guardar y luego llama a 'quit'
         void requestQuit (std::function<void()> quit);
 
