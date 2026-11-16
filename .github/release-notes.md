@@ -1,6 +1,10 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.6.1
+### 🆕 Novedades de la versión 1.6.2
+- 📱 **Una sola app para móvil y tablet**: la primera vez que abres Studoo en Android te pregunta si es un **móvil** o un **tablet**. Puedes cambiarlo cuando quieras en el menú ☰ → **Tamaño de pantalla** y el cambio se aplica al momento.
+- 🛠️ Arreglo: el panel del sonido vuelve a verse al pasar del modo móvil al de tablet.
+
+### Novedades de la versión 1.6.1
 - 📱 **Modo móvil**: en los móviles, Studoo se reorganiza para la pantalla pequeña. Las pestañas pasan abajo, grandes y con iconos (Ritmo, Piano, Canción, Mezcla, Automat., Aprende). La barra de arriba es más compacta y en el secuenciador el botón **Sonido** abre y cierra los ajustes del instrumento. En el mezclador, desliza hacia abajo para ver los faders.
 
 ### Novedades de la versión 1.6
