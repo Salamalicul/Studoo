@@ -6,6 +6,7 @@
 //     Al terminar, el instalador vuelve a abrir Studoo.
 //   - Linux (.deb): instala el paquete pidiendo la contraseña (pkexec).
 //   - Linux (instalar.sh, en tu carpeta personal): descomprime y reinstala.
+//   - Android: descarga el APK y abre el instalador de Android (hay que confirmar).
 //   - Otros casos (zip, compilado a mano): abre la página de descargas.
 //  Todas las funciones que usan internet tardan: llámalas desde un hilo aparte.
 // ============================================================================
@@ -24,7 +25,7 @@ namespace studoo::updater
     };
 
     // Cómo se instaló Studoo en este ordenador
-    enum class InstallKind { windowsInstaller, linuxDeb, linuxUser, manual };
+    enum class InstallKind { windowsInstaller, linuxDeb, linuxUser, androidApk, manual };
     InstallKind detectInstallKind();
 
     // true si 'remote' (por ejemplo "1.5.0") es más nueva que 'local'
@@ -41,6 +42,11 @@ namespace studoo::updater
 
     // Windows: lanza el instalador en modo silencioso (después hay que cerrar Studoo).
     bool launchWindowsInstaller (const juce::File& installer);
+
+    // Android: abre el instalador del sistema con el APK descargado.
+    // Devuelve 0 si se abrió, 1 si antes hay que dar permiso para instalar apps
+    // (se abre la pantalla de ajustes) y -1 si hubo un error.
+    int launchAndroidInstaller (const juce::File& apk);
 
     // Vuelve a abrir Studoo (después de actualizar en Linux).
     void relaunch();

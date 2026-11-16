@@ -61,6 +61,14 @@ paths_xml = "\n".join(f'        <MODULEPATH id="{m}" path="JUCE/modules"/>' for 
 
 defines = "JUCE_WEB_BROWSER=0\nJUCE_USE_CURL=0\nSTUDOO_ANDROID=1"
 
+# Actualizaciones dentro de la app: el "provider" que entrega el APK descargado
+# al instalador de Android (ver java/com/studoo/app/)
+manifest_extra = ('<manifest><application>'
+                  '<provider android:name="com.studoo.app.StudooApkProvider" '
+                  'android:authorities="com.studoo.app.actualizacion" '
+                  'android:exported="false" android:grantUriPermissions="true"/>'
+                  '</application></manifest>')
+
 jucer = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!-- Archivo creado por generate_jucer.py: no lo edites a mano. -->
 <JUCERPROJECT id="StdOo1" name="Studoo" projectType="guiapp" version="{version}"
@@ -83,6 +91,9 @@ jucer = f"""<?xml version="1.0" encoding="UTF-8"?>
                    androidBluetoothNeeded="0" bigIcon="{icon_id}" smallIcon="{icon_id}"
                    androidKeyStore="${{user.home}}/.android/studoo.keystore" androidKeyStorePass="android"
                    androidKeyAlias="studoo" androidKeyAliasPass="android"
+                   androidAdditionalJavaFolders="java"
+                   androidOtherPermissions="android.permission.REQUEST_INSTALL_PACKAGES"
+                   androidManifestCustomXmlElements={quoteattr(manifest_extra)}
                    app_name="Studoo">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" headerPath="../../../../src"

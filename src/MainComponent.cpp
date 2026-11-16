@@ -23,6 +23,32 @@ namespace
                                       nullptr);
     }
 
+    // Android: abre el instalador con la versión nueva. Si falta el permiso para
+    // instalar apps, Android abre sus ajustes y luego se vuelve a intentar.
+    void openAndroidInstaller (const juce::File& apk)
+    {
+        const int result = updater::launchAndroidInstaller (apk);
+        if (result == 0)
+            return; // Android muestra "¿Quieres actualizar esta aplicación?"
+        if (result == 1)
+        {
+            juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                              .withIconType (juce::MessageBoxIconType::NoIcon)
+                                              .withTitle (txt ("Falta un permiso (solo la primera vez)"))
+                                              .withMessage (txt ("Se ha abierto la pantalla de ajustes de Android.\n\n"
+                                                                 "1. Activa \"Permitir de esta fuente\" para Studoo.\n"
+                                                                 "2. Vuelve a Studoo.\n"
+                                                                 "3. Pulsa \"Continuar\"."))
+                                              .withButton (txt ("Continuar"))
+                                              .withButton (txt ("Cancelar")),
+                                          [apk] (int r) { if (r == 1) openAndroidInstaller (apk); });
+            return;
+        }
+        showMessage (txt ("No se pudo actualizar"),
+                     txt ("No se pudo abrir el instalador de Android. Puedes descargar la versión nueva a mano "
+                          "desde la página de descargas de Studoo."));
+    }
+
     // ------------------------------------------------------------------------
     //  Exportación en segundo plano, con barra de progreso
     // ------------------------------------------------------------------------
@@ -1148,6 +1174,9 @@ void MainComponent::offerUpdate (const updater::ReleaseInfo& info)
     else if (kind == updater::InstallKind::windowsInstaller)
         message << txt ("Studoo la descargará, se cerrará un momento para instalarla y se volverá a abrir solo. "
                         "Tus proyectos no se tocan.");
+    else if (kind == updater::InstallKind::androidApk)
+        message << txt ("Studoo la descargará y Android te pedirá confirmar la actualización (pulsa \"Actualizar\"). "
+                        "Tus proyectos no se tocan.");
     else if (kind == updater::InstallKind::linuxDeb)
         message << txt ("Studoo la descargará y la instalará. Te pedirá tu contraseña. Tus proyectos no se tocan.");
     else
@@ -1197,7 +1226,7 @@ void MainComponent::downloadAndInstall (const updater::ReleaseInfo& info)
 
         juce::String error;
         bool ok = updater::download (info.assetUrl, file, error);
-        if (ok && kind != updater::InstallKind::windowsInstaller)
+        if (ok && (kind == updater::InstallKind::linuxDeb || kind == updater::InstallKind::linuxUser))
         {
             juce::MessageManager::callAsync ([safe]
             {
@@ -1223,6 +1252,13 @@ void MainComponent::downloadAndInstall (const updater::ReleaseInfo& info)
                 showMessage (txt ("No se pudo actualizar"),
                              error + txt ("\n\nPuedes descargar la versión nueva a mano desde la página de descargas "
                                           "(menú Archivo → Buscar actualizaciones → Ir a descargas)."));
+                return;
+            }
+
+            if (kind == updater::InstallKind::androidApk)
+            {
+                // Pregunta si hay que guardar y abre el instalador de Android
+                safe->checkUnsavedThen ([file] { openAndroidInstaller (file); });
                 return;
             }
 
