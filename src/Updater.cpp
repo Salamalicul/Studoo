@@ -1,3 +1,6 @@
+// En Android necesitamos las ayudas de JUCE para llamar a Java (JNI).
+// Tienen que activarse antes de incluir JUCE.
+#define JUCE_CORE_INCLUDE_JNI_HELPERS 1
 #include "Updater.h"
 
 namespace studoo::updater
