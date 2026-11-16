@@ -34,8 +34,16 @@ void PianoRollGrid::setPlayhead (double steps)
 {
     if (! juce::approximatelyEqual (steps, playhead))
     {
+        // Solo se redibuja la franja de la raya verde (donde estaba y donde está)
+        auto strip = [this] (double s)
+        {
+            if (s < 0.0)
+                return juce::Rectangle<int>();
+            return juce::Rectangle<int> ((int) stepsToX (s) - 10, 0, 20, getHeight());
+        };
+        repaint (strip (playhead));
         playhead = steps;
-        repaint();
+        repaint (strip (playhead));
     }
 }
 
@@ -64,6 +72,7 @@ void PianoRollGrid::paint (juce::Graphics& g)
     const int length = Project::getPatternLength (pattern);
     const double sw = stepWidth();
     const int uid = roll.getChannelUid();
+    const auto clip = g.getClipBounds().toFloat();
 
     // Filas (teclas blancas y negras)
     for (int note = lowestNote; note <= highestNote; ++note)
@@ -118,6 +127,8 @@ void PianoRollGrid::paint (juce::Graphics& g)
                                          (float) ((double) n[ids::length] * sw), (float) rowHeight).reduced (0.5f, 0.5f);
         const float vel = n.getProperty (ids::velocity, 0.8f);
         ++ownNotes;
+        if (! r.expanded (6.0f).intersects (clip))
+            continue;   // fuera de la zona que se está redibujando
         Draw::glow (g, r, colour, 4.0f, 3.5f);
         if (orange) Draw::accentFill (g, r, 3.5f);
         else        Draw::colourFill (g, r, colour, 3.5f);

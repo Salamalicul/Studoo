@@ -55,7 +55,7 @@ icon_id = fid(rel(resources[0]))
 
 modules = ["juce_audio_basics", "juce_audio_devices", "juce_audio_formats", "juce_audio_processors",
            "juce_audio_utils", "juce_core", "juce_data_structures", "juce_dsp", "juce_events",
-           "juce_graphics", "juce_gui_basics", "juce_gui_extra"]
+           "juce_graphics", "juce_gui_basics", "juce_gui_extra", "juce_opengl"]
 modules_xml = "\n".join(f'    <MODULE id="{m}" showAllCode="0" useLocalCopy="0" useGlobalPath="0"/>' for m in modules)
 paths_xml = "\n".join(f'        <MODULEPATH id="{m}" path="JUCE/modules"/>' for m in modules)
 

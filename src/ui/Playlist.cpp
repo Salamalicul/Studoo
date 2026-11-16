@@ -127,9 +127,12 @@ void PlaylistGrid::paint (juce::Graphics& g)
     g.drawHorizontalLine (rulerHeight - 1, 0.0f, (float) getWidth());
 
     // Bloques (clips)
+    const auto clipArea = g.getClipBounds().toFloat();
     for (auto clip : ctx.project.playlist())
     {
         auto r = clipBounds (clip).reduced (1.0f, 1.0f);
+        if (! r.expanded (10.0f).intersects (clipArea))
+            continue;   // fuera de la zona que se está redibujando
         const bool audio = clip[ids::kind].toString() == "audio";
         juce::String name;
         juce::Colour colour = Colours::green;
@@ -218,6 +221,16 @@ void PlaylistGrid::paint (juce::Graphics& g)
         tri.addTriangle (x - 7.0f, 0.0f, x + 7.0f, 0.0f, x, 10.0f);
         g.fillPath (tri);
     }
+}
+
+void PlaylistGrid::updatePlayhead()
+{
+    const int x = ctx.engine.isSongMode() ? (int) stepsToX (ctx.engine.getPlayPosition()) : -1000;
+    if (x == lastPlayheadX)
+        return;
+    repaint (lastPlayheadX - 12, 0, 24, getHeight());
+    repaint (x - 12, 0, 24, getHeight());
+    lastPlayheadX = x;
 }
 
 void PlaylistGrid::mouseMove (const juce::MouseEvent& e)
@@ -420,8 +433,8 @@ void Playlist::refresh()
 
 void Playlist::timerCallback()
 {
-    if (ctx.engine.isPlaying() || isMouseOverOrDragging (true))
-        grid.repaint();
+    if (isShowing())
+        grid.updatePlayhead();
 }
 
 void Playlist::paint (juce::Graphics& g)

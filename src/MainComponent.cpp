@@ -118,6 +118,13 @@ namespace
 // ============================================================================
 MainComponent::MainComponent()
 {
+    setOpaque (true);   // el fondo se pinta entero: JUCE no tiene que pintar nada detrás
+   #if JUCE_ANDROID
+    // En Android dibujamos con la tarjeta gráfica (OpenGL): mucho más fluido
+    openGL.setComponentPaintingEnabled (true);
+    openGL.setContinuousRepainting (false);
+    openGL.attachTo (*this);
+   #endif
     setLookAndFeel (&lookAndFeel);
     juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
 
@@ -228,6 +235,9 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
+   #if JUCE_ANDROID
+    openGL.detach();
+   #endif
     PluginWindows::closeAll();
     project.removeChangeListener (this);
     deviceManager.removeChangeListener (this);
@@ -1406,10 +1416,17 @@ void MainComponent::timerCallback()
 void MainComponent::paint (juce::Graphics& g)
 {
     // Fondo con un brillo naranja muy suave arriba a la izquierda
-    g.fillAll (Colours::background);
-    g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.06f), 0.0f, 0.0f,
-                                             juce::Colours::transparentBlack, (float) getWidth() * 0.6f, (float) getHeight() * 0.7f, true));
-    g.fillAll();
+    // (se pinta una sola vez en una imagen y luego se copia: es mucho más rápido)
+    if (backgroundCache.getWidth() != getWidth() || backgroundCache.getHeight() != getHeight())
+    {
+        backgroundCache = juce::Image (juce::Image::RGB, juce::jmax (1, getWidth()), juce::jmax (1, getHeight()), false);
+        juce::Graphics bg (backgroundCache);
+        bg.fillAll (Colours::background);
+        bg.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.06f), 0.0f, 0.0f,
+                                                  juce::Colours::transparentBlack, (float) getWidth() * 0.6f, (float) getHeight() * 0.7f, true));
+        bg.fillAll();
+    }
+    g.drawImageAt (backgroundCache, 0, 0);
 
     // Barra de pestañas
     if (Layout::compact())

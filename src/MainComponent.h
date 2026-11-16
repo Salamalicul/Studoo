@@ -4,6 +4,9 @@
 //  Une el proyecto, el motor de audio, la tarjeta de sonido y las pantallas.
 // ============================================================================
 #include <juce_audio_utils/juce_audio_utils.h>
+#if JUCE_ANDROID
+ #include <juce_opengl/juce_opengl.h>
+#endif
 #include <set>
 
 #include "model/Project.h"
@@ -74,6 +77,10 @@ namespace studoo
         // --- Tablets (Android) ------------------------------------------------------
         void shareFile (const juce::File&);
         void importProject();
+        juce::Image backgroundCache;            // fondo ya pintado (más rápido)
+       #if JUCE_ANDROID
+        juce::OpenGLContext openGL;             // dibujar con la tarjeta gráfica
+       #endif
         LongPressRightClick longPress;          // mantener pulsado = clic derecho
         juce::ScopedMessageBox shareBox;
 
