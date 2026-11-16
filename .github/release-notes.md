@@ -1,6 +1,9 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.7.1
+### 🆕 Novedades de la versión 1.7.2
+- 🏠 **Beat de House con un clic**: en el secuenciador, pulsa **"Beat de ejemplo" → House**. Studoo pone el tempo a 124 BPM y crea un beat de 4 compases con el kit House (bombo en cada tiempo, palmada, hi-hats abiertos a contratiempo y shaker), un **bajo** y **acordes de piano** (La menor 7 – Re menor 7 – Fa 7 – Mi menor 7). Puedes cambiarlo todo a tu gusto.
+
+### Novedades de la versión 1.7.1
 - ⚡ **Mucho más fluido**: mientras suena la música, Studoo ya no redibuja la pantalla entera 30 veces por segundo, solo lo que se mueve. En el piano roll y la playlist gasta unas **8 veces menos** procesador. Se nota sobre todo en ordenadores y móviles sencillos.
 - 📲 **Android: dibuja con la tarjeta gráfica** (OpenGL), así va más suave.
 - 📱 **Android: pantalla completa de verdad**: se esconde la barra de arriba (hora, batería, wifi) y la de abajo. Desliza desde el borde si las necesitas.

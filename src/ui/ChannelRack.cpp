@@ -413,11 +413,22 @@ ChannelRack::ChannelRack (AppContext& c)
 
     addAndMakeVisible (exampleButton);
     exampleButton.setButtonText (txt ("Beat de ejemplo"));
-    exampleButton.setTooltip (txt ("Rellena el patrón actual con un ritmo de ejemplo (batería + 808)."));
+    exampleButton.setTooltip (txt ("Rellena el patrón actual con un beat de ejemplo: Trap (batería + 808) o House (batería, bajo y piano)."));
     exampleButton.onClick = [this]
     {
-        ctx.project.beginTransaction();
-        ctx.project.loadExampleBeat (getPattern());
+        juce::PopupMenu menu;
+        menu.addSectionHeader (txt ("Elige un estilo"));
+        menu.addItem (1, txt ("Trap / Hip-hop (batería + 808)"));
+        menu.addItem (2, txt ("House (batería, bajo y piano, 124 BPM)"));
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&exampleButton),
+                            [safe = juce::Component::SafePointer<ChannelRack> (this)] (int result)
+                            {
+                                if (safe == nullptr || result == 0)
+                                    return;
+                                safe->ctx.project.beginTransaction();
+                                if (result == 1) safe->ctx.project.loadExampleBeat (safe->getPattern());
+                                else             safe->ctx.project.loadHouseBeat (safe->getPattern());
+                            });
     };
     makeNonFocusing (exampleButton);
 

@@ -124,6 +124,9 @@ namespace studoo
         void setStep (juce::ValueTree pattern, int channelUid, int step, bool on);
         void clearPattern (juce::ValueTree pattern);
         void loadExampleBeat (juce::ValueTree pattern);
+        // Beat de House completo (4 compases a 124 BPM): batería del kit House,
+        // bajo y acordes de piano. Crea los canales que falten.
+        void loadHouseBeat (juce::ValueTree pattern);
 
         juce::ValueTree addNote (juce::ValueTree pattern, int channelUid, double start,
                                  double length, int pitch, float velocity = 0.8f);
