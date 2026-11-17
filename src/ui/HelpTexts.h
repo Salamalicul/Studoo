@@ -109,7 +109,7 @@ namespace studoo::help
 
     inline constexpr const char* learnTitle = "Aprende";
     inline constexpr const char* learnText =
-        "Una ruta completa para aprender a producir, de cero a terminar canciones, en 7 niveles y 39 lecciones.\n\n"
+        "Una ruta completa para aprender a producir, de cero a terminar canciones, en 8 niveles y 51 lecciones, con bases de 11 géneros (trap, reggaetón, house, drill...) para cargar y cambiar.\n\n"
         "- Elige una lección en la lista de la izquierda (mejor en orden la primera vez).\n"
         "- Cada lección tiene explicaciones, ilustraciones animadas, pasos y un ejercicio para practicar.\n"
         "- Los botones naranjas te llevan a la parte de Studoo donde se practica.\n"

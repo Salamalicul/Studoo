@@ -1,6 +1,7 @@
 #include "Version.h"
 #include "MainComponent.h"
 #include "ui/HelpTexts.h"
+#include "model/GenreBeats.h"
 
 namespace studoo
 {
@@ -160,6 +161,15 @@ MainComponent::MainComponent()
     learnView = std::make_unique<LearnView>();
     learnView->onStartTutorial = [this] { startTutorial(); };
     learnView->onGoToView = [this] (View v) { showView (v); };
+    learnView->onLoadGenre = [this] (const juce::String& genre)
+    {
+        // La base va en un patrón nuevo: así no se borra nada de lo que ya tenías
+        project.beginTransaction();
+        auto pattern = project.addPattern (txt ("Base ") + genres::nameOf (genre));
+        project.setCurrentPattern (pattern[ids::uid]);
+        genres::load (project, pattern, genre);
+        showView (View::channelRack);
+    };
     learnView->setSettings (settings.get());
 
     views = { channelRack.get(), pianoRoll.get(), playlist.get(), mixerView.get(), automationView.get(), learnView.get() };

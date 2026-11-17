@@ -291,6 +291,14 @@ public:
                 add (new IllustrationBlock (inner.upToFirstOccurrenceOf ("|", false, false),
                                             inner.fromFirstOccurrenceOf ("|", false, false)));
             }
+            else if (trimmed.startsWith ("[base:"))
+            {
+                flush();
+                auto inner = trimmed.fromFirstOccurrenceOf ("[base:", false, false).upToLastOccurrenceOf ("]", false, false);
+                const auto genre = inner.upToFirstOccurrenceOf ("|", false, false);
+                const auto label = inner.fromFirstOccurrenceOf ("|", false, false);
+                add (new ButtonBlock (juce::String::fromUTF8 ("▶  ") + label, [this, genre] { if (view.onLoadGenre) view.onLoadGenre (genre); }));
+            }
             else if (trimmed.startsWith ("[ir:"))
             {
                 flush();

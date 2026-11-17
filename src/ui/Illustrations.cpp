@@ -171,8 +171,8 @@ namespace
     void ruta (juce::Graphics& g, R area, double t)
     {
         static const char* names[] = { "Primeros\npasos", "Ritmo y\nbatería", "Notas y\nmelodía", "Diseño\nde sonido",
-                                       "Mezcla", "De beat a\ncanción", "Seguir\nmejorando" };
-        const int n = 7;
+                                       "Mezcla", "De beat a\ncanción", "Seguir\nmejorando", "Géneros\nmusicales" };
+        const int n = 8;
         const float w = area.getWidth() / (float) n;
         const float active = (float) std::fmod (t * 0.8, (double) n + 1.0);
         juce::Path line;
@@ -926,6 +926,30 @@ bool draw (juce::Graphics& g, const juce::String& id, juce::Rectangle<float> are
     else if (id == "beat_boombap")
         drumGrid (g, area, { { "Bombo", kick, "x......x..x....." }, { "Caja", snare, "....x.......x..." },
                              { "Hi-hat", hat, "x.o.x.o.x.o.x.o." } }, 90.0, time);
+    else if (id == "beat_lofi")
+        drumGrid (g, area, { { "Bombo", kick, "x.......x.x....." }, { "Caja", snare, "....x.......x..." },
+                             { "Hi-hat", hat, "x.o.x.o.x.o.x.o." }, { "Shaker", perc, ".o.o.o.o.o.o.o.o" } }, 80.0, time);
+    else if (id == "beat_drill")
+        drumGrid (g, area, { { "Bombo", kick, "x.........x....." }, { "Caja", snare, "........x.....x." },
+                             { "Hi-hat", hat, "x..x..x.x..x..x." }, { "808", bass, "x.....x.x.....x." } }, 71.0, time,
+                  "La caja extra del paso 15 da el balanceo del drill");
+    else if (id == "beat_techno")
+        drumGrid (g, area, { { "Bombo", kick, "x...x...x...x..." }, { "Clap", snare, "....x.......x..." },
+                             { "Hat abierto", perc, "..x...x...x...x." }, { "Hi-hat", hat, "oooooooooooooooo" },
+                             { "Bajo", bass, ".xxx.xxx.xxx.xxx" } }, 130.0, time,
+                  "El bajo rellena los huecos entre bombos");
+    else if (id == "beat_afro")
+        drumGrid (g, area, { { "Bombo", kick, "x.....x.x......." }, { "Rim", snare, "...x..x....x..x." },
+                             { "Shaker", hat, "x.oxo.oxo.oxo.ox" }, { "Conga", perc, ".....x.x.....x.x" } }, 105.0, time);
+    else if (id == "beat_phonk")
+        drumGrid (g, area, { { "Bombo", kick, "x.......x.x....." }, { "Caja", snare, "....x.......x..." },
+                             { "Hi-hat", hat, "x.o.x.o.x.o.x.o." }, { "Cencerro", perc, "x..x..x...x..x.." } }, 130.0, time);
+    else if (id == "beat_pop")
+        drumGrid (g, area, { { "Bombo", kick, "x.......x.x....." }, { "Clap", snare, "....x.......x..." },
+                             { "Hi-hat", hat, "x.o.x.o.x.o.x.o." }, { "Pandereta", perc, "....x.......x..." } }, 110.0, time);
+    else if (id == "beat_rnb")
+        drumGrid (g, area, { { "Bombo", kick, "x......x..x....." }, { "Chasquido", snare, "....x.......x..." },
+                             { "Hi-hat", hat, "x.o.x.xxx.o.x.o." }, { "808", bass, "x.......x..x...." } }, 75.0, time);
     else if (id == "swing")      swing (g, area, time);
     else if (id == "velocidad")  velocidad (g, area, time);
     else if (id == "teclado")    teclado (g, area, time);

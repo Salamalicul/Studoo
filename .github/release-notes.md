@@ -1,6 +1,10 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.7.1
+### 🆕 Novedades de la versión 1.7.2
+- 🎓 **Aprende: nuevo Nivel 8 · Géneros musicales.** 12 lecciones nuevas: cómo usar las bases, Trap, Reggaetón, House, Boom bap, Lo-fi, Drill, Techno, Afrobeats, Phonk, Pop y R&B. Cada una explica de dónde viene el género, su receta (tempo, batería, bajo, acordes) con un ritmo animado, y trae ejercicios para experimentar.
+- ▶️ **Bases de 11 géneros para cargar y cambiar**: en cada lección, pulsa **"Cargar la base"**. Studoo crea un patrón nuevo con batería, bajo y acordes del género, pone el tempo y abre el secuenciador. También están en el botón **"Beat de ejemplo"** del secuenciador.
+
+### Novedades de la versión 1.7.1
 - ⚡ **Mucho más fluido**: mientras suena la música, Studoo ya no redibuja la pantalla entera 30 veces por segundo, solo lo que se mueve. En el piano roll y la playlist gasta unas **8 veces menos** procesador. Se nota sobre todo en ordenadores y móviles sencillos.
 - 📲 **Android: dibuja con la tarjeta gráfica** (OpenGL), así va más suave.
 - 📱 **Android: pantalla completa de verdad**: se esconde la barra de arriba (hora, batería, wifi) y la de abajo. Desliza desde el borde si las necesitas.

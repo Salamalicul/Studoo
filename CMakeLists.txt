@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # instalar nada extra para abrir la app.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-project(Studoo VERSION 1.7.1 LANGUAGES C CXX)
+project(Studoo VERSION 1.7.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -40,6 +40,7 @@ endif()
 # Código del motor de audio (lo comparten la app y las pruebas)
 set(STUDOO_ENGINE_SOURCES
     src/model/Project.cpp
+    src/model/GenreBeats.cpp
     src/audio/AudioEngine.cpp
     src/audio/DrumSounds.cpp
     src/audio/Instruments.cpp

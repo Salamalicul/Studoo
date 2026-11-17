@@ -1,5 +1,6 @@
 #include "ChannelRack.h"
 #include "HelpTexts.h"
+#include "model/GenreBeats.h"
 
 namespace studoo
 {
@@ -413,11 +414,26 @@ ChannelRack::ChannelRack (AppContext& c)
 
     addAndMakeVisible (exampleButton);
     exampleButton.setButtonText (txt ("Beat de ejemplo"));
-    exampleButton.setTooltip (txt ("Rellena el patrón actual con un ritmo de ejemplo (batería + 808)."));
+    exampleButton.setTooltip (txt ("Rellena el patrón actual con un beat de ejemplo o con la base de un género (trap, house, reggaetón...). Luego cámbialo a tu gusto."));
     exampleButton.onClick = [this]
     {
-        ctx.project.beginTransaction();
-        ctx.project.loadExampleBeat (getPattern());
+        juce::PopupMenu menu;
+        menu.addItem (1, txt ("Beat sencillo (batería + 808)"));
+        menu.addSectionHeader (txt ("Bases de géneros (batería, bajo y acordes)"));
+        int item = 100;
+        for (auto& genre : genres::all())
+            menu.addItem (item++, txt (genre.name) + "  (" + juce::String (juce::roundToInt (genre.bpm)) + " BPM)");
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&exampleButton),
+                            [safe = juce::Component::SafePointer<ChannelRack> (this)] (int result)
+                            {
+                                if (safe == nullptr || result == 0)
+                                    return;
+                                safe->ctx.project.beginTransaction();
+                                if (result == 1)
+                                    safe->ctx.project.loadExampleBeat (safe->getPattern());
+                                else if (result >= 100 && result - 100 < (int) genres::all().size())
+                                    genres::load (safe->ctx.project, safe->getPattern(), genres::all()[(size_t) (result - 100)].id);
+                            });
     };
     makeNonFocusing (exampleButton);
 
