@@ -56,6 +56,11 @@ jobs:
       - name: Pruebas del motor de audio
         run: ./build/StudooEngineTest_artefacts/Release/StudooEngineTest
 
+      - name: Pruebas de Aprende y de seguridad
+        run: |
+          ./build/StudooLearnTest_artefacts/Release/StudooLearnTest
+          ./build/StudooFuzzTest_artefacts/Release/StudooFuzzTest 500
+
       - name: Empaquetar
         run: |
           mkdir -p Studoo-Linux
@@ -97,6 +102,9 @@ jobs:
 
       - name: Pruebas del motor de audio
         run: .\build\StudooEngineTest_artefacts\Release\StudooEngineTest.exe
+
+      - name: Pruebas de Aprende
+        run: .\build\StudooLearnTest_artefacts\Release\StudooLearnTest.exe
 
       - uses: actions/upload-artifact@v4
         with:

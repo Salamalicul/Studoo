@@ -34,10 +34,13 @@ namespace studoo
         void answer (int option);
         void layoutGame();
 
-        // Sonidos
+    public:
+        // Sonidos (públicos para poder comprobarlos en las pruebas automáticas)
         AudioEngine::SharedBuffer renderNotes (const std::vector<std::vector<int>>& groups, double secondsEach);
         AudioEngine::SharedBuffer renderDrum (const juce::String& kitId, const juce::String& soundId);
         AudioEngine::SharedBuffer renderGenre (const juce::String& genreId);
+
+    private:
 
         AudioEngine& engine;
         learn::Progress& progress;
