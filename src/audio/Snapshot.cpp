@@ -125,9 +125,11 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
     {
         ClipSnap cs;
         cs.isAudio = c[ids::kind].toString() == "audio";
-        cs.start = pos (c[ids::start]);
-        cs.length = juce::jmax (0.25, pos (c[ids::length]));
-        cs.offset = pos (c[ids::offset]);
+        // Una canción de Studoo puede durar como mucho 1000 compases
+        constexpr double maxSong = 16000.0;
+        cs.start = pos (c[ids::start], maxSong);
+        cs.length = juce::jmax (0.25, pos (c[ids::length], maxSong));
+        cs.offset = pos (c[ids::offset], maxSong);
 
         if (cs.isAudio)
         {

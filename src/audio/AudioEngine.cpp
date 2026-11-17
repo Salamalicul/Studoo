@@ -1,5 +1,6 @@
 #include "AudioEngine.h"
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace studoo
@@ -652,9 +653,9 @@ void AudioEngine::renderAudioClips (const Snapshot& snap, double from, double to
         {
             const double songTime = from + (i - sampleOffset) / samplesPerStep;
             const double srcPos = ((songTime - clip.start) + clip.offset) * secondsPerStep * rt.audioSample->sampleRate;
+            if (! (srcPos >= 0.0)) continue;               // también descarta NaN
+            if (srcPos >= (double) (srcLength - 1)) break;  // antes de convertir a int (sin desbordes)
             const int idx = (int) srcPos;
-            if (idx < 0) continue;
-            if (idx + 1 >= srcLength) break;
             const float frac = (float) (srcPos - idx);
             outL[i] += srcL[idx] + (srcL[idx + 1] - srcL[idx]) * frac;
             outR[i] += srcR[idx] + (srcR[idx + 1] - srcR[idx]) * frac;
@@ -853,6 +854,10 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     metronome.render (master, n);
 
     // --- Salida a los altavoces -------------------------------------------------------------------
+    // Protección: nunca se envía a los altavoces nada por encima del máximo ni
+    // valores no válidos (NaN/infinito, por ejemplo de un plugin estropeado).
+    // Si aparece uno, se reinician los efectos para que no se quede "pegado".
+    bool invalid = false;
     for (int ch = 0; ch < numOutputs; ++ch)
     {
         if (outputs[ch] == nullptr)
@@ -860,8 +865,15 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         const float* src = master.getReadPointer (ch % 2);
         float* dst = outputs[ch] + outputOffset;
         for (int i = 0; i < n; ++i)
-            dst[i] = juce::jlimit (-1.0f, 1.0f, src[i]);
+        {
+            const float v = src[i];
+            if (! std::isfinite (v)) { dst[i] = 0.0f; invalid = true; }
+            else                     dst[i] = juce::jlimit (-1.0f, 1.0f, v);
+        }
     }
+    if (invalid)
+        for (auto& t : mixer)
+            t.reset();   // sin reservar memoria (estamos en el hilo de audio)
 
     // --- Grabación ------------------------------------------------------------------------------------
     if (recording.load() && recordWriter != nullptr && isPlaying && song

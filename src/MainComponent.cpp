@@ -68,11 +68,11 @@ namespace
         void run() override
         {
             const bool mp3 = lame.existsAsFile();
-            // Archivo temporal con nombre único (nadie puede preparar uno con ese nombre antes)
-        const auto privateFolder = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Studoo");
-        if (mp3)
-            privateFolder.createDirectory();
-        const auto wav = mp3 ? privateFolder.getNonexistentChildFile ("exportando", ".wav") : target;
+            // Archivo temporal en la carpeta privada del usuario, con nombre único
+            const auto privateFolder = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Studoo");
+            if (mp3)
+                privateFolder.createDirectory();
+            const auto wav = mp3 ? privateFolder.getNonexistentChildFile ("exportando", ".wav") : target;
 
             setStatusMessage (txt ("Generando el audio..."));
             ok = engine.renderSongToFile (wav, 44100.0, [this, mp3] (float p)
@@ -1250,7 +1250,7 @@ void MainComponent::downloadAndInstall (const updater::ReleaseInfo& info)
         const auto file = dir.getChildFile (info.assetName);
 
         juce::String error;
-        bool ok = updater::download (info.assetUrl, file, error);
+        bool ok = updater::download (info.assetUrl, info.sha256, file, error);
         if (ok && (kind == updater::InstallKind::linuxDeb || kind == updater::InstallKind::linuxUser))
         {
             juce::MessageManager::callAsync ([safe]

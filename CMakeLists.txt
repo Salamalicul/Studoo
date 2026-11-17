@@ -115,6 +115,7 @@ target_link_libraries(Studoo
         juce::juce_audio_processors
         juce::juce_dsp
         juce::juce_gui_extra
+        juce::juce_cryptography
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -138,5 +139,17 @@ if(STUDOO_BUILD_TESTS)
         PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     if(MSVC)
         target_compile_options(StudooEngineTest PRIVATE /utf-8)
+    endif()
+
+    # Prueba de seguridad: miles de proyectos estropeados al azar
+    juce_add_console_app(StudooFuzzTest PRODUCT_NAME "StudooFuzzTest")
+    target_sources(StudooFuzzTest PRIVATE tests/FuzzTest.cpp ${STUDOO_ENGINE_SOURCES})
+    target_include_directories(StudooFuzzTest PRIVATE src)
+    target_compile_definitions(StudooFuzzTest PRIVATE ${STUDOO_DEFINITIONS})
+    target_link_libraries(StudooFuzzTest
+        PRIVATE juce::juce_audio_utils juce::juce_audio_processors juce::juce_dsp juce::juce_gui_extra
+        PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+    if(MSVC)
+        target_compile_options(StudooFuzzTest PRIVATE /utf-8)
     endif()
 endif()

@@ -269,16 +269,23 @@ juce::Array<juce::File> chosenFiles (const juce::FileChooser& fc, const juce::Fi
         auto dest = importFolder.getChildFile (name);
         if (dest.getParentDirectory() != importFolder)
             continue;
+        // Si ya hay un archivo con ese nombre, no lo pisamos: se guarda como "nombre (2)"
+        if (dest.existsAsFile())
+            dest = importFolder.getNonexistentChildFile (dest.getFileNameWithoutExtension(), dest.getFileExtension(), true);
         if (auto in = doc.createInputStream())
         {
-            dest.deleteFile();
-            juce::FileOutputStream out (dest);
-            if (out.openedOk())
+            constexpr juce::int64 maxBytes = 512 * 1024 * 1024;   // como mucho 512 MB (no llenar el móvil)
+            bool ok = false;
             {
-                out.writeFromInputStream (*in, -1);
-                out.flush();
-                files.add (dest);
+                juce::FileOutputStream out (dest);
+                if (out.openedOk())
+                {
+                    ok = out.writeFromInputStream (*in, maxBytes + 1) <= maxBytes;
+                    out.flush();
+                }
             }
+            if (ok) files.add (dest);
+            else    dest.deleteFile();
         }
        #else
         juce::ignoreUnused (importFolder);

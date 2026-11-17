@@ -208,10 +208,13 @@ bool fetchLatest (ReleaseInfo& info, juce::String& error)
                 // por HTTPS, y con un nombre de archivo normal (sin carpetas)
                 const auto name = asset["name"].toString();
                 const auto url = asset["url"].toString(); // API: sirve el archivo con "Accept: application/octet-stream"
-                if (name.endsWith (suffix) && isSafeAssetName (name) && isOfficialAssetUrl (url))
+                const auto digest = asset["digest"].toString();
+                if (name.endsWith (suffix) && isSafeAssetName (name) && isOfficialAssetUrl (url)
+                    && digest.startsWith ("sha256:"))
                 {
                     info.assetName = name;
                     info.assetUrl = url;
+                    info.sha256 = digest.fromFirstOccurrenceOf ("sha256:", false, false).toLowerCase();
                 }
             }
     return true;
@@ -241,7 +244,7 @@ juce::File downloadFolder()
    #endif
 }
 
-bool download (const juce::String& url, const juce::File& destination, juce::String& error)
+bool download (const juce::String& url, const juce::String& sha256, const juce::File& destination, juce::String& error)
 {
     if (! isOfficialAssetUrl (url) || ! isSafeAssetName (destination.getFileName()))
     {
@@ -250,10 +253,21 @@ bool download (const juce::String& url, const juce::File& destination, juce::Str
     }
     destination.getParentDirectory().createDirectory();
     destination.deleteFile();
-    if (httpGet (url, &destination, nullptr, 600) && destination.getSize() > 100000)
-        return true;
-    error = juce::String::fromUTF8 ("No se pudo descargar la actualización.");
-    return false;
+    if (! httpGet (url, &destination, nullptr, 600) || destination.getSize() <= 100000)
+    {
+        error = juce::String::fromUTF8 ("No se pudo descargar la actualización.");
+        return false;
+    }
+
+    // Seguridad: el archivo tiene que ser exactamente el que se publicó en GitHub
+    if (sha256.length() != 64 || juce::SHA256 (destination).toHexString().toLowerCase() != sha256)
+    {
+        destination.deleteFile();
+        error = juce::String::fromUTF8 ("La descarga no coincide con la versión oficial de Studoo (puede que se haya "
+                                        "estropeado por el camino). Por seguridad no se ha instalado. Inténtalo más tarde.");
+        return false;
+    }
+    return true;
 }
 
 bool installOnLinux (InstallKind kind, const juce::File& downloaded, juce::String& error)
@@ -262,13 +276,14 @@ bool installOnLinux (InstallKind kind, const juce::File& downloaded, juce::Strin
     int exitCode = -1;
     if (kind == InstallKind::linuxDeb)
     {
-        if (! hasCommand ("pkexec"))
+        if (! juce::File ("/usr/bin/pkexec").existsAsFile() || ! juce::File ("/usr/bin/apt-get").existsAsFile())
         {
             error = juce::String::fromUTF8 ("Falta \"pkexec\" para pedir la contraseña. Instala el archivo .deb a mano.");
             return false;
         }
         // pkexec muestra la ventana del sistema que pide la contraseña
-        if (runCommand ({ "pkexec", "apt-get", "install", "-y", "--allow-downgrades", downloaded.getFullPathName() },
+        // Rutas completas: así no se puede colar otro programa con el mismo nombre
+        if (runCommand ({ "/usr/bin/pkexec", "/usr/bin/apt-get", "install", "-y", "--allow-downgrades", downloaded.getFullPathName() },
                         nullptr, 15 * 60 * 1000, exitCode) && exitCode == 0)
             return true;
         error = juce::String::fromUTF8 ("No se pudo instalar (¿cancelaste la contraseña?).");

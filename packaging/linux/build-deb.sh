@@ -7,6 +7,7 @@ set -e
 EXE="$1"; VERSION="$2"; OUT="$3"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(mktemp -d)"
+chmod 755 "$ROOT"   # mktemp crea la carpeta solo para ti; el paquete necesita permisos normales
 trap 'rm -rf "$ROOT"' EXIT
 
 mkdir -p "$ROOT/DEBIAN" "$ROOT/opt/studoo" "$ROOT/usr/bin" "$ROOT/usr/share/applications"
