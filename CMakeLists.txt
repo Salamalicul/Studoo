@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # instalar nada extra para abrir la app.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-project(Studoo VERSION 1.7.2 LANGUAGES C CXX)
+project(Studoo VERSION 1.8.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,6 +74,9 @@ target_sources(Studoo PRIVATE
     src/ui/MixerView.cpp
     src/ui/AutomationView.cpp
     src/ui/LearnView.cpp
+    src/ui/LearnProgress.cpp
+    src/ui/Challenges.cpp
+    src/ui/EarGames.cpp
     src/ui/Illustrations.cpp
     src/ui/Tutorial.cpp
     ${STUDOO_ENGINE_SOURCES})
@@ -139,6 +142,20 @@ if(STUDOO_BUILD_TESTS)
         PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
     if(MSVC)
         target_compile_options(StudooEngineTest PRIVATE /utf-8)
+    endif()
+
+    # Pruebas de Aprende: retos, sonidos de los juegos y progreso
+    juce_add_console_app(StudooLearnTest PRODUCT_NAME "StudooLearnTest")
+    target_sources(StudooLearnTest PRIVATE tests/LearnTest.cpp ${STUDOO_ENGINE_SOURCES}
+        src/ui/Challenges.cpp src/ui/EarGames.cpp src/ui/LearnProgress.cpp
+        src/ui/StudooLookAndFeel.cpp src/ui/Widgets.cpp)
+    target_include_directories(StudooLearnTest PRIVATE src src/ui)
+    target_compile_definitions(StudooLearnTest PRIVATE ${STUDOO_DEFINITIONS})
+    target_link_libraries(StudooLearnTest
+        PRIVATE StudooData juce::juce_audio_utils juce::juce_audio_processors juce::juce_dsp juce::juce_gui_extra
+        PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+    if(MSVC)
+        target_compile_options(StudooLearnTest PRIVATE /utf-8)
     endif()
 
     # Prueba de seguridad: miles de proyectos estropeados al azar

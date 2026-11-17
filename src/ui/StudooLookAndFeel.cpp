@@ -237,8 +237,12 @@ void StudooLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b
     g.strokePath (shape, juce::PathStrokeType (1.0f));
 }
 
-juce::Font StudooLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHeight)
+juce::Font StudooLookAndFeel::getTextButtonFont (juce::TextButton& button, int buttonHeight)
 {
+    // Un botón puede pedir su propio tamaño de letra (por ejemplo, en Aprende)
+    const auto custom = button.getProperties()["fontSize"];
+    if (! custom.isVoid())
+        return Fonts::bold ((float) custom);
     return Fonts::bold (juce::jlimit (11.0f, 15.0f, (float) buttonHeight * 0.48f));
 }
 

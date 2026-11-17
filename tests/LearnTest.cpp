@@ -1,0 +1,201 @@
+// ============================================================================
+//  Pruebas automáticas de "Aprende":
+//    - cada reto NO se da por hecho en un proyecto nuevo, y SÍ cuando haces
+//      lo que pide
+//    - todos los sonidos de los juegos de oído suenan (no salen en silencio)
+//    - el progreso: lecciones, tests, retos, racha y logros
+// ============================================================================
+#include <juce_audio_utils/juce_audio_utils.h>
+#include "audio/Kits.h"
+#include "model/GenreBeats.h"
+#include "ui/Challenges.h"
+#include "ui/EarGames.h"
+#include "ui/LearnProgress.h"
+
+#include <iostream>
+
+using namespace studoo;
+
+static int failures = 0;
+
+static juce::String u (const char* utf8) { return juce::String::fromUTF8 (utf8); }
+
+static void check (bool condition, const char* what) ;
+static void check (bool condition, const juce::String& what)
+{
+    std::cout << (condition ? "  OK    " : "  FALLO ") << what << "\n";
+    if (! condition)
+        ++failures;
+}
+
+namespace
+{
+    juce::ValueTree channelWithSample (Project& p, const juce::String& sample)
+    {
+        return p.channels().getChildWithProperty (ids::sample, sample);
+    }
+
+    void steps (Project& p, const juce::ValueTree& ch, std::initializer_list<int> list)
+    {
+        for (int s : list)
+            p.setStep (p.getCurrentPattern(), (int) ch[ids::uid], s, true);
+    }
+
+    // Lo que haría el usuario para superar cada reto
+    void doChallenge (Project& p, const juce::String& id)
+    {
+        auto kick = channelWithSample (p, "builtin:kick");
+        auto snare = channelWithSample (p, "builtin:snare");
+        auto hat = channelWithSample (p, "builtin:hihat");
+        auto synth = p.findChannelByType (ChannelType::synth);
+        auto bass = p.findChannelByType (ChannelType::bass808);
+        auto pattern = p.getCurrentPattern();
+        auto track1 = p.getMixerTrack (1);
+
+        if (id == "primer_beat")         steps (p, kick, { 0, 4, 8, 12 });
+        else if (id == "bpm")            p.getState().setProperty (ids::bpm, 120.0, nullptr);
+        else if (id == "largo_64")       pattern.setProperty (ids::length, 64, nullptr);
+        else if (id == "caja_2_4")       steps (p, snare, { 4, 12 });
+        else if (id == "bombo_negras")   steps (p, kick, { 0, 4, 8, 12 });
+        else if (id == "contratiempo")   steps (p, hat, { 2, 6, 10, 14 });
+        else if (id == "hihat_corcheas") steps (p, hat, { 0, 2, 4, 6, 8, 10, 12, 14 });
+        else if (id == "roll")           steps (p, hat, { 12, 13, 14 });
+        else if (id == "dembow")         steps (p, snare, { 3, 6, 11, 14 });
+        else if (id == "silencio")       kick.setProperty (ids::muted, true, nullptr);
+        else if (id == "sample_kit")     p.addKitSound (kits::all()[0], kits::all()[0].sounds[0]);
+        else if (id == "notas_melodia")  for (int n : { 60, 62, 64, 65 }) p.addNote (pattern, synth[ids::uid], (n - 60) * 2.0, 1.0, n);
+        else if (id == "acorde")         for (int n : { 60, 64, 67 }) p.addNote (pattern, synth[ids::uid], 0.0, 4.0, n);
+        else if (id == "808_notas")      { p.addNote (pattern, bass[ids::uid], 0.0, 4.0, 36); p.addNote (pattern, bass[ids::uid], 4.0, 4.0, 36); p.addNote (pattern, bass[ids::uid], 8.0, 4.0, 39); }
+        else if (id == "onda")           synth.setProperty (ids::wave, 1, nullptr);
+        else if (id == "adsr_pad")       synth.setProperty (ids::attack, 0.5f, nullptr);
+        else if (id == "filtro")         synth.setProperty (ids::cutoff, 1000.0f, nullptr);
+        else if (id == "volumen_mezcla") track1.setProperty (ids::volume, 0.5f, nullptr);
+        else if (id == "panorama")       kick.setProperty (ids::pan, 0.5f, nullptr);
+        else if (id == "eq")             track1.setProperty (ids::eqLow, 3.0f, nullptr);
+        else if (id == "compresor")      track1.setProperty (ids::compOn, true, nullptr);
+        else if (id == "reverb")         track1.setProperty (ids::reverbMix, 0.3f, nullptr);
+        else if (id == "delay")          track1.setProperty (ids::delayMix, 0.3f, nullptr);
+        else if (id == "dos_patrones")   p.addPattern();
+        else if (id == "playlist")       for (int i = 1; i < 4; ++i) p.addClip ("pattern", pattern[ids::uid], 0, i * 16.0, 16.0);
+        else if (id == "automatizacion")
+        {
+            AutomationTarget t;
+            t.kind = AutomationTarget::Kind::mixer;
+            t.index = 1;
+            t.param = AutomationTarget::Param::volume;
+            auto lane = p.addAutomationLane (t);
+            lane.getChild (1).setProperty (ids::value, 0.1f, nullptr);
+        }
+        else if (id == "grabacion")      p.addChannel (ChannelType::audio, "Voz", 7);
+        else if (id == "base_genero")    genres::load (p, p.addPattern ("Base House"), "house");
+        else                             std::cout << "  (reto sin prueba: " << id << ")\n";
+    }
+
+    float peak (const AudioEngine::SharedBuffer& b)
+    {
+        return b == nullptr ? 0.0f : b->getMagnitude (0, b->getNumSamples());
+    }
+}
+
+static void check (bool condition, const char* what) { check (condition, u (what)); }
+
+int main()
+{
+    juce::ScopedJuceInitialiser_GUI init;
+
+    // --- Retos ---------------------------------------------------------------------
+    std::cout << "Retos (" << learn::challenges().size() << ")\n";
+    for (auto& c : learn::challenges())
+    {
+        Project fresh;
+        check (! c.check (fresh), u ("Proyecto nuevo: \"") + c.id + "\" todavía no está hecho");
+        Project p;
+        doChallenge (p, c.id);
+        check (c.check (p), u ("Al hacerlo, \"") + c.id + "\" se detecta");
+    }
+
+    // --- Sonidos de los juegos ------------------------------------------------------------
+    std::cout << "Sonidos de los juegos de oído\n";
+    {
+        AudioEngine engine;
+        learn::Progress progress;
+        EarGames games (engine, progress);
+
+        int drums = 0, silent = 0;
+        for (auto& kit : kits::all())
+            for (auto& s : kit.sounds)
+            {
+                ++drums;
+                if (peak (games.renderDrum (kit.id, s.id)) < 0.01f)
+                {
+                    ++silent;
+                    std::cout << "    en silencio: " << kit.id << "/" << s.id << "\n";
+                }
+            }
+        check (silent == 0, juce::String (drums) + u (" sonidos de batería suenan"));
+
+        auto notes = games.renderNotes ({ { 60 }, { 67 } }, 0.75);
+        check (peak (notes) > 0.05f && peak (notes) <= 1.0f, "Las dos notas de \"¿Sube o baja?\" suenan sin saturar");
+        auto chord = games.renderNotes ({ { 60 }, { 64 }, { 67 }, { 60, 64, 67 } }, 0.42);
+        check (peak (chord) > 0.05f && peak (chord) <= 1.0f, "El acorde de \"¿Mayor o menor?\" suena sin saturar");
+
+        for (auto& g : genres::all())
+        {
+            auto beat = games.renderGenre (g.id);
+            const bool ok = beat != nullptr && beat->getNumSamples() > 44100 && peak (beat) > 0.05f && peak (beat) <= 1.0f
+                            && beat->getRMSLevel (0, 0, beat->getNumSamples()) > 0.01f;
+            check (ok, u ("La base de ") + genres::nameOf (g.id) + u (" suena en \"¿Qué género es?\""));
+        }
+    }
+
+    // --- Progreso, racha y logros ----------------------------------------------------------
+    std::cout << "Progreso y logros\n";
+    {
+        auto file = juce::File::createTempFile (".settings");
+        juce::PropertiesFile::Options o;
+        juce::PropertiesFile settings (file, o);
+        learn::Progress progress;
+        progress.setSettings (&settings);
+        juce::StringArray unlocked;
+        progress.onUnlocked = [&] (const learn::Achievement& a) { unlocked.add (a.id); };
+
+        check (progress.currentStreak() == 0, "Sin practicar: racha 0");
+        progress.setLessonDone (u ("Qué es una DAW"), true);
+        check (progress.isLessonDone (u ("Qué es una DAW")) && progress.numLessonsDone() == 1, "Lección marcada como aprendida");
+        check (progress.currentStreak() == 1 && progress.practicedToday(), "Racha de 1 día al practicar hoy");
+        check (unlocked.contains ("primer_paso"), "Logro \"Primer paso\" al aprender una lección");
+
+        progress.recordQuiz ("BPM y tempo", 2, 3);
+        progress.recordQuiz ("BPM y tempo", 1, 3);
+        check (progress.bestQuizScore ("BPM y tempo") == 2, "Se guarda la mejor nota del test");
+        progress.recordQuiz ("BPM y tempo", 3, 3);
+        check (progress.numPerfectQuizzes() == 1 && unlocked.contains ("test_perfecto"), "Test perfecto y su logro");
+
+        progress.setChallengeDone ("bpm");
+        progress.setChallengeDone ("bpm");
+        check (progress.numChallengesDone() == 1 && unlocked.contains ("primer_reto"), "Reto contado una sola vez y su logro");
+
+        progress.recordGameStreak ("altura", 5);
+        progress.recordGameStreak ("altura", 3);
+        check (progress.bestGameStreak ("altura") == 5 && unlocked.contains ("oido_fino"), "Récord del juego y logro \"Oído fino\"");
+
+        // Racha: ayer practicó y llevaba 6 días -> hoy son 7
+        settings.setValue ("learnLastDay", (juce::Time::getCurrentTime() - juce::RelativeTime::days (1)).formatted ("%Y-%m-%d"));
+        settings.setValue ("learnStreak", 6);
+        progress.setLessonDone ("BPM y tempo", true);
+        check (progress.currentStreak() == 7 && unlocked.contains ("racha_7"), "La racha sube a 7 días y da su logro");
+
+        // Si pasa un día sin practicar, la racha se pierde
+        settings.setValue ("learnLastDay", (juce::Time::getCurrentTime() - juce::RelativeTime::days (2)).formatted ("%Y-%m-%d"));
+        check (progress.currentStreak() == 0, "Un día sin practicar: la racha vuelve a 0");
+        check (progress.bestStreak() == 7, "La mejor racha se recuerda");
+
+        const int before = unlocked.size();
+        progress.setLessonDone (u ("Qué es una DAW"), true);
+        check (unlocked.size() == before, "Los logros no se repiten");
+        file.deleteFile();
+    }
+
+    std::cout << (failures == 0 ? "\nTodas las pruebas de Aprende han pasado.\n" : "\nHay pruebas que han fallado.\n");
+    return failures == 0 ? 0 : 1;
+}

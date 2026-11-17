@@ -109,12 +109,13 @@ namespace studoo::help
 
     inline constexpr const char* learnTitle = "Aprende";
     inline constexpr const char* learnText =
-        "Una ruta completa para aprender a producir, de cero a terminar canciones, en 8 niveles y 51 lecciones, con bases de 11 géneros (trap, reggaetón, house, drill...) para cargar y cambiar.\n\n"
-        "- Elige una lección en la lista de la izquierda (mejor en orden la primera vez).\n"
-        "- Cada lección tiene explicaciones, ilustraciones animadas, pasos y un ejercicio para practicar.\n"
-        "- Los botones naranjas te llevan a la parte de Studoo donde se practica.\n"
-        "- \"Ver vídeos en YouTube\" abre vídeos en español sobre ese tema.\n"
-        "- \"Marcar como aprendida\" guarda tu progreso (lo ves arriba).\n\n"
+        "Todo para aprender a producir, de cero a terminar canciones. Tiene cuatro pestañas:\n\n"
+        "- Ruta: 56 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
+        "un test al final y bases de 11 géneros para cargar y cambiar.\n"
+        "- Juegos: entrena el oído (instrumentos, notas, acordes y géneros).\n"
+        "- Logros: tu racha de días practicando, tus estadísticas y tus medallas.\n"
+        "- Diccionario: busca cualquier palabra (808, reverb, sidechain...) y la lección donde se explica.\n\n"
+        "Practica un poco cada día para no perder la racha. "
         "El botón \"Tutorial guiado\" te lleva paso a paso por Studoo para hacer tu primer beat.";
 
     inline constexpr const char* shortcutsTitle = "Atajos de teclado";

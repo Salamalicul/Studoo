@@ -243,6 +243,20 @@ void AudioEngine::previewNote (int channelUid, int note, float velocity, double 
         previewEvents[(size_t) scope.startIndex1] = { channelUid, note, velocity, (int) (seconds * sampleRate) };
 }
 
+void AudioEngine::playBuffer (SharedBuffer buffer, double bufferSampleRate, float gain)
+{
+    SharedBuffer old;
+    {
+        const juce::ScopedLock sl (lock);
+        old = std::move (audition);
+        audition = std::move (buffer);
+        auditionPos = 0.0;
+        auditionStep = juce::jlimit (0.125, 8.0, bufferSampleRate / sampleRate);
+        auditionGain = juce::jlimit (0.0f, 1.0f, gain);
+    }
+    // 'old' se libera aquí, fuera del candado (no en el hilo de audio)
+}
+
 float AudioEngine::getTrackPeak (int track, int channel) const
 {
     return juce::isPositiveAndBelow (track, numMixerTracks) ? mixer[(size_t) track].getPeak (channel) : 0.0f;
@@ -852,6 +866,30 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     }
     mixer[0].process (n, trackParams[0], snap->bpm, trackParams[0].mute);
     metronome.render (master, n);
+
+    // --- Sonido de los juegos de oído (no pasa por el mezclador) ---------------------------
+    if (audition != nullptr)
+    {
+        const auto& src = *audition;
+        const int len = src.getNumSamples();
+        const float* srcL = src.getNumChannels() > 0 ? src.getReadPointer (0) : nullptr;
+        const float* srcR = src.getNumChannels() > 1 ? src.getReadPointer (1) : srcL;
+        float* l = master.getWritePointer (0);
+        float* r = master.getWritePointer (1);
+        int i = 0;
+        for (; i < n && srcL != nullptr; ++i)
+        {
+            const int idx = (int) auditionPos;
+            if (idx + 1 >= len)
+                break;
+            const float frac = (float) (auditionPos - idx);
+            l[i] += (srcL[idx] + (srcL[idx + 1] - srcL[idx]) * frac) * auditionGain;
+            r[i] += (srcR[idx] + (srcR[idx + 1] - srcR[idx]) * frac) * auditionGain;
+            auditionPos += auditionStep;
+        }
+        if (i < n) // terminó: lo soltamos en el próximo playBuffer (no liberamos memoria aquí)
+            auditionPos = (double) len;
+    }
 
     // --- Salida a los altavoces -------------------------------------------------------------------
     // Protección: nunca se envía a los altavoces nada por encima del máximo ni
