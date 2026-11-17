@@ -48,12 +48,14 @@ namespace
         juce::StringArray args;
         if (hasCommand ("curl"))
         {
-            args = { "curl", "-sSfL", "--max-time", juce::String (timeoutSecs), "-A", userAgent, "-H", accept };
+            // Solo HTTPS (también en las redirecciones)
+            args = { "curl", "-sSfL", "--proto", "=https", "--proto-redir", "=https",
+                     "--max-time", juce::String (timeoutSecs), "-A", userAgent, "-H", accept };
             if (toFile != nullptr) args.addArray ({ "-o", toFile->getFullPathName() });
         }
         else if (hasCommand ("wget"))
         {
-            args = { "wget", "-q", "--timeout=" + juce::String (timeoutSecs), "--user-agent=" + juce::String (userAgent),
+            args = { "wget", "-q", "--https-only", "--timeout=" + juce::String (timeoutSecs), "--user-agent=" + juce::String (userAgent),
                      "--header=" + accept,
                      "-O", toFile != nullptr ? toFile->getFullPathName() : juce::String ("-") };
         }
@@ -201,22 +203,71 @@ bool fetchLatest (ReleaseInfo& info, juce::String& error)
     if (suffix.isNotEmpty())
         if (auto* assets = json["assets"].getArray())
             for (auto& asset : *assets)
-                if (asset["name"].toString().endsWith (suffix))
+            {
+                // Seguridad: solo aceptamos archivos de la release oficial de Studoo,
+                // por HTTPS, y con un nombre de archivo normal (sin carpetas)
+                const auto name = asset["name"].toString();
+                const auto url = asset["url"].toString(); // API: sirve el archivo con "Accept: application/octet-stream"
+                const auto digest = asset["digest"].toString();
+                if (name.endsWith (suffix) && isSafeAssetName (name) && isOfficialAssetUrl (url)
+                    && digest.startsWith ("sha256:"))
                 {
-                    info.assetName = asset["name"].toString();
-                    info.assetUrl = asset["url"].toString(); // API: sirve el archivo con "Accept: application/octet-stream"
+                    info.assetName = name;
+                    info.assetUrl = url;
+                    info.sha256 = digest.fromFirstOccurrenceOf ("sha256:", false, false).toLowerCase();
                 }
+            }
     return true;
 }
 
-bool download (const juce::String& url, const juce::File& destination, juce::String& error)
+bool isOfficialAssetUrl (const juce::String& url)
 {
+    return url.startsWith ("https://api.github.com/repos/Salamalicul/Studoo/releases/assets/")
+        && url.fromLastOccurrenceOf ("/", false, false).containsOnly ("0123456789");
+}
+
+bool isSafeAssetName (const juce::String& name)
+{
+    return name.startsWith ("Studoo-") && name.length() < 100
+        && name.containsOnly ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_")
+        && ! name.contains ("..");
+}
+
+juce::File downloadFolder()
+{
+    // Carpeta privada del usuario (no la carpeta temporal compartida por todos)
+   #if JUCE_ANDROID
+    return juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("StudooActualizacion");
+   #else
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+               .getChildFile ("Studoo").getChildFile ("Actualizacion");
+   #endif
+}
+
+bool download (const juce::String& url, const juce::String& sha256, const juce::File& destination, juce::String& error)
+{
+    if (! isOfficialAssetUrl (url) || ! isSafeAssetName (destination.getFileName()))
+    {
+        error = juce::String::fromUTF8 ("La actualización no viene de la página oficial de Studoo. No se ha descargado.");
+        return false;
+    }
     destination.getParentDirectory().createDirectory();
     destination.deleteFile();
-    if (httpGet (url, &destination, nullptr, 600) && destination.getSize() > 100000)
-        return true;
-    error = juce::String::fromUTF8 ("No se pudo descargar la actualización.");
-    return false;
+    if (! httpGet (url, &destination, nullptr, 600) || destination.getSize() <= 100000)
+    {
+        error = juce::String::fromUTF8 ("No se pudo descargar la actualización.");
+        return false;
+    }
+
+    // Seguridad: el archivo tiene que ser exactamente el que se publicó en GitHub
+    if (sha256.length() != 64 || juce::SHA256 (destination).toHexString().toLowerCase() != sha256)
+    {
+        destination.deleteFile();
+        error = juce::String::fromUTF8 ("La descarga no coincide con la versión oficial de Studoo (puede que se haya "
+                                        "estropeado por el camino). Por seguridad no se ha instalado. Inténtalo más tarde.");
+        return false;
+    }
+    return true;
 }
 
 bool installOnLinux (InstallKind kind, const juce::File& downloaded, juce::String& error)
@@ -225,13 +276,14 @@ bool installOnLinux (InstallKind kind, const juce::File& downloaded, juce::Strin
     int exitCode = -1;
     if (kind == InstallKind::linuxDeb)
     {
-        if (! hasCommand ("pkexec"))
+        if (! juce::File ("/usr/bin/pkexec").existsAsFile() || ! juce::File ("/usr/bin/apt-get").existsAsFile())
         {
             error = juce::String::fromUTF8 ("Falta \"pkexec\" para pedir la contraseña. Instala el archivo .deb a mano.");
             return false;
         }
         // pkexec muestra la ventana del sistema que pide la contraseña
-        if (runCommand ({ "pkexec", "apt-get", "install", "-y", "--allow-downgrades", downloaded.getFullPathName() },
+        // Rutas completas: así no se puede colar otro programa con el mismo nombre
+        if (runCommand ({ "/usr/bin/pkexec", "/usr/bin/apt-get", "install", "-y", "--allow-downgrades", downloaded.getFullPathName() },
                         nullptr, 15 * 60 * 1000, exitCode) && exitCode == 0)
             return true;
         error = juce::String::fromUTF8 ("No se pudo instalar (¿cancelaste la contraseña?).");

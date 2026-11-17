@@ -69,12 +69,20 @@ SamplePtr SampleCache::load (const juce::String& path)
         return data;
     }
 
+    // Seguridad: no abrimos rutas de red (\\servidor\carpeta en Windows).
+    // Un proyecto con trampa podría usarlas para que Windows envíe tus datos
+    // de inicio de sesión a otro ordenador. Solo aceptamos archivos normales
+    // con extensión de audio.
+    if (path.startsWith ("\\\\") || path.startsWith ("//") || ! juce::File::isAbsolutePath (path))
+        return nullptr;
+
     juce::File file (path);
-    if (! file.existsAsFile())
+    if (! file.existsAsFile() || ! isAudioFile (file))
         return nullptr;
 
     std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
-    if (reader == nullptr || reader->lengthInSamples <= 0)
+    if (reader == nullptr || reader->lengthInSamples <= 0
+        || ! (reader->sampleRate >= 8000.0 && reader->sampleRate <= 384000.0))
         return nullptr;
 
     // Máximo 10 minutos para no llenar la memoria
@@ -84,7 +92,7 @@ SamplePtr SampleCache::load (const juce::String& path)
 
     data->buffer.setSize (numChannels, numSamples);
     reader->read (&data->buffer, 0, numSamples, 0, true, numChannels > 1);
-    data->sampleRate = reader->sampleRate > 0 ? reader->sampleRate : 44100.0;
+    data->sampleRate = reader->sampleRate;
     data->name = file.getFileNameWithoutExtension();
     return data;
 }

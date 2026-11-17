@@ -4,6 +4,13 @@
 - 🎓 **Aprende: nuevo Nivel 8 · Géneros musicales.** 12 lecciones nuevas: cómo usar las bases, Trap, Reggaetón, House, Boom bap, Lo-fi, Drill, Techno, Afrobeats, Phonk, Pop y R&B. Cada una explica de dónde viene el género, su receta (tempo, batería, bajo, acordes) con un ritmo animado, y trae ejercicios para experimentar.
 - ▶️ **Bases de 11 géneros para cargar y cambiar**: en cada lección, pulsa **"Cargar la base"**. Studoo crea un patrón nuevo con batería, bajo y acordes del género, pone el tempo y abre el secuenciador. También están en el botón **"Beat de ejemplo"** del secuenciador.
 
+- 🔒 **Revisión de seguridad completa**:
+  - Al abrir un proyecto que te pase otra persona, Studoo comprueba y ordena todo lo que lleva. Un archivo con trampa ya no puede cerrar la app, sonar a un volumen peligroso ni abrir programas disfrazados de plugins (solo se abren los plugins de tu lista).
+  - Las actualizaciones solo se descargan de la página oficial de Studoo, por conexión segura, y se comprueba su **huella digital (SHA-256)** antes de instalarlas.
+  - Protección extra para los altavoces: nunca sale un sonido por encima del máximo.
+  - En Windows no se abren samples en rutas de red. En Android, los archivos importados no pisan los que ya tenías.
+  - Probado con miles de proyectos estropeados a propósito, sin ningún fallo.
+
 ### Novedades de la versión 1.7.1
 - ⚡ **Mucho más fluido**: mientras suena la música, Studoo ya no redibuja la pantalla entera 30 veces por segundo, solo lo que se mueve. En el piano roll y la playlist gasta unas **8 veces menos** procesador. Se nota sobre todo en ordenadores y móviles sencillos.
 - 📲 **Android: dibuja con la tarjeta gráfica** (OpenGL), así va más suave.

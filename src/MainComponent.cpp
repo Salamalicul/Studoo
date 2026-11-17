@@ -68,8 +68,11 @@ namespace
         void run() override
         {
             const bool mp3 = lame.existsAsFile();
-            const auto wav = mp3 ? juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("studoo_export.wav")
-                                 : target;
+            // Archivo temporal en la carpeta privada del usuario, con nombre único
+            const auto privateFolder = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Studoo");
+            if (mp3)
+                privateFolder.createDirectory();
+            const auto wav = mp3 ? privateFolder.getNonexistentChildFile ("exportando", ".wav") : target;
 
             setStatusMessage (txt ("Generando el audio..."));
             ok = engine.renderSongToFile (wav, 44100.0, [this, mp3] (float p)
@@ -331,7 +334,7 @@ void MainComponent::restorePlugins()
         const auto generation = project.getGeneration();
 
         pluginHost->createInstanceFromXml (desc, engine.getSampleRate(), engine.getBlockSize(),
-            [safe, key, state, install, generation] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String&)
+            [safe, key, state, install, generation] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error)
         {
             if (safe == nullptr)
                 return;
@@ -339,6 +342,8 @@ void MainComponent::restorePlugins()
             if (instance == nullptr || generation != safe->project.getGeneration())
             {
                 safe->failedPlugins.insert (key);
+                if (instance == nullptr && error.isNotEmpty())
+                    safe->setStatus (error);
                 return;
             }
             if (state.isNotEmpty())
@@ -1239,13 +1244,13 @@ void MainComponent::downloadAndInstall (const updater::ReleaseInfo& info)
     juce::Component::SafePointer<MainComponent> safe (this);
     juce::Thread::launch ([safe, info, kind]
     {
-        auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("StudooActualizacion");
+        auto dir = updater::downloadFolder();
         dir.deleteRecursively();
         dir.createDirectory();
         const auto file = dir.getChildFile (info.assetName);
 
         juce::String error;
-        bool ok = updater::download (info.assetUrl, file, error);
+        bool ok = updater::download (info.assetUrl, info.sha256, file, error);
         if (ok && (kind == updater::InstallKind::linuxDeb || kind == updater::InstallKind::linuxUser))
         {
             juce::MessageManager::callAsync ([safe]

@@ -151,7 +151,7 @@ namespace studoo
         juce::MidiBuffer liveMidi;
 
         // Grabación
-        juce::TimeSliceThread writerThread { "Studoo grabación" };
+        juce::TimeSliceThread writerThread { "Studoo grabacion" };
         std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> recordWriter;
         juce::File recordFile;
         std::atomic<bool> recording { false };

@@ -11,6 +11,7 @@
 //  Todas las funciones que usan internet tardan: llámalas desde un hilo aparte.
 // ============================================================================
 #include <juce_core/juce_core.h>
+#include <juce_cryptography/juce_cryptography.h>
 
 namespace studoo::updater
 {
@@ -22,6 +23,7 @@ namespace studoo::updater
         juce::String notes;     // novedades de esa versión (texto sencillo)
         juce::String assetUrl;  // archivo a descargar para este ordenador (vacío si no hay)
         juce::String assetName;
+        juce::String sha256;    // huella del archivo que da GitHub (para comprobar la descarga)
     };
 
     // Cómo se instaló Studoo en este ordenador
@@ -34,8 +36,17 @@ namespace studoo::updater
     // Consulta la última versión publicada. Devuelve false si no hay internet.
     bool fetchLatest (ReleaseInfo& info, juce::String& error);
 
-    // Descarga un archivo. Devuelve false si falla.
-    bool download (const juce::String& url, const juce::File& destination, juce::String& error);
+    // Seguridad: solo se descargan archivos de la release oficial de Studoo en
+    // GitHub, por HTTPS y con un nombre normal (sin carpetas ni "..").
+    bool isOfficialAssetUrl (const juce::String& url);
+    bool isSafeAssetName (const juce::String& name);
+
+    // Carpeta privada del usuario donde se guardan las descargas
+    juce::File downloadFolder();
+
+    // Descarga un archivo y comprueba que su huella SHA-256 es la que da GitHub.
+    // Devuelve false si falla o si el archivo no es exactamente el publicado.
+    bool download (const juce::String& url, const juce::String& sha256, const juce::File& destination, juce::String& error);
 
     // Linux: instala el archivo descargado y espera a que termine.
     bool installOnLinux (InstallKind, const juce::File& downloaded, juce::String& error);

@@ -1,4 +1,5 @@
 #include "Project.h"
+#include <set>
 
 namespace studoo
 {
@@ -179,17 +180,84 @@ juce::ValueTree Project::createMixerTrack (int index, const juce::String& name)
 
 void Project::ensureStructure()
 {
+    // Seguridad: un proyecto puede venir de otra persona o estar estropeado.
+    // Aquí se ordena: cada sección existe una sola vez, solo contiene lo que
+    // le toca, los números de identificación no se repiten y el mezclador
+    // tiene exactamente sus pistas, en orden.
+    for (int i = state.getNumChildren(); --i >= 0;)
+    {
+        const auto type = state.getChild (i).getType();
+        const bool known = type == ids::CHANNELS || type == ids::PATTERNS || type == ids::PLAYLIST
+                        || type == ids::MIXER || type == ids::AUTOMATION;
+        if (! known || state.getChildWithName (type) != state.getChild (i))
+            state.removeChild (i, nullptr);
+    }
     for (auto id : { ids::CHANNELS, ids::PATTERNS, ids::PLAYLIST, ids::MIXER, ids::AUTOMATION })
         if (! state.getChildWithName (id).isValid())
             state.appendChild (juce::ValueTree (id), nullptr);
 
+    constexpr int maxValidUid = 100000000;
+    int maxUid = 0;
+    auto keepOnly = [&maxUid, maxValidUid] (juce::ValueTree parent, const juce::Identifier& childType, bool uniqueUid,
+                               std::initializer_list<juce::Identifier> grandChildren)
+    {
+        std::set<int> seen;
+        for (int i = parent.getNumChildren(); --i >= 0;)
+        {
+            auto child = parent.getChild (i);
+            if (! child.hasType (childType))
+            {
+                parent.removeChild (i, nullptr);
+                continue;
+            }
+            for (int k = child.getNumChildren(); --k >= 0;)
+            {
+                bool allowed = false;
+                for (auto& g : grandChildren)
+                    allowed = allowed || child.getChild (k).hasType (g);
+                if (! allowed)
+                    child.removeChild (k, nullptr);
+            }
+            if (uniqueUid || child.hasProperty (ids::uid))
+            {
+                const int uid = child[ids::uid];
+                const bool valid = uid > 0 && uid <= maxValidUid;
+                if (valid)
+                    maxUid = juce::jmax (maxUid, uid);
+                if (uniqueUid && (! valid || ! seen.insert (uid).second))
+                    parent.removeChild (i, nullptr);
+            }
+        }
+    };
+    keepOnly (channels(), ids::CHANNEL, true, {});
+    keepOnly (patterns(), ids::PATTERN, true, { ids::STEPSET, ids::NOTE });
+    keepOnly (playlist(), ids::CLIP, false, {});
+    keepOnly (automation(), ids::LANE, false, { ids::POINT });
+
+    // El mezclador: exactamente numMixerTracks pistas, en orden
+    {
+        auto mix = mixer();
+        std::array<juce::ValueTree, numMixerTracks> tracks;
+        for (auto t : mix)
+        {
+            const int index = t[ids::index];
+            if (t.hasType (ids::TRACK) && juce::isPositiveAndBelow (index, numMixerTracks) && ! tracks[(size_t) index].isValid())
+                tracks[(size_t) index] = t.createCopy();
+        }
+        mix.removeAllChildren (nullptr);
+        for (int i = 0; i < numMixerTracks; ++i)
+            mix.appendChild (tracks[(size_t) i].isValid() ? tracks[(size_t) i]
+                                                          : createMixerTrack (i, i == 0 ? juce::String ("Master") : "Pista " + juce::String (i)),
+                             nullptr);
+    }
+
     if (! state.hasProperty (ids::bpm))      state.setProperty (ids::bpm, 140.0, nullptr);
-    if (! state.hasProperty (ids::nextUid))  state.setProperty (ids::nextUid, 1, nullptr);
     if (! state.hasProperty (ids::playMode)) state.setProperty (ids::playMode, "pattern", nullptr);
 
-    auto mix = mixer();
-    for (int i = mix.getNumChildren(); i < numMixerTracks; ++i)
-        mix.appendChild (createMixerTrack (i, i == 0 ? juce::String ("Master") : "Pista " + juce::String (i)), nullptr);
+    // Los canales y patrones nuevos nunca pueden repetir un número ya usado
+    const int nextUid = state[ids::nextUid];
+    if (nextUid <= maxUid || nextUid <= 0 || nextUid > maxValidUid)
+        state.setProperty (ids::nextUid, maxUid + 1, nullptr);
 
     if (patterns().getNumChildren() == 0)
     {
@@ -271,6 +339,13 @@ bool Project::loadFromFile (const juce::File& f, juce::String& error)
         return false;
     }
 
+    // Un proyecto normal ocupa unos pocos KB: no abrimos archivos enormes
+    if (f.getSize() > 50 * 1024 * 1024)
+    {
+        error = juce::String::fromUTF8 ("El archivo es demasiado grande para ser un proyecto de Studoo.");
+        return false;
+    }
+
     if (! loadFromXmlString (f.loadFileAsString(), error))
         return false;
 
@@ -320,7 +395,7 @@ bool Project::saveToFile (const juce::File& f)
 
 int Project::newUid()
 {
-    const int uid = juce::jmax (1, (int) state[ids::nextUid]);
+    const int uid = juce::jlimit (1, 1000000000, (int) state[ids::nextUid]);
     state.setProperty (ids::nextUid, uid + 1, nullptr);
     return uid;
 }
@@ -669,7 +744,7 @@ bool Project::getStep (const juce::ValueTree& pattern, int channelUid, int step)
         if (c.hasType (ids::STEPSET) && (int) c[ids::channel] == channelUid)
         {
             const auto data = c[ids::data].toString();
-            return step < data.length() && data[step] == '1';
+            return step >= 0 && step < data.length() && data[step] == '1';
         }
     return false;
 }

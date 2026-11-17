@@ -12,6 +12,7 @@
 #  JUCE tiene que estar en packaging/android/JUCE (una copia o un enlace).
 # ============================================================================
 import hashlib
+import os
 import pathlib
 import re
 from xml.sax.saxutils import quoteattr
@@ -54,10 +55,16 @@ resources_xml = "\n".join(
 icon_id = fid(rel(resources[0]))
 
 modules = ["juce_audio_basics", "juce_audio_devices", "juce_audio_formats", "juce_audio_processors",
-           "juce_audio_utils", "juce_core", "juce_data_structures", "juce_dsp", "juce_events",
+           "juce_audio_utils", "juce_core", "juce_cryptography", "juce_data_structures", "juce_dsp", "juce_events",
            "juce_graphics", "juce_gui_basics", "juce_gui_extra", "juce_opengl"]
 modules_xml = "\n".join(f'    <MODULE id="{m}" showAllCode="0" useLocalCopy="0" useGlobalPath="0"/>' for m in modules)
 paths_xml = "\n".join(f'        <MODULEPATH id="{m}" path="JUCE/modules"/>' for m in modules)
+
+# Contraseña de la clave de firma: viene del secreto ANDROID_KEYSTORE_PASSWORD
+# de GitHub (nunca se escribe en el código). Sin secreto se usa "android".
+keystore_password = os.environ.get("STUDOO_KEYSTORE_PASSWORD") or "android"
+if not keystore_password.isalnum():
+    raise SystemExit("La contraseña de la clave solo puede tener letras y números")
 
 defines = "JUCE_WEB_BROWSER=0\nJUCE_USE_CURL=0\nSTUDOO_ANDROID=1"
 
@@ -89,8 +96,8 @@ jucer = f"""<?xml version="1.0" encoding="UTF-8"?>
                    androidVersionCode="{version_code}" androidScreenOrientation="landscape"
                    microphonePermissionNeeded="1" androidInternetNeeded="1" androidEnableContentSharing="1"
                    androidBluetoothNeeded="0" bigIcon="{icon_id}" smallIcon="{icon_id}"
-                   androidKeyStore="${{user.home}}/.android/studoo.keystore" androidKeyStorePass="android"
-                   androidKeyAlias="studoo" androidKeyAliasPass="android"
+                   androidKeyStore="${{user.home}}/.android/studoo.keystore" androidKeyStorePass="{keystore_password}"
+                   androidKeyAlias="studoo" androidKeyAliasPass="{keystore_password}"
                    androidAdditionalJavaFolders="java"
                    androidOtherPermissions="android.permission.REQUEST_INSTALL_PACKAGES"
                    androidManifestCustomXmlElements={quoteattr(manifest_extra)}
