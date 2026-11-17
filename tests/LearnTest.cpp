@@ -11,6 +11,7 @@
 #include "ui/Challenges.h"
 #include "ui/EarGames.h"
 #include "ui/LearnProgress.h"
+#include "Pro.h"
 
 #include <iostream>
 
@@ -101,6 +102,12 @@ static void check (bool condition, const char* what) { check (condition, u (what
 
 int main()
 {
+    // Simulamos la tienda de Google Play (versión gratis) para probar Studoo Pro
+   #if JUCE_WINDOWS
+    _putenv_s ("STUDOO_PRUEBA_TIENDA", "1");
+   #else
+    setenv ("STUDOO_PRUEBA_TIENDA", "1", 1);
+   #endif
     juce::ScopedJuceInitialiser_GUI init;
 
     // --- Retos ---------------------------------------------------------------------
@@ -193,6 +200,40 @@ int main()
         const int before = unlocked.size();
         progress.setLessonDone (u ("Qué es una DAW"), true);
         check (unlocked.size() == before, "Los logros no se repiten");
+        file.deleteFile();
+    }
+
+    // --- Studoo Pro: qué es gratis y qué es de pago --------------------------------------
+    std::cout << "Studoo Pro (tienda simulada)\n";
+    {
+        auto file = juce::File::createTempFile (".settings");
+        juce::PropertiesFile::Options o;
+        juce::PropertiesFile settings (file, o);
+        pro::start (&settings);
+        juce::StringArray events;
+        pro::setEventHandler ([&] (const juce::String& e) { events.add (e); });
+
+        check (pro::hasStore() && ! pro::isUnlocked(), "Versión gratis: Pro no está desbloqueado");
+        check (pro::isKitFree ("trap") && pro::isKitFree ("lofi") && ! pro::isKitFree ("drill") && ! pro::isKitFree ("fx"),
+               "5 kits gratis; el resto y los FX son Pro");
+        check (pro::isSynthPresetFree (0) && ! pro::isSynthPresetFree (6) && pro::is808PresetFree (1) && ! pro::is808PresetFree (2),
+               "Algunos sintes y 808 gratis, el resto Pro");
+        check (pro::isGenreFree ("house") && ! pro::isGenreFree ("drill"), "3 bases gratis; el resto Pro");
+        check (pro::isLearnLevelFree (3) && ! pro::isLearnLevelFree (4) && ! pro::areGamesFree() && ! pro::areAchievementsFree(),
+               "Aprende: niveles 1-4 gratis; 5-9, juegos y logros Pro");
+        int freeKits = 0;
+        for (auto& k : kits::all())
+            freeKits += pro::isKitFree (k.id) ? 1 : 0;
+        check (freeKits == 5, "Hay exactamente 5 kits gratis");
+
+        pro::buy (pro::donationProducts[0]);
+        check (! pro::isUnlocked() && events.contains ("donacion_ok"), "Donar no desbloquea Pro, pero da las gracias");
+        pro::buy (pro::proProduct);
+        check (pro::isUnlocked() && events.contains ("pro_comprado"), "Comprar Pro lo desbloquea");
+        check (pro::isKitFree ("drill") && pro::isGenreFree ("drill") && pro::isLearnLevelFree (8) && pro::areGamesFree(),
+               "Con Pro, todo está desbloqueado");
+        check (settings.getBoolValue ("proUnlocked", false), "Pro se recuerda (para usarlo sin internet)");
+        pro::setEventHandler (nullptr);
         file.deleteFile();
     }
 

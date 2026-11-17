@@ -263,6 +263,7 @@ jobs:
           cp artifacts/Studoo-Windows-Instalador/Studoo-Instalador.exe Studoo-${{ env.TAG }}-Instalador-Windows.exe
           cp artifacts/Studoo-Linux-deb/*.deb Studoo-${{ env.TAG }}-Linux.deb
           cp artifacts/Studoo-Android/Studoo-Android.apk Studoo-${{ env.TAG }}-Android.apk
+          cp artifacts/Studoo-GooglePlay/Studoo-GooglePlay.aab Studoo-${{ env.TAG }}-GooglePlay.aab
 
       - name: Reemplazar la versión si ya existe
         if: inputs.reemplazar
@@ -282,3 +283,4 @@ jobs:
             Studoo-${{ env.TAG }}-Linux.deb
             Studoo-${{ env.TAG }}-Linux.tar.gz
             Studoo-${{ env.TAG }}-Android.apk
+            Studoo-${{ env.TAG }}-GooglePlay.aab
