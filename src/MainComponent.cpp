@@ -161,7 +161,7 @@ MainComponent::MainComponent()
     playlist = std::make_unique<Playlist> (*ctx);
     mixerView = std::make_unique<MixerView> (*ctx);
     automationView = std::make_unique<AutomationView> (*ctx);
-    learnView = std::make_unique<LearnView>();
+    learnView = std::make_unique<LearnView> (*ctx);
     learnView->onStartTutorial = [this] { startTutorial(); };
     learnView->onGoToView = [this] (View v) { showView (v); };
     learnView->onLoadGenre = [this] (const juce::String& genre)

@@ -1,0 +1,87 @@
+#pragma once
+// ============================================================================
+//  Glossary: el diccionario de "Aprende". Cada palabra tiene su explicación
+//  y, si la hay, la lección donde se aprende (título exacto).
+// ============================================================================
+
+namespace studoo::learn
+{
+    struct Term
+    {
+        const char* word;
+        const char* definition;
+        const char* lesson;   // nullptr si no hay lección
+    };
+
+    inline constexpr Term glossary[] = {
+        { "808", "Bajo muy grave que viene de la caja de ritmos Roland TR-808. Es la base del trap, el drill y el reggaetón.", "El 808 paso a paso" },
+        { "Acorde", "Varias notas (normalmente 3 o más) que suenan a la vez.", "Acordes y progresiones" },
+        { "ADSR", "Ataque, Caída (Decay), Sostenido y Relajación (Release): cómo cambia el volumen de una nota desde que empieza hasta que se apaga.", "La envolvente ADSR" },
+        { "Armonía", "Las notas que suenan a la vez y cómo se combinan (los acordes).", "Acordes y progresiones" },
+        { "Ataque", "Lo que tarda un sonido en llegar a su volumen máximo.", "La envolvente ADSR" },
+        { "Automatización", "Hacer que un control (volumen, filtro...) se mueva solo a lo largo de la canción.", "Automatización" },
+        { "Base (beat)", "La parte instrumental de una canción: batería, bajo, acordes... sin la voz.", "Tu primer beat en 5 minutos" },
+        { "Bombo (kick)", "El golpe más grave de la batería, el \"pum\".", "Las partes de la batería" },
+        { "Boom bap", "Estilo de hip-hop clásico de Nueva York, con bombo y caja muy marcados.", "Boom bap (hip-hop clásico)" },
+        { "BPM", "Pulsos por minuto: la velocidad (tempo) de la canción.", "BPM y tempo" },
+        { "Caja (snare)", "Golpe seco y brillante de la batería, normalmente en los tiempos 2 y 4.", "Las partes de la batería" },
+        { "Compás", "Grupo de tiempos que se repite. En Studoo, 1 compás = 4 tiempos = 16 pasos.", "Compases, tiempos y pasos" },
+        { "Compresor", "Efecto que iguala las partes fuertes y flojas de un sonido.", "El compresor" },
+        { "Contratiempo", "Golpe que cae entre los tiempos (por ejemplo, el hi-hat abierto del house).", "Ritmo de house" },
+        { "Cutoff", "La frecuencia donde corta el filtro. Más bajo = sonido más oscuro.", "Filtro y resonancia" },
+        { "DAW", "Estación de trabajo de audio digital: el programa donde se hace la música, como Studoo.", "Qué es una DAW" },
+        { "Delay", "Efecto de eco: repite el sonido un poco más tarde.", "Delay: el eco" },
+        { "Dembow", "El ritmo del reggaetón, con la caja en patrón 3 + 3 + 2.", "Ritmo de reggaetón (dembow)" },
+        { "Distorsión", "Ensuciar un sonido a propósito para que suene más fuerte y agresivo.", "El 808 paso a paso" },
+        { "Drop", "El momento de máxima energía después de una subida, típico de la música electrónica.", "Estructura de una canción" },
+        { "EQ (ecualizador)", "Efecto para subir o bajar graves, medios y agudos.", "El ecualizador (EQ)" },
+        { "Escala", "Grupo de notas que suenan bien juntas, como Do mayor o La menor.", "Escalas: mayor y menor" },
+        { "Estribillo", "La parte principal y más pegadiza de una canción, la que se repite.", "Estructura de una canción" },
+        { "Exportar", "Convertir tu proyecto en un archivo de audio (WAV o MP3) para compartirlo.", "Exportar y compartir" },
+        { "Fader", "La barra vertical del mezclador que sube o baja el volumen de una pista.", "Mezclar: el volumen" },
+        { "Feedback", "En el delay, cuántas veces se repite el eco.", "Delay: el eco" },
+        { "Filtro", "Efecto que quita una parte del sonido (por ejemplo, los agudos).", "Filtro y resonancia" },
+        { "Four on the floor", "Bombo en cada tiempo del compás. La base del house y el techno.", "Ritmo de house" },
+        { "Glide", "Cuando una nota se desliza hasta la siguiente. Muy usado en el 808 del drill.", "El 808 paso a paso" },
+        { "Grado", "El número de cada acorde dentro de una escala (I, II, III, IV, V, VI, VII).", "Teoría: grados y acordes de séptima" },
+        { "Groove", "La sensación de ritmo que hace mover la cabeza o bailar.", "Boom bap y el swing" },
+        { "Hi-hat", "Platillos pequeños de la batería: el \"tss tss\" que marca el ritmo.", "Las partes de la batería" },
+        { "Hook", "Una frase o melodía muy pegadiza, normalmente en el estribillo.", "Cómo hacer una melodía pegadiza" },
+        { "Loop (bucle)", "Un trozo de música que se repite.", "Tu primer beat en 5 minutos" },
+        { "Masterizar", "El último paso: que la canción suene fuerte, pareja y bien en todas partes.", "Masterizar" },
+        { "Melodía", "Una sucesión de notas, una detrás de otra, que se puede tararear.", "Cómo hacer una melodía pegadiza" },
+        { "Metrónomo", "Un clic que marca los tiempos para tocar o grabar a tiempo.", "BPM y tempo" },
+        { "Mezcla", "Ajustar volúmenes, panorama y efectos para que todo suene bien junto.", "Mezclar: el volumen" },
+        { "MIDI", "Lenguaje para enviar notas entre aparatos (por ejemplo, de un teclado a Studoo).", "Teclados MIDI" },
+        { "Mute", "Silenciar un canal o una pista.", "Tu primer beat en 5 minutos" },
+        { "Octava", "La misma nota más aguda o más grave.", "Las notas y el teclado" },
+        { "One-shot", "Un sample que suena entero de una vez, como un golpe de batería.", "Samples y sampler" },
+        { "Pad", "Sonido largo y suave que hace de fondo.", "La envolvente ADSR" },
+        { "Panorama (PAN)", "Colocar un sonido más a la izquierda o más a la derecha.", "Panorama: izquierda y derecha" },
+        { "Paso", "Cada cuadrado del Secuenciador. 16 pasos = 1 compás.", "Compases, tiempos y pasos" },
+        { "Patrón", "Un trozo de música (ritmo, melodía...) que puedes repetir en la Playlist.", "Estructura de una canción" },
+        { "Piano roll", "Donde se escriben las notas: arriba más agudo, a la derecha más tarde.", "Usar el piano roll" },
+        { "Playlist", "La línea del tiempo donde colocas los patrones para montar la canción.", "Estructura de una canción" },
+        { "Plugin (VST3)", "Un instrumento o efecto extra que se añade a Studoo.", "Plugins VST3" },
+        { "Progresión", "Varios acordes uno detrás de otro.", "Acordes y progresiones" },
+        { "Resonancia", "Realza la zona donde corta el filtro: sonido más \"chillón\".", "Filtro y resonancia" },
+        { "Reverb", "Efecto que simula una sala o espacio.", "Reverb: el espacio" },
+        { "Roll", "Varios golpes muy seguidos, típico de los hi-hats del trap.", "Ritmo de trap paso a paso" },
+        { "Sample", "Un trozo de audio grabado: un golpe, una voz, un instrumento...", "Samples y sampler" },
+        { "Sampler", "Instrumento que toca samples.", "Samples y sampler" },
+        { "Saturar", "Cuando el sonido se pasa del máximo y se distorsiona (el medidor llega al rojo).", "Mezclar: el volumen" },
+        { "Secuenciador", "Donde se crean ritmos encendiendo pasos.", "Tu primer beat en 5 minutos" },
+        { "Séptima", "Acorde de 4 notas, más rico que uno básico. Muy usado en jazz, lo-fi y R&B.", "Teoría: grados y acordes de séptima" },
+        { "Sidechain", "Bajar el volumen de algunos sonidos cada vez que suena el bombo (efecto de \"bombeo\").", "Sidechain: el bombeo" },
+        { "Sintetizador", "Instrumento que crea sonidos con ondas electrónicas.", "Las ondas del sintetizador" },
+        { "Solo", "Escuchar solo una pista y silenciar las demás.", "Mezclar: el volumen" },
+        { "Stab", "Acorde muy corto y rítmico, típico del house.", "House" },
+        { "Sub", "Los graves más profundos, que se sienten más que se oyen.", "El 808 paso a paso" },
+        { "Swing", "Retrasar un poco algunos golpes para que el ritmo tenga balanceo.", "Boom bap y el swing" },
+        { "Tempo", "La velocidad de la canción, en BPM.", "BPM y tempo" },
+        { "Tiempo (pulso)", "Cada golpe que cuentas al seguir la música: 1, 2, 3, 4.", "Compases, tiempos y pasos" },
+        { "Tono (tonalidad)", "La escala principal en la que está una canción, como La menor.", "Escalas: mayor y menor" },
+        { "Velocity", "La fuerza con la que suena una nota.", "Dar vida a la batería" },
+        { "WAV / MP3", "Formatos de audio. WAV: calidad máxima. MP3: ocupa menos.", "Exportar y compartir" },
+    };
+}

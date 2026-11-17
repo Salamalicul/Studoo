@@ -281,6 +281,25 @@ int main (int argc, char* argv[])
     }
 
     // --- Exportar ------------------------------------------------------------------------------
+    // --- Sonidos de los juegos de oído ------------------------------------------------------
+    std::cout << "Juegos de oído\n";
+    {
+        engine.stop();
+        renderSeconds (engine, 4.0);   // que terminen las colas de lo que sonaba antes
+        auto tone = std::make_shared<juce::AudioBuffer<float>> (2, 22050);
+        for (int i = 0; i < tone->getNumSamples(); ++i)
+            for (int ch = 0; ch < 2; ++ch)
+                tone->setSample (ch, i, 0.5f * std::sin (6.2831853f * 440.0f * (float) i / 44100.0f));
+        engine.playBuffer (tone, 44100.0, 1.0f);
+        auto heard = renderSeconds (engine, 0.3);
+        check (heard.getMagnitude (0, 0, heard.getNumSamples()) > 0.3f, "El sonido del juego se oye (con el beat parado)");
+        auto after = renderSeconds (engine, 0.5);
+        check (after.getMagnitude (0, (int) (sampleRate * 0.3), (int) (sampleRate * 0.2)) < 1.0e-4f, "Y se para solo al terminar");
+        engine.playBuffer (tone, 44100.0, 1.0f);
+        engine.stopBuffer();
+        check (renderSeconds (engine, 0.1).getMagnitude (0, 0, 4410) < 1.0e-4f, "stopBuffer lo corta");
+    }
+
     std::cout << "Exportar\n";
     {
         auto wav = outDir.getChildFile ("cancion.wav");

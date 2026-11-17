@@ -1,6 +1,15 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.7.2
+### 🆕 Novedades de la versión 1.8: Aprende 2.0
+- 🎯 **Retos que se comprueban solos**: 28 retos dentro de las lecciones (pon el bombo en cada tiempo, haz un roll de hi-hat, escribe una melodía, usa el compresor...). Pulsa **"Ir a hacerlo"** y Studoo detecta solo cuándo lo has conseguido.
+- ❓ **Test al final de cada lección**: 3 preguntas con explicación si fallas. Se guarda tu mejor nota.
+- 👂 **Juegos de oído**: ¿Qué instrumento es?, ¿Sube o baja?, ¿Mayor o menor? y ¿Qué género es?, con rachas y récords.
+- 🏆 **Logros y racha diaria**: 17 medallas y una llamita que cuenta los días seguidos que practicas.
+- 📖 **Diccionario y buscador**: 69 palabras explicadas (808, sidechain, reverb...) y búsqueda en todas las lecciones.
+- 📚 **Nivel 9 · Producción avanzada**, 5 lecciones nuevas: sidechain, mezclar voces, masterizar, grados y acordes de séptima, y analizar una canción paso a paso.
+- 📱 **Pensado para el móvil**: letra más grande, lecciones a pantalla completa con botón para volver, y todo cabe sin tener que bajar.
+
+### Novedades de la versión 1.7.2
 - 🎓 **Aprende: nuevo Nivel 8 · Géneros musicales.** 12 lecciones nuevas: cómo usar las bases, Trap, Reggaetón, House, Boom bap, Lo-fi, Drill, Techno, Afrobeats, Phonk, Pop y R&B. Cada una explica de dónde viene el género, su receta (tempo, batería, bajo, acordes) con un ritmo animado, y trae ejercicios para experimentar.
 - ▶️ **Bases de 11 géneros para cargar y cambiar**: en cada lección, pulsa **"Cargar la base"**. Studoo crea un patrón nuevo con batería, bajo y acordes del género, pone el tempo y abre el secuenciador. También están en el botón **"Beat de ejemplo"** del secuenciador.
 

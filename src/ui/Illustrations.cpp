@@ -171,8 +171,8 @@ namespace
     void ruta (juce::Graphics& g, R area, double t)
     {
         static const char* names[] = { "Primeros\npasos", "Ritmo y\nbatería", "Notas y\nmelodía", "Diseño\nde sonido",
-                                       "Mezcla", "De beat a\ncanción", "Seguir\nmejorando", "Géneros\nmusicales" };
-        const int n = 8;
+                                       "Mezcla", "De beat a\ncanción", "Seguir\nmejorando", "Géneros\nmusicales", "Producción\navanzada" };
+        const int n = 9;
         const float w = area.getWidth() / (float) n;
         const float active = (float) std::fmod (t * 0.8, (double) n + 1.0);
         juce::Path line;
@@ -718,6 +718,92 @@ namespace
                   Colours::textDim, 10.5f);
     }
 
+    // Sidechain: el bombo golpea y el pad "se agacha"
+    void sidechain (juce::Graphics& g, R area, double t)
+    {
+        const double bpm = 124.0;
+        const float beatPos = (float) std::fmod (t * bpm / 60.0, 4.0);       // 0..4 tiempos
+        const float labelW = juce::jmin (110.0f, area.getWidth() * 0.22f);
+        auto top = area.removeFromTop (area.getHeight() * 0.38f).reduced (0.0f, 4.0f);
+        auto bottom = area.reduced (0.0f, 4.0f);
+
+        // Fila del bombo: 4 golpes, el actual se ilumina
+        text (g, "Bombo", top.removeFromLeft (labelW), Colours::accent, 13.0f, true, juce::Justification::centredLeft);
+        for (int b = 0; b < 4; ++b)
+        {
+            const float w = top.getWidth() / 4.0f;
+            auto cell = R (top.getX() + w * (float) b, top.getY(), w, top.getHeight()).reduced (6.0f, 4.0f);
+            const bool hit = (int) beatPos == b && std::fmod (beatPos, 1.0f) < 0.3f;
+            if (hit) Draw::glow (g, cell, Colours::accent, 8.0f, 8.0f);
+            g.setColour (hit ? Colours::accent : Colours::accent.withAlpha (0.35f));
+            g.fillRoundedRectangle (cell, 8.0f);
+        }
+
+        // Volumen del pad: baja en cada golpe y vuelve a subir
+        text (g, "Pad", bottom.removeFromLeft (labelW), Colours::blue, 13.0f, true, juce::Justification::centredLeft);
+        auto duck = [] (float x) { const float f = std::fmod (x * 4.0f, 1.0f); return 0.25f + 0.75f * (1.0f - std::exp (-f * 7.0f)); };
+        juce::Path fill;
+        fill.startNewSubPath (bottom.getX(), bottom.getBottom());
+        const int n = 200;
+        for (int i = 0; i <= n; ++i)
+        {
+            const float x = (float) i / (float) n;
+            fill.lineTo (bottom.getX() + x * bottom.getWidth(), bottom.getBottom() - duck (x) * bottom.getHeight());
+        }
+        fill.lineTo (bottom.getRight(), bottom.getBottom());
+        fill.closeSubPath();
+        g.setGradientFill (juce::ColourGradient (Colours::blue.withAlpha (0.7f), 0.0f, bottom.getY(), Colours::blue.withAlpha (0.1f), 0.0f, bottom.getBottom(), false));
+        g.fillPath (fill);
+        const float cx = bottom.getX() + beatPos / 4.0f * bottom.getWidth();
+        g.setColour (Colours::green);
+        g.fillRect (cx - 1.0f, bottom.getY(), 2.0f, bottom.getHeight());
+    }
+
+    // Master: la mezcla entra, pasa por EQ, compresor y limitador, y sale más pareja
+    void master (juce::Graphics& g, R area, double t)
+    {
+        const float shift = (float) t * 0.3f;
+        auto signal = [shift] (float x)
+        {
+            return juce::jlimit (0.05f, 1.15f, 0.35f + 0.55f * std::pow (std::abs (std::sin ((x + shift) * pi * 4.0f)), 4.0f)
+                                                 + 0.12f * std::sin ((x + shift) * 23.0f));
+        };
+        auto stages = area.removeFromTop (34.0f);
+        const char* names[] = { "Mezcla", "EQ", "Compresor", "Limitador", "Master" };
+        const float w = stages.getWidth() / 5.0f;
+        for (int i = 0; i < 5; ++i)
+        {
+            auto b = R (stages.getX() + w * (float) i, stages.getY(), w, stages.getHeight()).reduced (6.0f, 3.0f);
+            box (g, b, i == 4 ? Colours::green : Colours::accent, 8.0f, i == 4 ? 0.25f : 0.14f);
+            text (g, names[i], b, Colours::text, 12.0f, true);
+            if (i < 4)
+                arrow (g, { b.getRight() + 1.0f, b.getCentreY() }, { b.getRight() + 11.0f, b.getCentreY() }, Colours::textDim, 1.5f);
+        }
+        area.removeFromTop (10.0f);
+        for (int half = 0; half < 2; ++half)
+        {
+            auto r = R (area.getX(), area.getY() + (float) half * area.getHeight() * 0.5f, area.getWidth(), area.getHeight() * 0.5f).reduced (0.0f, 5.0f);
+            auto label = r.removeFromLeft (juce::jmin (100.0f, area.getWidth() * 0.2f));
+            text (g, half == 0 ? "Antes" : "Después", label, half == 0 ? Colours::textDim : Colours::green, 13.0f, true, juce::Justification::centredLeft);
+            juce::Path p;
+            const int n = 150;
+            for (int i = 0; i < n; ++i)
+            {
+                const float x = (float) i / (float) n;
+                float env = signal (x);
+                if (half == 1) env = juce::jmin (0.92f, 0.45f + env * 0.5f);   // más fuerte y sin pasarse
+                const float h = juce::jmin (1.0f, env) * r.getHeight() * 0.5f;
+                p.addRectangle (r.getX() + x * r.getWidth(), r.getCentreY() - h, r.getWidth() / (float) n - 1.0f, h * 2.0f);
+            }
+            g.setColour (half == 0 ? Colours::blue.withAlpha (0.75f) : Colours::green);
+            g.fillPath (p);
+            const float dashes[] = { 5.0f, 4.0f };
+            g.setColour (Colours::red.withAlpha (0.8f));
+            const float ty = r.getCentreY() - 0.95f * r.getHeight() * 0.5f;
+            g.drawDashedLine ({ r.getX(), ty, r.getRight(), ty }, dashes, 2, 1.2f);
+        }
+    }
+
     void compresor (juce::Graphics& g, R area, double t)
     {
         const float shift = (float) t * 0.25f;
@@ -967,6 +1053,8 @@ bool draw (juce::Graphics& g, const juce::String& id, juce::Rectangle<float> are
     else if (id == "panorama")   panorama (g, area, time);
     else if (id == "eq")         eq (g, area, time);
     else if (id == "compresor")  compresor (g, area, time);
+    else if (id == "sidechain")  sidechain (g, area, time);
+    else if (id == "master")     master (g, area, time);
     else if (id == "reverb")     reverb (g, area, time);
     else if (id == "delay")      delay (g, area, time);
     else if (id == "automatizacion") automatizacion (g, area, time);

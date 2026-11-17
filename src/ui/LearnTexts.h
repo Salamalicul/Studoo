@@ -12,6 +12,7 @@
 //    [anim:id|Pie]      -> ilustración animada (ver Illustrations.cpp)
 //    [ir:vista|Texto]   -> botón que abre una parte de Studoo
 //                          (secuenciador, pianoroll, playlist, mezclador, automatizacion)
+//    [reto:id]          -> reto que Studoo comprueba solo (ver Challenges.cpp)
 //    [base:genero|Texto] -> botón que carga la base de un género en un patrón
 //                          nuevo (ver model/GenreBeats.cpp) y abre el secuenciador
 //    **texto**          -> negrita, dentro de cualquier línea
@@ -38,6 +39,7 @@ namespace studoo::learn
         "Nivel 6 · De beat a canción",
         "Nivel 7 · Seguir mejorando",
         "Nivel 8 · Géneros musicales",
+        "Nivel 9 · Producción avanzada",
     };
 
     inline constexpr Lesson lessons[] = {
@@ -46,14 +48,17 @@ namespace studoo::learn
       "como empezar a producir musica desde cero",
 R"TXT(Bienvenido a **Aprende**. Aquí tienes todo lo necesario para pasar de no saber nada a terminar tus propias canciones, en orden y sin prisas.
 
-[anim:ruta|La ruta: 8 niveles, de lo más básico a los géneros musicales]
+[anim:ruta|La ruta: 9 niveles, de lo más básico a la producción avanzada]
 
 ## Cómo funciona este apartado
-1. Las lecciones están ordenadas en **8 niveles**. Hazlas en orden la primera vez. El último, **Géneros musicales**, explica cada estilo y trae una base para cargar y cambiar.
+1. Las lecciones están ordenadas en **9 niveles**. Hazlas en orden la primera vez. El nivel **Géneros musicales** explica cada estilo y trae una base para cargar y cambiar.
 2. Cada lección tiene explicaciones, **ilustraciones que se mueven** y pasos para hacerlo en Studoo.
-3. Al final de cada lección hay un cuadro verde **Practica**: hazlo de verdad, es lo que más enseña.
-4. Pulsa **Marcar como aprendida** cuando la termines. Verás tu progreso en la lista de la izquierda.
-5. Si quieres verlo explicado en vídeo, pulsa **Ver vídeos en YouTube**: se abre una búsqueda en español sobre ese tema.
+3. Muchas lecciones tienen **retos**: Studoo comprueba solo si los has hecho. Y al final hay un **test** de 3 preguntas.
+4. En la pestaña **Juegos** entrenas el oído, en **Logros** ves tu racha y tus medallas, y en **Diccionario** buscas cualquier palabra.
+5. Pulsa **Marcar como aprendida** cuando la termines. Verás tu progreso en la lista de lecciones.
+6. Si quieres verlo explicado en vídeo, pulsa **Ver vídeos en YouTube**: se abre una búsqueda en español sobre ese tema.
+
+> Practica un poco **cada día** para mantener tu **racha** (la llamita de arriba). ¡Hay medallas por 3, 7 y 30 días seguidos!
 
 > Es mejor practicar 20 minutos cada día que 4 horas un solo día. La música se aprende con las manos y con los oídos.
 
@@ -103,7 +108,10 @@ R"TXT(Vamos a hacer un ritmo sencillo pero completo. Cada cuadrado del secuencia
 ## ¿Por qué suena bien?
 El bombo y la caja se turnan: "pum - pa - pum - pa". Ese vaivén es la base de casi toda la música moderna. El hi-hat rellena el espacio y marca la velocidad.
 
-? Cambia de sitio un golpe de bombo (por ejemplo, del paso 9 al 11) y escucha cómo cambia la sensación. Prueba 3 variaciones distintas.)TXT" },
+? Cambia de sitio un golpe de bombo (por ejemplo, del paso 9 al 11) y escucha cómo cambia la sensación. Prueba 3 variaciones distintas.
+
+[reto:primer_beat]
+[reto:silencio])TXT" },
 
     { "Nivel 1 · Primeros pasos", "BPM y tempo", "4 min",
       "que es el BPM en la musica explicado",
@@ -128,7 +136,9 @@ R"TXT(El **BPM** (beats por minuto) es la **velocidad** de la canción: cuántos
 
 > Para saber el BPM de una canción que te gusta, busca en internet "nombre de la canción BPM".
 
-? Pon el metrónomo, elige 90 BPM y da palmas siguiendo el clic. Luego prueba a 140. ¿Notas lo distinto que se siente?)TXT" },
+? Pon el metrónomo, elige 90 BPM y da palmas siguiendo el clic. Luego prueba a 140. ¿Notas lo distinto que se siente?
+
+[reto:bpm])TXT" },
 
     { "Nivel 1 · Primeros pasos", "Compases, tiempos y pasos", "4 min",
       "compases y tiempos musica explicacion facil",
@@ -146,7 +156,9 @@ Cada tiempo se divide en **4 pasos** (semicorcheas). Por eso un patrón de 16 pa
 ## Cómo se cuenta
 Los músicos cuentan los pasos así: "**1** y-e-a **2** y-e-a **3** y-e-a **4** y-e-a". El número es el tiempo y "y-e-a" son los pasos de en medio.
 
-? Elige "32 pasos" y haz un ritmo de 2 compases donde el segundo compás sea un poco distinto al primero (por ejemplo, un golpe de bombo extra al final).)TXT" },
+? Elige "32 pasos" y haz un ritmo de 2 compases donde el segundo compás sea un poco distinto al primero (por ejemplo, un golpe de bombo extra al final).
+
+[reto:largo_64])TXT" },
 
     // =========================================================================
     { "Nivel 2 · Ritmo y batería", "Las partes de la batería", "5 min",
@@ -171,7 +183,9 @@ Studoo trae **18 kits** (Trap, Drill, Reggaetón, House, Lo-fi, Afrobeat...). En
 
 [ir:secuenciador|Abrir el secuenciador]
 
-? Haz un ritmo con el kit Trap y luego pulsa "Usar este kit" con el kit Boom Bap. Escucha cómo el mismo ritmo cambia de estilo.)TXT" },
+? Haz un ritmo con el kit Trap y luego pulsa "Usar este kit" con el kit Boom Bap. Escucha cómo el mismo ritmo cambia de estilo.
+
+[reto:caja_2_4])TXT" },
 
     { "Nivel 2 · Ritmo y batería", "Ritmo de trap paso a paso", "8 min",
       "como hacer un beat de trap hi hats rolls tutorial",
@@ -193,7 +207,9 @@ R"TXT(El trap se toca rápido (130-160 BPM) pero se **siente a medio tiempo**: l
 
 > No pongas rolls en todos los compases. Si todo es especial, nada es especial: úsalos al final de cada 2 o 4 compases.
 
-? Haz un patrón de trap de 2 compases (32 pasos) con un roll de hi-hat solo al final del segundo compás.)TXT" },
+? Haz un patrón de trap de 2 compases (32 pasos) con un roll de hi-hat solo al final del segundo compás.
+
+[reto:roll])TXT" },
 
     { "Nivel 2 · Ritmo y batería", "Ritmo de reggaetón (dembow)", "6 min",
       "como hacer ritmo de reggaeton dembow tutorial",
@@ -214,7 +230,9 @@ R"TXT(El reggaetón se basa en un ritmo llamado **dembow**. Es muy reconocible: 
 
 > Usa el kit **Reggaetón** de "+ Añadir → Sonidos incluidos" y ya tendrás los sonidos adecuados.
 
-? Haz el dembow y después crea un segundo patrón quitando el bombo durante un compás. Eso es un "drop": cuando el bombo vuelve, la energía sube.)TXT" },
+? Haz el dembow y después crea un segundo patrón quitando el bombo durante un compás. Eso es un "drop": cuando el bombo vuelve, la energía sube.
+
+[reto:dembow])TXT" },
 
     { "Nivel 2 · Ritmo y batería", "Ritmo de house", "6 min",
       "como hacer un beat de house four on the floor",
@@ -233,7 +251,10 @@ R"TXT(El house (120-128 BPM) usa el ritmo **four on the floor**: el bombo suena 
 - El hi-hat abierto entre bombos da el "rebote".
 - Las canciones cambian poco a poco: se añade o quita un sonido cada 8 compases.
 
-? Haz este ritmo con el kit House y luego prueba con el kit Clásico 909, el sonido original del house de los años 80 y 90.)TXT" },
+? Haz este ritmo con el kit House y luego prueba con el kit Clásico 909, el sonido original del house de los años 80 y 90.
+
+[reto:bombo_negras]
+[reto:contratiempo])TXT" },
 
     { "Nivel 2 · Ritmo y batería", "Boom bap y el swing", "6 min",
       "como hacer un beat boom bap tutorial",
@@ -254,7 +275,9 @@ El **swing** es retrasar un poquito los golpes que caen entre pulsos. Así el ri
 
 > En Studoo puedes conseguir un efecto parecido con la velocidad de las notas (lección siguiente) y poniendo el hi-hat solo en algunos pasos.
 
-? Haz un boom bap y compáralo con tu ritmo de trap. Fíjate en que en el boom bap la caja suena dos veces por compás y en el trap solo una.)TXT" },
+? Haz un boom bap y compáralo con tu ritmo de trap. Fíjate en que en el boom bap la caja suena dos veces por compás y en el trap solo una.
+
+[reto:hihat_corcheas])TXT" },
 
     { "Nivel 2 · Ritmo y batería", "Dar vida a la batería", "6 min",
       "como hacer que la bateria suene humana variaciones fills",
@@ -342,7 +365,9 @@ R"TXT(Un **acorde** son 3 o más notas a la vez. Una **progresión** es una seri
 
 [ir:pianoroll|Abrir el piano roll]
 
-? Haz la progresión La menor → Fa → Do → Sol con el sintetizador "Pad" (+ Añadir → Sintetizador). Ponle tu ritmo de batería debajo.)TXT" },
+? Haz la progresión La menor → Fa → Do → Sol con el sintetizador "Pad" (+ Añadir → Sintetizador). Ponle tu ritmo de batería debajo.
+
+[reto:acorde])TXT" },
 
     { "Nivel 3 · Notas y melodía", "Usar el piano roll", "5 min",
       "como usar el piano roll tutorial",
@@ -362,7 +387,9 @@ R"TXT(El piano roll muestra las notas como barras. Es donde escribes melodías, 
 
 [ir:pianoroll|Abrir el piano roll]
 
-? Copia esta melodía en el canal Sintetizador: La, Do, Mi, Re (una nota por tiempo). Luego cambia la última nota por Sol y escucha la diferencia.)TXT" },
+? Copia esta melodía en el canal Sintetizador: La, Do, Mi, Re (una nota por tiempo). Luego cambia la última nota por Sol y escucha la diferencia.
+
+[reto:notas_melodia])TXT" },
 
     { "Nivel 3 · Notas y melodía", "Cómo hacer una melodía pegadiza", "8 min",
       "como hacer melodias pegadizas produccion musical",
@@ -405,7 +432,9 @@ Si dos notas del 808 se **solapan**, el sonido se desliza de una a otra ("uuuh")
 
 ! Si el bombo y el 808 suenan a la vez y se hace una "bola", baja un poco el volumen de uno de los dos o quita el bombo donde el 808 ya golpea fuerte.
 
-? Haz un 808 que siga tu bombo de trap usando La1 y Sol1, con un glide de La1 a Do2 al final del patrón.)TXT" },
+? Haz un 808 que siga tu bombo de trap usando La1 y Sol1, con un glide de La1 a Do2 al final del patrón.
+
+[reto:808_notas])TXT" },
 
     // =========================================================================
     { "Nivel 4 · Diseño de sonido", "Samples y sampler", "5 min",
@@ -425,7 +454,9 @@ R"TXT(Un **sample** es un trozo de audio grabado: un golpe de batería, una voz,
 
 ! Usa solo samples gratis o "royalty free" (libres de derechos) si vas a publicar tu música. Usar trozos de canciones de otros sin permiso puede darte problemas.
 
-? Busca en internet "free drum samples" o "samples gratis royalty free", descarga un pack y arrastra un par de sonidos al secuenciador.)TXT" },
+? Busca en internet "free drum samples" o "samples gratis royalty free", descarga un pack y arrastra un par de sonidos al secuenciador.
+
+[reto:sample_kit])TXT" },
 
     { "Nivel 4 · Diseño de sonido", "Las ondas del sintetizador", "6 min",
       "tipos de ondas sintetizador seno cuadrada sierra",
@@ -446,7 +477,9 @@ R"TXT(Un **sintetizador** crea el sonido desde cero con **osciladores**, que pro
 
 > Empieza siempre desde un sonido preparado y cambia una cosa cada vez. Así aprendes qué hace cada control.
 
-? Toca la misma nota con las 4 ondas y describe con tus palabras cómo suena cada una.)TXT" },
+? Toca la misma nota con las 4 ondas y describe con tus palabras cómo suena cada una.
+
+[reto:onda])TXT" },
 
     { "Nivel 4 · Diseño de sonido", "La envolvente ADSR", "6 min",
       "envolvente ADSR explicacion sintetizador",
@@ -465,7 +498,9 @@ R"TXT(La **envolvente ADSR** controla cómo cambia el volumen de cada nota desde
 - **Pad** (colchón de fondo): ataque largo, sostenido alto, relajación larga.
 - **Lead** (melodía principal): ataque corto, sostenido alto, relajación media.
 
-? Con el mismo sintetizador, haz primero un pluck y luego un pad cambiando solo las 4 ruedas ADSR.)TXT" },
+? Con el mismo sintetizador, haz primero un pluck y luego un pad cambiando solo las 4 ruedas ADSR.
+
+[reto:adsr_pad])TXT" },
 
     { "Nivel 4 · Diseño de sonido", "Filtro y resonancia", "5 min",
       "filtro paso bajo cutoff resonancia explicacion",
@@ -483,7 +518,9 @@ R"TXT(El **filtro** quita frecuencias. El de Studoo es **paso bajo**: deja pasar
 
 > Cuando algo "molesta" en la mezcla pero no sabes por qué, prueba a bajar su filtro.
 
-? Pon un acorde largo con un sintetizador de sierra y mueve la rueda Filtro mientras suena.)TXT" },
+? Pon un acorde largo con un sintetizador de sierra y mueve la rueda Filtro mientras suena.
+
+[reto:filtro])TXT" },
 
     { "Nivel 4 · Diseño de sonido", "Plugins VST3", "5 min",
       "mejores plugins VST3 gratis",
@@ -526,7 +563,9 @@ El Master es la suma de todo. Sus luces **no deben llegar al rojo**. Si llegan, 
 
 [ir:mezclador|Abrir el mezclador]
 
-? Pon a cero todos los faders y vuelve a mezclar tu beat siguiendo el orden de arriba.)TXT" },
+? Pon a cero todos los faders y vuelve a mezclar tu beat siguiendo el orden de arriba.
+
+[reto:volumen_mezcla])TXT" },
 
     { "Nivel 5 · Mezcla", "Panorama: izquierda y derecha", "4 min",
       "panorama en la mezcla paneo explicacion",
@@ -546,7 +585,9 @@ R"TXT(El **panorama** (pan) coloca cada sonido a la izquierda, al centro o a la 
 
 > Si mueves un sonido a la izquierda, intenta mover otro parecido a la derecha para que la mezcla no se "caiga" hacia un lado.
 
-? Pon el hi-hat un 30 % a la derecha y una percusión un 30 % a la izquierda. Escucha con auriculares.)TXT" },
+? Pon el hi-hat un 30 % a la derecha y una percusión un 30 % a la izquierda. Escucha con auriculares.
+
+[reto:panorama])TXT" },
 
     { "Nivel 5 · Mezcla", "El ecualizador (EQ)", "6 min",
       "ecualizacion para principiantes graves medios agudos",
@@ -566,7 +607,9 @@ R"TXT(El **EQ** sube o baja zonas de frecuencia: graves, medios y agudos. Sirve 
 
 > En el mezclador de Studoo cada pista tiene EQ de **Graves, Medios y Agudos**. Gira hacia la izquierda para quitar.
 
-? Baja los graves del hi-hat y de la melodía y escucha cómo el 808 se oye más limpio.)TXT" },
+? Baja los graves del hi-hat y de la melodía y escucha cómo el 808 se oye más limpio.
+
+[reto:eq])TXT" },
 
     { "Nivel 5 · Mezcla", "El compresor", "6 min",
       "que es un compresor de audio explicacion facil",
@@ -585,7 +628,9 @@ R"TXT(El **compresor** baja automáticamente las partes más fuertes. Así el so
 
 ! Si comprimes demasiado, el sonido pierde vida y suena "aplastado". Empieza con ratio 3:1 y ve bajando el umbral poco a poco.
 
-? Activa el compresor en la pista de tu 808 y baja el umbral hasta que notes que todas las notas suenan igual de fuertes.)TXT" },
+? Activa el compresor en la pista de tu 808 y baja el umbral hasta que notes que todas las notas suenan igual de fuertes.
+
+[reto:compresor])TXT" },
 
     { "Nivel 5 · Mezcla", "Reverb: el espacio", "5 min",
       "como usar reverb en la mezcla",
@@ -604,7 +649,9 @@ R"TXT(La **reverb** imita los rebotes del sonido en una sala. Hace que algo suen
 
 > Pon la reverb a tu gusto y luego bájala un poco. Casi siempre se pone demasiada.
 
-? Pon reverb en el clap con Tamaño grande y Mezcla al 20 %. Luego quítala y compara.)TXT" },
+? Pon reverb en el clap con Tamaño grande y Mezcla al 20 %. Luego quítala y compara.
+
+[reto:reverb])TXT" },
 
     { "Nivel 5 · Mezcla", "Delay: el eco", "5 min",
       "como usar delay en voces y melodias",
@@ -622,7 +669,9 @@ R"TXT(El **delay** repite el sonido como un eco. En Studoo va sincronizado con e
 - Delay al final de las frases de la voz: rellena los huecos.
 - Con muchas repeticiones y un poco de reverb consigues ambientes de ensueño.
 
-? Pon un delay de 0,75 con repeticiones medias en tu melodía o en un pluck y escúchalo.)TXT" },
+? Pon un delay de 0,75 con repeticiones medias en tu melodía o en un pluck y escúchalo.
+
+[reto:delay])TXT" },
 
     // =========================================================================
     { "Nivel 6 · De beat a canción", "Estructura de una canción", "8 min",
@@ -647,7 +696,10 @@ R"TXT(Una canción se arma con **secciones** que se repiten. Tener una estructur
 
 [ir:playlist|Abrir la playlist]
 
-? Monta una canción de al menos 1 minuto: Intro 4 - Estribillo 8 - Estrofa 8 - Estribillo 8 - Outro 4.)TXT" },
+? Monta una canción de al menos 1 minuto: Intro 4 - Estribillo 8 - Estrofa 8 - Estribillo 8 - Outro 4.
+
+[reto:dos_patrones]
+[reto:playlist])TXT" },
 
     { "Nivel 6 · De beat a canción", "Automatización", "5 min",
       "automatizacion en la produccion musical ejemplos",
@@ -670,7 +722,9 @@ R"TXT(**Automatizar** es hacer que un control se mueva solo a lo largo de la can
 
 [ir:automatizacion|Abrir la automatización]
 
-? Haz un fade out: automatiza el volumen del Master para que baje a cero en los últimos 4 compases.)TXT" },
+? Haz un fade out: automatiza el volumen del Master para que baje a cero en los últimos 4 compases.
+
+[reto:automatizacion])TXT" },
 
     { "Nivel 6 · De beat a canción", "Grabar tu voz", "8 min",
       "como grabar voz en casa con microfono consejos",
@@ -692,7 +746,9 @@ R"TXT(Puedes grabar tu voz (o una guitarra) con un micrófono y ponerla encima d
 - Si las luces del mezclador llegan arriba del todo, aléjate o baja la ganancia.
 - Graba varias tomas y quédate con la mejor.
 
-? Graba 8 compases hablando o cantando encima de tu beat y ponle un poco de reverb y compresor.)TXT" },
+? Graba 8 compases hablando o cantando encima de tu beat y ponle un poco de reverb y compresor.
+
+[reto:grabacion])TXT" },
 
     { "Nivel 6 · De beat a canción", "Teclados MIDI", "4 min",
       "como conectar un teclado MIDI al ordenador",
@@ -822,7 +878,7 @@ R"TXT(Es muy normal quedarse atascado con un bucle de 8 compases que suena bien 
       "teoria musical para productores curso gratis",
 R"TXT(¡Has terminado la ruta principal! Ya conoces lo necesario para hacer canciones completas. A partir de aquí, todo es practicar y profundizar.
 
-[anim:ruta|Ya tienes lo básico. En el Nivel 8 te esperan los géneros musicales]
+[anim:ruta|Ya tienes lo básico. En los niveles 8 y 9: géneros y producción avanzada]
 
 ## Qué aprender después
 - **Más teoría**: los grados de la escala, acordes de séptima e inversiones. Hacen tus progresiones más ricas.
@@ -860,7 +916,9 @@ R"TXT(Cada género musical es como una **receta**: tiene su tempo, su forma de t
 
 ! Las bases son un punto de partida para aprender. Cuando hagas tus canciones, cámbialas tanto como quieras: así serán tuyas.
 
-? Elige el género que más te guste de la lista de la izquierda y carga su base.)TXT" },
+? Elige el género que más te guste de la lista de la izquierda y carga su base.
+
+[reto:base_genero])TXT" },
 
     // =========================================================================
     { "Nivel 8 · Géneros musicales", "Trap", "8 min",
@@ -1167,5 +1225,142 @@ R"TXT(El **R&B** (rhythm and blues) es música **suave, sensual y con mucha emoc
 > En R&B la voz hace muchos adornos (melismas). Deja huecos en la base para que la voz pueda lucirse.
 
 ? Graba una melodía tarareada encima de tu base y luego intenta tocarla en el Piano roll con el preset **Lead brillante**.)TXT" },
+
+    // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Sidechain: el bombeo", "7 min",
+      "que es el sidechain explicado facil",
+R"TXT(¿Has notado que en el house y en la música electrónica todo parece "respirar" al ritmo del bombo? Eso es el **sidechain**: cada vez que suena el bombo, otros sonidos (el bajo, los pads) bajan un momento su volumen y luego vuelven a subir.
+
+[anim:sidechain|Cada vez que golpea el bombo, el pad se "agacha" y vuelve a subir]
+
+## Para qué sirve
+- **Hacer sitio al bombo**: el bombo y el bajo comparten los graves. Si no se apartan, se tapan y suena "embarrado".
+- **Dar movimiento**: el famoso efecto de bombeo hace que la música se mueva sola, aunque los acordes sean largos.
+
+## Cómo se hace normalmente
+1. Se pone un **compresor** en la pista del bajo o del pad.
+2. Se le dice que "escuche" al bombo (eso es la cadena lateral, *sidechain*).
+3. Cada golpe de bombo hace que el compresor baje el volumen del bajo un instante.
+
+## Cómo conseguirlo en Studoo
+Studoo todavía no tiene compresor con sidechain, pero hay dos trucos que funcionan muy bien:
+1. **Sidechain "natural"**: pon el bajo **entre** los bombos, nunca encima. Es lo que hace la base de House: el bajo suena a contratiempo y nunca choca con el bombo.
+2. **Bombeo con automatización**: en Automatización, crea una línea de volumen para la pista del pad. Haz una forma de **V** en cada tiempo: abajo justo cuando suena el bombo y arriba antes del siguiente.
+
+[base:house|Cargar la base de House (bajo a contratiempo)]
+
+> Con plugins VST3 de compresor que tengan sidechain (hay gratuitos) se puede hacer el bombeo "de verdad" en el ordenador.
+
+? Carga la base de House y escucha el Bajo house: mueve una nota para que caiga encima de un bombo y compara. ¿Oyes cómo se tapan?)TXT" },
+
+    // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Mezclar voces", "8 min",
+      "como mezclar voces paso a paso",
+R"TXT(La voz es lo más importante de una canción: si no se entiende o suena "pegada encima" del beat, todo pierde. Mezclar voces tiene unos pasos que casi siempre se repiten.
+
+[anim:volumenes|La voz principal tiene que destacar por encima del beat]
+
+## La cadena de la voz (en orden)
+1. **Graba bien**: cerca del micro (un palmo), con auriculares y en una habitación sin eco. Lo que se graba mal no se arregla del todo.
+2. **EQ: quita graves**. La voz no necesita los graves más profundos. Baja los **Graves** de su pista: se quita el ruido de golpes y "bum".
+3. **Compresor**: actívalo (botón **On**). Hace que las palabras flojas y fuertes suenen parecidas y la voz se entienda siempre.
+4. **EQ: un poco de brillo**. Sube un poco los **Agudos** para que tenga presencia (sin pasarte: las "s" pican).
+5. **Reverb y delay suaves**: un poco de espacio para que no suene seca. Mucho menos de lo que crees.
+6. **Volumen**: súbela hasta que se entienda cada palabra, pero que siga pareciendo parte de la canción.
+
+## El panorama de las voces
+- **Voz principal**: siempre en el **centro**.
+- **Coros y dobles**: un poco a los lados (por ejemplo, uno a la izquierda y otro a la derecha).
+
+! No pongas mucha reverb a la voz principal: suena lejana y se entiende peor. Para efectos grandes, mejor en coros o en palabras sueltas.
+
+[ir:mezclador|Ir al Mezclador]
+
+? Graba una frase hablada, haz los pasos 2 a 6 en su pista y compara con el botón de **mute** de los efectos... ¡o escúchala antes y después!)TXT" },
+
+    // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Masterizar", "7 min",
+      "que es masterizar una cancion para principiantes",
+R"TXT(**Masterizar** es el último paso antes de publicar: la canción ya está mezclada y ahora se le da el toque final para que suene **fuerte, pareja y bien en todas partes** (móvil, coche, auriculares, altavoz).
+
+[anim:master|El master: la mezcla entra, sale más pareja y con más volumen, sin pasar del rojo]
+
+## Qué se hace al masterizar
+- **EQ general**: pequeños ajustes de graves y agudos a toda la canción.
+- **Compresión suave**: une todo y lo hace sonar más compacto.
+- **Limitador**: sube el volumen al máximo posible **sin pasar del rojo** (sin distorsionar).
+- **Comprobar en varios sitios**: escuchar en el móvil, en auriculares y en un altavoz.
+
+## Masterizar en Studoo
+Todo lo que pongas en la pista **Master** del Mezclador afecta a la canción entera.
+1. Termina la mezcla primero: el master no arregla una mala mezcla.
+2. En el **Master**, usa la **EQ** con cuidado (como mucho, 2 o 3 puntos arriba o abajo).
+3. Activa el **compresor** del Master con el umbral alto (que actúe poco).
+4. Mira el medidor del Master: el pico más fuerte debe quedar **cerca del máximo, pero sin llegar al rojo**.
+5. Exporta en **WAV** y escúchala en varios aparatos.
+
+> Compara tu canción con una canción de referencia del mismo género, al mismo volumen. Te dirá si te sobran graves o te faltan agudos.
+
+! Subir todo "a tope" no hace que suene mejor: lo aplasta y cansa al oído. Las plataformas como Spotify bajan el volumen de las canciones demasiado fuertes.
+
+? Exporta tu última canción, escúchala en el móvil y en auriculares, y apunta una cosa que cambiarías en el Master.)TXT" },
+
+    // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Teoría: grados y acordes de séptima", "9 min",
+      "grados de la escala y acordes de septima explicacion",
+R"TXT(Ya sabes qué es un acorde y una escala. Ahora un truco de los músicos: en vez de nombrar los acordes por su nota (Do, Sol...), se nombran por su **número dentro de la escala**. Así una progresión sirve en cualquier tono.
+
+[anim:acordes|Cada acorde de la escala tiene su número (grado)]
+
+## Los grados
+En **Do mayor**, cada nota de la escala es la base de un acorde:
+- **I** Do mayor · **II** Re menor · **III** Mi menor · **IV** Fa mayor
+- **V** Sol mayor · **VI** La menor · **VII** Si disminuido
+
+Fíjate: **I, IV y V** son mayores (alegres) y **II, III y VI** son menores (tristes).
+
+## Progresiones famosas en grados
+- **I – V – VI – IV**: la del pop (Do – Sol – La menor – Fa).
+- **VI – IV – I – V**: la misma, empezando en el VI. Suena más emotiva (La menor – Fa – Do – Sol).
+- **II – V – I**: la del jazz (Re menor – Sol – Do).
+- **I – VI – IV – V**: la de los años 50.
+
+## Acordes de séptima
+Un acorde de séptima es un acorde básico de 3 notas **más una cuarta nota**: la que está 2 notas por encima de la última.
+- **Do maj7** = Do – Mi – Sol – **Si**: suave y elegante (lo-fi, R&B).
+- **La m7** = La – Do – Mi – **Sol**: relajado y nocturno.
+- **Sol 7** = Sol – Si – Re – **Fa**: con tensión, "pide" ir a Do.
+
+[ir:pianoroll|Probar acordes en el Piano roll]
+
+> En el Piano roll, el desplegable de acordes tiene **Séptima**: con un clic pones las 4 notas.
+
+? Escribe la progresión **II – V – I** en Do (Re menor 7 – Sol 7 – Do maj7) con el preset **Piano eléctrico**. ¡Acabas de tocar jazz!)TXT" },
+
+    // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Analizar una canción paso a paso", "8 min",
+      "como analizar una cancion para producir",
+R"TXT(Los mejores productores aprendieron **copiando para aprender**: escuchando canciones que les gustaban y descubriendo cómo estaban hechas. Aquí tienes un método paso a paso.
+
+[anim:estructura|Apunta cuántos compases dura cada parte]
+
+## El método
+1. **Elige una canción** que te guste y que sea de un estilo parecido al tuyo.
+2. **Averigua el tempo**: busca "BPM de [canción]" en internet, o pon el metrónomo de Studoo y cambia el BPM hasta que los clics vayan a la vez que la canción.
+3. **Cuenta la estructura**: con el metrónomo, cuenta cuántos compases dura cada parte (intro, estrofa, estribillo...). Apúntalo.
+4. **Lista los instrumentos**: escucha varias veces, fijándote cada vez en una sola cosa: la batería, el bajo, los acordes, la melodía, los efectos.
+5. **Recrea el ritmo**: copia el bombo, la caja y los hi-hats en el Secuenciador de Studoo.
+6. **Busca la tonalidad**: tararea la nota que parece "casa" (donde la canción descansa) y búscala en el Piano roll.
+7. **Haz tu versión**: cambia el ritmo, los acordes o los sonidos. Así aprendes y además creas algo tuyo.
+
+## Qué apuntar (plantilla)
+- Tempo: ___ BPM · Tono: ___
+- Estructura: Intro ___ · Estrofa ___ · Estribillo ___ ...
+- Batería: ¿qué estilo? ¿dónde cae la caja?
+- ¿Qué entra y qué sale en cada parte?
+
+! Recrear canciones para aprender está genial. Publicar una copia como si fuera tuya, no: haz siempre tu propia versión.
+
+? Analiza una canción con este método y monta su estructura en la Playlist de Studoo con patrones vacíos (uno por parte).)TXT" },
     };
 }

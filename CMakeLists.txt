@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # instalar nada extra para abrir la app.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-project(Studoo VERSION 1.7.2 LANGUAGES C CXX)
+project(Studoo VERSION 1.8.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,6 +74,9 @@ target_sources(Studoo PRIVATE
     src/ui/MixerView.cpp
     src/ui/AutomationView.cpp
     src/ui/LearnView.cpp
+    src/ui/LearnProgress.cpp
+    src/ui/Challenges.cpp
+    src/ui/EarGames.cpp
     src/ui/Illustrations.cpp
     src/ui/Tutorial.cpp
     ${STUDOO_ENGINE_SOURCES})

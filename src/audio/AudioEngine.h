@@ -63,6 +63,12 @@ namespace studoo
         void setLiveChannel (int channelUid) { liveChannelUid.store (channelUid); }
         juce::MidiMessageCollector& getMidiCollector() { return midiCollector; }
 
+        // --- Escuchar un sonido ya preparado (juegos de oído de Aprende) ----------------
+        // Suena por encima de todo lo demás, una vez. Otro sonido corta al anterior.
+        using SharedBuffer = std::shared_ptr<const juce::AudioBuffer<float>>;
+        void playBuffer (SharedBuffer buffer, double bufferSampleRate, float gain = 0.8f);
+        void stopBuffer() { playBuffer (nullptr, 44100.0); }
+
         // --- Medidores del mezclador -------------------------------------------------
         float getTrackPeak (int track, int channel) const;
         // Nivel de sonido de un canal (para las luces de actividad del secuenciador)
@@ -143,6 +149,10 @@ namespace studoo
         std::atomic<double> currentBpm { 140.0 };
         std::atomic<int> liveChannelUid { 0 };
         std::array<std::atomic<float>, 256> channelActivity {};
+
+        SharedBuffer audition;            // sonido de los juegos de oído
+        double auditionPos = 0.0, auditionStep = 1.0;
+        float auditionGain = 0.8f;
 
         juce::AbstractFifo previewFifo { 64 };
         std::array<PreviewEvent, 64> previewEvents;
