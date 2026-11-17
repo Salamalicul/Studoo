@@ -423,8 +423,9 @@ ChannelRack::ChannelRack (AppContext& c)
         int item = 100;
         for (auto& genre : genres::all())
             menu.addItem (item++, txt (genre.name) + "  (" + juce::String (juce::roundToInt (genre.bpm)) + " BPM)");
+        juce::Component::SafePointer<ChannelRack> safe (this);
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&exampleButton),
-                            [safe = juce::Component::SafePointer<ChannelRack> (this)] (int result)
+                            [safe] (int result)
                             {
                                 if (safe == nullptr || result == 0)
                                     return;
