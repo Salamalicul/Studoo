@@ -1,14 +1,35 @@
 #include "Snapshot.h"
 #include <algorithm>
+#include <cmath>
 #include <map>
 
 namespace studoo
 {
+namespace
+{
+    // Seguridad: un proyecto puede venir de otra persona (o estar estropeado).
+    // Todos los números se limitan a los mismos rangos que los controles de la
+    // app, y los valores raros (infinito, "no es un número") se cambian por el
+    // valor normal. Así un archivo no puede romper el motor de audio ni hacer
+    // que suene a un volumen peligroso.
+    float num (const juce::ValueTree& t, const juce::Identifier& id, float lo, float hi, float def)
+    {
+        const auto v = (double) t.getProperty (id, def);
+        return std::isfinite (v) ? juce::jlimit (lo, hi, (float) v) : def;
+    }
+
+    double pos (const juce::var& value, double hi = 1.0e6)
+    {
+        const auto v = (double) value;
+        return std::isfinite (v) ? juce::jlimit (0.0, hi, v) : 0.0;
+    }
+}
+
 std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
 {
     auto snap = std::make_shared<Snapshot>();
 
-    snap->bpm = juce::jlimit (40.0, 250.0, (double) state.getProperty (ids::bpm, 140.0));
+    snap->bpm = num (state, ids::bpm, 40.0f, 250.0f, 140.0f);
     snap->metronome = (bool) state[ids::metronome];
     snap->songMode = state[ids::playMode].toString() == "song";
 
@@ -19,26 +40,26 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         ChannelSnap c;
         c.uid = ch[ids::uid];
         c.type = channelTypeFromString (ch[ids::type].toString());
-        c.volume = ch.getProperty (ids::volume, 0.8f);
-        c.pan = ch.getProperty (ids::pan, 0.0f);
+        c.volume = num (ch, ids::volume, 0.0f, 1.25f, 0.8f);
+        c.pan = num (ch, ids::pan, -1.0f, 1.0f, 0.0f);
         c.muted = ch[ids::muted];
         c.mixer = juce::jlimit (0, numMixerTracks - 1, (int) ch[ids::mixer]);
-        c.root = ch.getProperty (ids::root, 60);
+        c.root = juce::jlimit (0, 127, (int) ch.getProperty (ids::root, 60));
         c.oneShot = ch.getProperty (ids::oneShot, true);
         c.samplePath = ch[ids::sample].toString();
 
-        c.synth.wave = ch.getProperty (ids::wave, 0);
-        c.synth.attack = ch.getProperty (ids::attack, 0.005f);
-        c.synth.decay = ch.getProperty (ids::decay, 0.3f);
-        c.synth.sustain = ch.getProperty (ids::sustain, 0.6f);
-        c.synth.release = ch.getProperty (ids::release, 0.3f);
-        c.synth.cutoff = ch.getProperty (ids::cutoff, 5000.0f);
-        c.synth.resonance = ch.getProperty (ids::resonance, 0.2f);
-        c.synth.detune = ch.getProperty (ids::detune, 8.0f);
+        c.synth.wave = juce::jlimit (0, 3, (int) ch.getProperty (ids::wave, 0));
+        c.synth.attack = num (ch, ids::attack, 0.001f, 2.0f, 0.005f);
+        c.synth.decay = num (ch, ids::decay, 0.01f, 3.0f, 0.3f);
+        c.synth.sustain = num (ch, ids::sustain, 0.0f, 1.0f, 0.6f);
+        c.synth.release = num (ch, ids::release, 0.005f, 4.0f, 0.3f);
+        c.synth.cutoff = num (ch, ids::cutoff, 20.0f, 20000.0f, 5000.0f);
+        c.synth.resonance = num (ch, ids::resonance, 0.0f, 1.0f, 0.2f);
+        c.synth.detune = num (ch, ids::detune, 0.0f, 50.0f, 8.0f);
 
-        c.bass.decay = ch.getProperty (ids::decay, 1.5f);
-        c.bass.glide = ch.getProperty (ids::glide, 0.08f);
-        c.bass.drive = ch.getProperty (ids::drive, 0.3f);
+        c.bass.decay = num (ch, ids::decay, 0.1f, 4.0f, 1.5f);
+        c.bass.glide = num (ch, ids::glide, 0.0f, 0.5f, 0.08f);
+        c.bass.drive = num (ch, ids::drive, 0.0f, 1.0f, 0.3f);
 
         channelIndexByUid[c.uid] = (int) snap->channels.size();
         snap->channels.push_back (c);
@@ -79,10 +100,10 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
             else if (item.hasType (ids::NOTE))
             {
                 NoteEvent n;
-                n.start = item[ids::start];
-                n.length = juce::jmax (0.05, (double) item[ids::length]);
+                n.start = pos (item[ids::start]);
+                n.length = juce::jmax (0.05, pos (item[ids::length], 4096.0));
                 n.pitch = juce::jlimit (0, 127, (int) item[ids::pitch]);
-                n.velocity = juce::jlimit (0.0f, 1.0f, (float) item.getProperty (ids::velocity, 0.8f));
+                n.velocity = num (item, ids::velocity, 0.0f, 1.0f, 0.8f);
                 if (n.start < ps.length)
                     notes.push_back (n);
             }
@@ -104,9 +125,9 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
     {
         ClipSnap cs;
         cs.isAudio = c[ids::kind].toString() == "audio";
-        cs.start = c[ids::start];
-        cs.length = juce::jmax (0.25, (double) c[ids::length]);
-        cs.offset = c[ids::offset];
+        cs.start = pos (c[ids::start]);
+        cs.length = juce::jmax (0.25, pos (c[ids::length]));
+        cs.offset = pos (c[ids::offset]);
 
         if (cs.isAudio)
         {
@@ -133,21 +154,21 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         if (! juce::isPositiveAndBelow (i, numMixerTracks))
             continue;
         auto& m = snap->mixer[(size_t) i];
-        m.volume = t.getProperty (ids::volume, 0.8f);
-        m.pan = t.getProperty (ids::pan, 0.0f);
+        m.volume = num (t, ids::volume, 0.0f, 1.25f, 0.8f);
+        m.pan = num (t, ids::pan, -1.0f, 1.0f, 0.0f);
         m.mute = t[ids::muted];
         m.solo = t[ids::solo];
-        m.eqLow = t.getProperty (ids::eqLow, 0.0f);
-        m.eqMid = t.getProperty (ids::eqMid, 0.0f);
-        m.eqHigh = t.getProperty (ids::eqHigh, 0.0f);
+        m.eqLow = num (t, ids::eqLow, -12.0f, 12.0f, 0.0f);
+        m.eqMid = num (t, ids::eqMid, -12.0f, 12.0f, 0.0f);
+        m.eqHigh = num (t, ids::eqHigh, -12.0f, 12.0f, 0.0f);
         m.compOn = t[ids::compOn];
-        m.compThreshold = t.getProperty (ids::compThreshold, -18.0f);
-        m.compRatio = t.getProperty (ids::compRatio, 4.0f);
-        m.delayMix = t.getProperty (ids::delayMix, 0.0f);
-        m.delayTime = t.getProperty (ids::delayTime, 0.75f);
-        m.delayFeedback = t.getProperty (ids::delayFeedback, 0.35f);
-        m.reverbMix = t.getProperty (ids::reverbMix, 0.0f);
-        m.reverbSize = t.getProperty (ids::reverbSize, 0.6f);
+        m.compThreshold = num (t, ids::compThreshold, -40.0f, 0.0f, -18.0f);
+        m.compRatio = num (t, ids::compRatio, 1.0f, 20.0f, 4.0f);
+        m.delayMix = num (t, ids::delayMix, 0.0f, 1.0f, 0.0f);
+        m.delayTime = num (t, ids::delayTime, 0.25f, 2.0f, 0.75f);
+        m.delayFeedback = num (t, ids::delayFeedback, 0.0f, 0.9f, 0.35f);
+        m.reverbMix = num (t, ids::reverbMix, 0.0f, 1.0f, 0.0f);
+        m.reverbSize = num (t, ids::reverbSize, 0.0f, 1.0f, 0.6f);
     }
 
     // --- Automatización -------------------------------------------------------------
@@ -170,7 +191,7 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         }
 
         for (auto p : lane)
-            ls.points.emplace_back ((double) p[ids::time], (float) p[ids::value]);
+            ls.points.emplace_back (pos (p[ids::time]), num (p, ids::value, 0.0f, 1.0f, 0.5f));
         std::sort (ls.points.begin(), ls.points.end());
         if (! ls.points.empty())
             snap->lanes.push_back (std::move (ls));

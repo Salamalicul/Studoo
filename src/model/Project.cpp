@@ -271,6 +271,13 @@ bool Project::loadFromFile (const juce::File& f, juce::String& error)
         return false;
     }
 
+    // Un proyecto normal ocupa unos pocos KB: no abrimos archivos enormes
+    if (f.getSize() > 50 * 1024 * 1024)
+    {
+        error = juce::String::fromUTF8 ("El archivo es demasiado grande para ser un proyecto de Studoo.");
+        return false;
+    }
+
     if (! loadFromXmlString (f.loadFileAsString(), error))
         return false;
 
@@ -320,7 +327,7 @@ bool Project::saveToFile (const juce::File& f)
 
 int Project::newUid()
 {
-    const int uid = juce::jmax (1, (int) state[ids::nextUid]);
+    const int uid = juce::jlimit (1, 1000000000, (int) state[ids::nextUid]);
     state.setProperty (ids::nextUid, uid + 1, nullptr);
     return uid;
 }
