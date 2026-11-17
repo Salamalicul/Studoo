@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # instalar nada extra para abrir la app.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-project(Studoo VERSION 1.8.0 LANGUAGES C CXX)
+project(Studoo VERSION 1.9.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -63,6 +63,8 @@ target_sources(Studoo PRIVATE
     src/Main.cpp
     src/MainComponent.cpp
     src/Updater.cpp
+    src/Pro.cpp
+    src/ui/ProScreen.cpp
     src/ui/StudooLookAndFeel.cpp
     src/ui/Widgets.cpp
     src/ui/HelpButton.cpp
@@ -147,7 +149,7 @@ if(STUDOO_BUILD_TESTS)
     # Pruebas de Aprende: retos, sonidos de los juegos y progreso
     juce_add_console_app(StudooLearnTest PRODUCT_NAME "StudooLearnTest")
     target_sources(StudooLearnTest PRIVATE tests/LearnTest.cpp ${STUDOO_ENGINE_SOURCES}
-        src/ui/Challenges.cpp src/ui/EarGames.cpp src/ui/LearnProgress.cpp
+        src/Pro.cpp src/ui/Challenges.cpp src/ui/EarGames.cpp src/ui/LearnProgress.cpp
         src/ui/StudooLookAndFeel.cpp src/ui/Widgets.cpp)
     target_include_directories(StudooLearnTest PRIVATE src src/ui)
     target_compile_definitions(StudooLearnTest PRIVATE ${STUDOO_DEFINITIONS})

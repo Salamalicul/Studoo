@@ -92,8 +92,10 @@ namespace studoo
 
         // --- Exportación (sin tarjeta de sonido) ---------------------------------------
         // Debe llamarse con el motor desconectado de la tarjeta de sonido
+        // maxSeconds > 0: solo se exporta ese tiempo (versión gratis)
         bool renderSongToFile (const juce::File& wavFile, double sampleRate,
-                               std::function<bool (float progress)> keepGoing, juce::String& error);
+                               std::function<bool (float progress)> keepGoing, juce::String& error,
+                               double maxSeconds = 0.0);
 
         // --- AudioPlayHead (para que los plugins sepan el tempo) ---------------------------
         juce::Optional<PositionInfo> getPosition() const override;

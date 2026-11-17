@@ -66,7 +66,25 @@ keystore_password = os.environ.get("STUDOO_KEYSTORE_PASSWORD") or "android"
 if not keystore_password.isalnum():
     raise SystemExit("La contraseña de la clave solo puede tener letras y números")
 
-defines = "JUCE_WEB_BROWSER=0\nJUCE_USE_CURL=0\nSTUDOO_ANDROID=1"
+# Dos versiones de Android a partir del mismo código:
+#   - normal (GitHub): con el actualizador propio y todo desbloqueado
+#   - Google Play (STUDOO_PLAY=1): pagos con Google Play (Pro y donaciones),
+#     sin actualizador (lo prohíbe Google) y se genera un .aab
+play = os.environ.get("STUDOO_PLAY") == "1"
+
+defines = "JUCE_WEB_BROWSER=0\nJUCE_USE_CURL=0\nSTUDOO_ANDROID=1" + ("\nSTUDOO_PLAY=1" if play else "")
+
+if play:
+    # Clave pública de la app (Play Console > Monetizar > Licencias) para
+    # comprobar que las compras son de verdad. Va en un archivo que no se sube a git.
+    play_key = os.environ.get("STUDOO_PLAY_LICENSE_KEY", "").strip()
+    if not all(c.isalnum() or c in "+/=" for c in play_key):
+        raise SystemExit("La clave de licencia de Google Play no es válida")
+    (here / "java-play/com/studoo/app/StudooPlayKey.java").write_text(
+        "// Archivo creado por generate_jucer.py: no lo edites ni lo subas a git.\n"
+        "package com.studoo.app;\n"
+        "final class StudooPlayKey { static final String KEY = \"" + play_key + "\"; }\n",
+        encoding="utf-8")
 
 # Actualizaciones dentro de la app: el "provider" que entrega el APK descargado
 # al instalador de Android (ver java/com/studoo/app/)
@@ -74,7 +92,10 @@ manifest_extra = ('<manifest><application>'
                   '<provider android:name="com.studoo.app.StudooApkProvider" '
                   'android:authorities="com.studoo.app.actualizacion" '
                   'android:exported="false" android:grantUriPermissions="true"/>'
-                  '</application></manifest>')
+                  '</application></manifest>') if not play else ''
+other_permissions = "" if play else "android.permission.REQUEST_INSTALL_PACKAGES"
+java_folders = "java\njava-play" if play else "java"
+dependencies = "implementation 'com.android.billingclient:billing:8.0.0'" if play else ""
 
 jucer = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!-- Archivo creado por generate_jucer.py: no lo edites a mano. -->
@@ -92,14 +113,15 @@ jucer = f"""<?xml version="1.0" encoding="UTF-8"?>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
-    <ANDROIDSTUDIO targetFolder="Builds/Android" androidMinimumSDK="24" androidTargetSDK="35"
+    <ANDROIDSTUDIO targetFolder="Builds/Android" androidMinimumSDK="24" androidTargetSDK="36"
                    androidVersionCode="{version_code}" androidScreenOrientation="landscape"
                    microphonePermissionNeeded="1" androidInternetNeeded="1" androidEnableContentSharing="1"
                    androidBluetoothNeeded="0" bigIcon="{icon_id}" smallIcon="{icon_id}"
                    androidKeyStore="${{user.home}}/.android/studoo.keystore" androidKeyStorePass="{keystore_password}"
                    androidKeyAlias="studoo" androidKeyAliasPass="{keystore_password}"
-                   androidAdditionalJavaFolders="java"
-                   androidOtherPermissions="android.permission.REQUEST_INSTALL_PACKAGES"
+                   androidAdditionalJavaFolders={quoteattr(java_folders)}
+                   androidOtherPermissions={quoteattr(other_permissions)}
+                   androidDependencies={quoteattr(dependencies)}
                    androidManifestCustomXmlElements={quoteattr(manifest_extra)}
                    app_name="Studoo">
       <CONFIGURATIONS>
@@ -122,4 +144,4 @@ jucer = f"""<?xml version="1.0" encoding="UTF-8"?>
 """
 
 (here / "Studoo.jucer").write_text(jucer, encoding="utf-8")
-print(f"Studoo.jucer creado (versión {version}, código {version_code}, {len(sources)} archivos)")
+print(f"Studoo.jucer creado ({'Google Play' if play else 'GitHub'}, versión {version}, código {version_code}, {len(sources)} archivos)")

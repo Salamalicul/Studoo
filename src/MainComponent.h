@@ -23,6 +23,8 @@
 #include "ui/StudooLookAndFeel.h"
 #include "ui/Toolbar.h"
 #include "ui/Tutorial.h"
+#include "ui/ProScreen.h"
+#include "Pro.h"
 #include "Updater.h"
 
 namespace studoo
@@ -56,7 +58,8 @@ namespace studoo
         void saveProject (std::function<void()> then = {});
         void saveProjectAs (std::function<void()> then = {});
         void checkUnsavedThen (std::function<void()> action);
-        void exportSong (bool mp3);
+        // maxSeconds: < 0 = decidir (versión gratis: 1 minuto), 0 = sin límite
+        void exportSong (bool mp3, double maxSeconds = -1.0);
         static juce::File findLame();
         void afterProjectLoaded();
         void storePluginStates();
@@ -114,6 +117,7 @@ namespace studoo
         std::array<juce::Component*, (size_t) View::numViews> views {};
         View currentView = View::channelRack;
         TutorialOverlay tutorial;
+        ProScreen proScreen;
 
         std::unique_ptr<juce::FileChooser> chooser;
         std::set<int> pendingPlugins, failedPlugins;

@@ -15,7 +15,13 @@
 
 namespace studoo::updater
 {
-    inline constexpr const char* releasesPage = "https://github.com/Salamalicul/Studoo/releases/latest";
+    // Las versiones se publican en el repositorio público "Studoo-descargas" (el
+    // código puede ser privado). Mientras ese repositorio no exista, se usa el
+    // de siempre ("Studoo").
+    inline constexpr const char* repositories[] = { "Salamalicul/Studoo-descargas", "Salamalicul/Studoo" };
+
+    // Página de descargas (la del repositorio que respondió la última vez)
+    juce::String releasesPage();
 
     struct ReleaseInfo
     {

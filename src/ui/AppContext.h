@@ -24,5 +24,6 @@ namespace studoo
         std::function<void (View)> showView;
         std::function<void (int channelUid)> addPluginChannel;  // abre el menú de plugins
         std::function<void (int track)> showMixerPluginMenu;
+        std::function<void (const juce::String& reason)> showPro;  // pantalla de Studoo Pro
     };
 }

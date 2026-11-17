@@ -1,6 +1,12 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.8: Aprende 2.0
+### 🆕 Novedades de la versión 1.9
+- 🏪 **Studoo se prepara para Google Play**: nueva versión para la tienda (archivo `.aab`) con **Studoo Pro** (pago único) y **donaciones** para apoyar al creador. En el ordenador y en el APK de GitHub todo sigue gratis y desbloqueado.
+- 📱 Preparado para **Android 16**.
+- 📥 Las descargas y actualizaciones pasan a un repositorio propio, **Studoo-descargas**. Tu Studoo lo encuentra solo, no tienes que hacer nada.
+- 🧪 Más pruebas automáticas: lo que es gratis y lo que es Pro se comprueba solo en cada versión.
+
+### Novedades de la versión 1.8: Aprende 2.0
 - 🎯 **Retos que se comprueban solos**: 28 retos dentro de las lecciones (pon el bombo en cada tiempo, haz un roll de hi-hat, escribe una melodía, usa el compresor...). Pulsa **"Ir a hacerlo"** y Studoo detecta solo cuándo lo has conseguido.
 - ❓ **Test al final de cada lección**: 3 preguntas con explicación si fallas. Se guarda tu mejor nota.
 - 👂 **Juegos de oído**: ¿Qué instrumento es?, ¿Sube o baja?, ¿Mayor o menor? y ¿Qué género es?, con rachas y récords.

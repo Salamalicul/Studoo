@@ -9,3 +9,4 @@ packaging/android/JUCE
 packaging/android/Builds/
 packaging/android/JuceLibraryCode/
 packaging/android/Studoo.jucer
+packaging/android/java-play/com/studoo/app/StudooPlayKey.java
