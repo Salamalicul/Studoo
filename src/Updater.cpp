@@ -7,7 +7,8 @@ namespace studoo::updater
 {
 namespace
 {
-    constexpr const char* apiUrl = "https://api.github.com/repos/Salamalicul/Studoo/releases/latest";
+    juce::String lastRepository = repositories[0];   // se escribe en otro hilo: con candado
+    juce::SpinLock repositoryLock;
     constexpr const char* userAgent = "Studoo-Updater";
 
     juce::File currentExe()
@@ -173,21 +174,42 @@ bool isNewer (const juce::String& remote, const juce::String& local)
     return false;
 }
 
+juce::String releasesPage()
+{
+    const juce::SpinLock::ScopedLockType sl (repositoryLock);
+    return "https://github.com/" + lastRepository + "/releases/latest";
+}
+
 bool fetchLatest (ReleaseInfo& info, juce::String& error)
 {
+    // Primero el repositorio de descargas; si no existe, el de siempre
     juce::String text;
-    if (! httpGet (apiUrl, nullptr, &text, 15) || text.isEmpty())
+    juce::var json;
+    bool connected = false;
+    for (auto* repo : repositories)
+    {
+        text.clear();
+        if (! httpGet ("https://api.github.com/repos/" + juce::String (repo) + "/releases/latest", nullptr, &text, 15) || text.isEmpty())
+            continue;
+        connected = true;
+        json = juce::JSON::parse (text);
+        if (json["tag_name"].toString().isNotEmpty())
+        {
+            const juce::SpinLock::ScopedLockType sl (repositoryLock);
+            lastRepository = repo;
+            break;
+        }
+    }
+    if (! connected)
     {
         error = juce::String::fromUTF8 ("No se pudo conectar con GitHub. ¿Tienes internet?");
         return false;
     }
 
-    const auto json = juce::JSON::parse (text);
     const auto tag = json["tag_name"].toString();
     if (tag.isEmpty() && json["message"].toString() == "Not Found")
     {
-        error = juce::String::fromUTF8 ("No se encuentra Studoo en GitHub. Puede que el proyecto sea privado: "
-                                        "para que las actualizaciones funcionen, tiene que ser público.");
+        error = juce::String::fromUTF8 ("No se encuentra la página de descargas de Studoo en GitHub.");
         return false;
     }
     if (tag.isEmpty())
@@ -222,8 +244,10 @@ bool fetchLatest (ReleaseInfo& info, juce::String& error)
 
 bool isOfficialAssetUrl (const juce::String& url)
 {
-    return url.startsWith ("https://api.github.com/repos/Salamalicul/Studoo/releases/assets/")
-        && url.fromLastOccurrenceOf ("/", false, false).containsOnly ("0123456789");
+    bool fromStudoo = false;
+    for (auto* repo : repositories)
+        fromStudoo = fromStudoo || url.startsWith ("https://api.github.com/repos/" + juce::String (repo) + "/releases/assets/");
+    return fromStudoo && url.fromLastOccurrenceOf ("/", false, false).containsOnly ("0123456789");
 }
 
 bool isSafeAssetName (const juce::String& name)

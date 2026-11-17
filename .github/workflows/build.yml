@@ -6,9 +6,13 @@
 # ============================================================================
 name: Compilar Studoo
 
+# Para ahorrar minutos de GitHub: se compila al subir cambios a una rama de
+# trabajo (no a main, que solo recibe lo ya probado) y al publicar a mano. No se
+# compila si solo cambian textos de documentación.
 on:
   push:
-  pull_request:
+    branches-ignore: [main]
+    paths-ignore: ["**.md", "packaging/play/**", "docs/**"]
   workflow_dispatch:
     inputs:
       version:
@@ -240,6 +244,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      HAS_RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -284,3 +290,29 @@ jobs:
             Studoo-${{ env.TAG }}-Linux.tar.gz
             Studoo-${{ env.TAG }}-Android.apk
             Studoo-${{ env.TAG }}-GooglePlay.aab
+
+      # Repositorio público de descargas (Salamalicul/Studoo-descargas): ahí
+      # buscan las actualizaciones, así el código puede ser privado. Necesita el
+      # secreto RELEASES_TOKEN (token con permiso de escritura en ese repositorio).
+      # El .aab de Google Play no se publica ahí.
+      - name: Reemplazar la versión en el repositorio de descargas
+        if: inputs.reemplazar && env.HAS_RELEASES_TOKEN == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: gh release delete "$TAG" --cleanup-tag --yes --repo Salamalicul/Studoo-descargas || true
+
+      - name: Publicar en el repositorio de descargas
+        if: env.HAS_RELEASES_TOKEN == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: Salamalicul/Studoo-descargas
+          token: ${{ secrets.RELEASES_TOKEN }}
+          name: Studoo ${{ env.TAG }}
+          tag_name: ${{ env.TAG }}
+          body_path: .github/release-notes.md
+          files: |
+            Studoo-${{ env.TAG }}-Instalador-Windows.exe
+            Studoo-${{ env.TAG }}-Windows.zip
+            Studoo-${{ env.TAG }}-Linux.deb
+            Studoo-${{ env.TAG }}-Linux.tar.gz
+            Studoo-${{ env.TAG }}-Android.apk

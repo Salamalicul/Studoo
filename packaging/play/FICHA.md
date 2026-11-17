@@ -13,7 +13,7 @@ Copia y pega estos textos en la Play Console. Están contados para que quepan en
 | **Categoría** | Música y audio |
 | **Etiquetas** | Creación musical, Educación musical, Instrumentos |
 | **Correo de contacto** | Un correo tuyo (se ve en la ficha: mejor uno solo para Studoo) |
-| **Política de privacidad** | `https://github.com/Salamalicul/Studoo/blob/main/PRIVACIDAD.md` |
+| **Política de privacidad** | `https://github.com/Salamalicul/Studoo-descargas/blob/main/PRIVACIDAD.md` |
 
 ## Descripción breve (máx. 80)
 

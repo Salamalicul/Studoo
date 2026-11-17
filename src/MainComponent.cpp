@@ -1301,7 +1301,7 @@ void MainComponent::offerUpdate (const updater::ReleaseInfo& info)
         if (result == 1)
         {
             if (automatic) safe->downloadAndInstall (info);
-            else           juce::URL (updater::releasesPage).launchInDefaultBrowser();
+            else           juce::URL (updater::releasesPage()).launchInDefaultBrowser();
         }
         else if (result == 2)
         {

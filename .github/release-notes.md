@@ -3,6 +3,7 @@
 ### 🆕 Novedades de la versión 1.9
 - 🏪 **Studoo se prepara para Google Play**: nueva versión para la tienda (archivo `.aab`) con **Studoo Pro** (pago único) y **donaciones** para apoyar al creador. En el ordenador y en el APK de GitHub todo sigue gratis y desbloqueado.
 - 📱 Preparado para **Android 16**.
+- 📥 Las descargas y actualizaciones pasan a un repositorio propio, **Studoo-descargas**. Tu Studoo lo encuentra solo, no tienes que hacer nada.
 - 🧪 Más pruebas automáticas: lo que es gratis y lo que es Pro se comprueba solo en cada versión.
 
 ### Novedades de la versión 1.8: Aprende 2.0

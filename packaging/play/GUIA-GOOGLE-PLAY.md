@@ -4,6 +4,28 @@ Sigue los pasos en orden. Los textos para copiar y pegar están en [`FICHA.md`](
 
 ---
 
+## 0. Antes de nada: el repositorio público de descargas
+
+El código de Studoo va a ser **privado**, pero las descargas, las actualizaciones automáticas y la política de privacidad tienen que verse desde fuera. Por eso hay un segundo repositorio, **público**, solo para eso.
+
+1. En GitHub: **New repository**.
+   - Nombre: `Studoo-descargas`.
+   - **Public**.
+   - Marca **"Add a README file"** (tiene que tener al menos un archivo).
+2. Crea un **token** para que GitHub pueda publicar ahí las versiones:
+   - Tu foto (arriba a la derecha) > **Settings** > **Developer settings** > **Personal access tokens** > **Fine-grained tokens** > **Generate new token**.
+   - Nombre: `Studoo descargas`. Caducidad: la máxima.
+   - **Repository access**: "Only select repositories" > `Studoo-descargas`.
+   - **Permissions** > Repository permissions > **Contents: Read and write**.
+   - **Generate token** y copia el texto (empieza por `github_pat_`). Solo se ve una vez.
+3. En el repositorio **Studoo** (el del código): **Settings** > **Secrets and variables** > **Actions** > **New repository secret**.
+   - Nombre: `RELEASES_TOKEN`.
+   - Valor: el token.
+4. Avisa a Claude: subirá la página de descargas y la política de privacidad, y publicará una versión en los dos sitios.
+5. Cuando esa versión esté publicada y los usuarios hayan podido actualizar (unos días), ya puedes poner **Studoo** en **privado**: Settings > General > Danger Zone > **Change visibility** > Private.
+
+⚠️ Licencia de JUCE (la base de Studoo): con el código privado y cobrando, regístrate gratis en la licencia **"Starter"** de JUCE en https://juce.com (vale mientras ganes menos de 20.000 $ al año con Studoo, contando donaciones).
+
 ## 1. Crear la cuenta de desarrollador (una sola vez)
 
 1. Entra en **https://play.google.com/console** con la cuenta de Google que quieras usar (mejor una solo para Studoo).
@@ -33,7 +55,7 @@ En el **Panel**, completa cada apartado con lo que pone en `FICHA.md`:
 ## 4. Subir la app (el archivo .aab)
 
 1. Descarga el archivo **`Studoo-vX.X.X-GooglePlay.aab`** de la última versión en  
-   https://github.com/Salamalicul/Studoo/releases
+   https://github.com/Salamalicul/Studoo/releases (el repositorio del código: solo tú lo ves cuando sea privado)
 2. En la Play Console: **Probar y publicar > Pruebas > Prueba cerrada > Crear canal** (llámalo "Probadores").
 3. **Crear versión** y sube el `.aab`.
 4. Cuando pregunte por la **firma de la app**, deja la opción recomendada: **"Google gestiona y protege la clave de firma de tu app"**. La llave que ya tienes pasa a ser tu **clave de subida**, y Google firma la app que reciben los usuarios.
