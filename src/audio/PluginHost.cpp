@@ -67,7 +67,20 @@ void PluginHost::createInstanceFromXml (const juce::String& descriptionXml, doub
         callback (nullptr, juce::String::fromUTF8 ("Descripción del plugin no válida"));
         return;
     }
-    createInstance (desc, sampleRate, blockSize, std::move (callback));
+
+    // Seguridad: un proyecto que te pasa otra persona podría pedir abrir un
+    // programa cualquiera de tu ordenador haciéndose pasar por un plugin.
+    // Solo abrimos plugins que TÚ has buscado y están en tu lista.
+    for (const auto& known : knownPlugins.getTypes())
+        if (known.fileOrIdentifier == desc.fileOrIdentifier && known.uniqueId == desc.uniqueId
+            && known.pluginFormatName == desc.pluginFormatName)
+        {
+            createInstance (known, sampleRate, blockSize, std::move (callback));
+            return;
+        }
+
+    callback (nullptr, juce::String::fromUTF8 ("Este proyecto usa el plugin \"") + desc.name
+                           + juce::String::fromUTF8 ("\", que no está en tu lista de plugins. Búscalo con el botón Plugins."));
 }
 
 void PluginHost::showScanner (juce::Component* centreAround)

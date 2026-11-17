@@ -263,7 +263,12 @@ juce::Array<juce::File> chosenFiles (const juce::FileChooser& fc, const juce::Fi
         if (name.isEmpty())
             name = "sonido.wav";
         importFolder.createDirectory();
-        auto dest = importFolder.getChildFile (juce::File::createLegalFileName (name));
+        name = juce::File::createLegalFileName (name).trimCharactersAtStart (".");   // sin "..", sin carpetas
+        if (name.isEmpty())
+            name = "sonido.wav";
+        auto dest = importFolder.getChildFile (name);
+        if (dest.getParentDirectory() != importFolder)
+            continue;
         if (auto in = doc.createInputStream())
         {
             dest.deleteFile();

@@ -34,6 +34,14 @@ namespace studoo::updater
     // Consulta la última versión publicada. Devuelve false si no hay internet.
     bool fetchLatest (ReleaseInfo& info, juce::String& error);
 
+    // Seguridad: solo se descargan archivos de la release oficial de Studoo en
+    // GitHub, por HTTPS y con un nombre normal (sin carpetas ni "..").
+    bool isOfficialAssetUrl (const juce::String& url);
+    bool isSafeAssetName (const juce::String& name);
+
+    // Carpeta privada del usuario donde se guardan las descargas
+    juce::File downloadFolder();
+
     // Descarga un archivo. Devuelve false si falla.
     bool download (const juce::String& url, const juce::File& destination, juce::String& error);
 
