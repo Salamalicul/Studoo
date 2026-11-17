@@ -57,10 +57,10 @@ namespace
     {
     public:
         ExportJob (AudioEngine& e, juce::AudioDeviceManager& dm, juce::File targetFile, juce::File lameExe,
-                   std::function<void (bool, const juce::String&)> onDone)
+                   std::function<void (bool, const juce::String&)> onDone, double maxSecondsToExport = 0.0)
             : ThreadWithProgressWindow (txt ("Exportando tu canción..."), true, true),
               engine (e), deviceManager (dm), target (std::move (targetFile)), lame (std::move (lameExe)),
-              done (std::move (onDone))
+              done (std::move (onDone)), maxSeconds (maxSecondsToExport)
         {
             deviceManager.removeAudioCallback (&engine);
         }
@@ -79,7 +79,7 @@ namespace
             {
                 setProgress (p * (mp3 ? 0.8 : 1.0));
                 return ! threadShouldExit();
-            }, error);
+            }, error, maxSeconds);
 
             if (ok && mp3)
             {
@@ -114,6 +114,7 @@ namespace
         std::function<void (bool, const juce::String&)> done;
         bool ok = false;
         juce::String error;
+        double maxSeconds = 0.0;
     };
 }
 
@@ -144,9 +145,11 @@ MainComponent::MainComponent()
     settings = std::make_unique<juce::PropertiesFile> (options);
 
     pluginHost = std::make_unique<PluginHost> (*settings);
+    pro::start (settings.get());
     ctx.reset (new AppContext { project, engine, samples, *pluginHost, *settings, {}, {}, {} });
     ctx->showView = [this] (View v) { showView (v); };
     ctx->showMixerPluginMenu = [this] (int track) { showMixerPluginMenu (track); };
+    ctx->showPro = [this] (const juce::String& reason) { proScreen.show (reason); };
 
     // --- Pantallas ----------------------------------------------------------------
     toolbar = std::make_unique<Toolbar> (*ctx);
@@ -166,6 +169,11 @@ MainComponent::MainComponent()
     learnView->onGoToView = [this] (View v) { showView (v); };
     learnView->onLoadGenre = [this] (const juce::String& genre)
     {
+        if (! pro::isGenreFree (genre))
+        {
+            proScreen.show (txt ("La base de ") + genres::nameOf (genre) + txt (" es de Studoo Pro"));
+            return;
+        }
         // La base va en un patrón nuevo: así no se borra nada de lo que ya tenías
         project.beginTransaction();
         auto pattern = project.addPattern (txt ("Base ") + genres::nameOf (genre));
@@ -203,6 +211,33 @@ MainComponent::MainComponent()
     }
 
     addChildComponent (tutorial);
+    addChildComponent (proScreen);
+
+    // Avisos de la tienda de Google Play
+    pro::setEventHandler ([this] (const juce::String& event)
+    {
+        if (event == "pro_comprado")
+        {
+            learnView->resized();
+            learnView->repaint();
+            showMessage (txt ("¡Ya tienes Studoo Pro!"),
+                         txt ("Muchas gracias por apoyar Studoo. Ya tienes desbloqueados todos los kits, sonidos, bases, "
+                              "Aprende completo y la exportación sin límite."));
+        }
+        else if (event == "donacion_ok")
+        {
+            showMessage (txt ("¡Muchísimas gracias!"), txt ("Tu donación ayuda a que Studoo siga mejorando. ¡Eres un crack!"));
+        }
+        else if (event == "pendiente")
+        {
+            showMessage (txt ("Pago pendiente"), txt ("Google Play está terminando de procesar tu pago. "
+                                                      "Cuando se complete, Studoo se desbloqueará solo."));
+        }
+        else if (event.startsWith ("error:"))
+        {
+            showMessage (txt ("No se pudo completar el pago"), event.fromFirstOccurrenceOf ("error:", false, false));
+        }
+    });
     tutorial.onFinished = [this]
     {
         settings->setValue ("tutorialDone", true);
@@ -241,8 +276,12 @@ MainComponent::MainComponent()
     // Buscar una versión nueva de Studoo unos segundos después de abrir
     juce::Timer::callAfterDelay (6000, [safe]
     {
+       #if ! STUDOO_PLAY
         if (safe != nullptr && safe->settings->getBoolValue ("autoUpdate", true) && ! safe->tutorial.isRunning())
             safe->checkForUpdates (false);
+       #else
+        juce::ignoreUnused (safe);
+       #endif
     });
 }
 
@@ -476,8 +515,16 @@ void MainComponent::showFileMenu()
         menu.addSubMenu (txt ("Tamaño de pantalla"), screen);
         menu.addSeparator();
     }
+    if (pro::hasStore())
+    {
+        menu.addItem (30, pro::isUnlocked() ? txt ("Studoo Pro (desbloqueado)  ·  Apoya Studoo") : txt ("Conseguir Studoo Pro  ·  Apoya Studoo"));
+        menu.addSeparator();
+    }
+   #if ! STUDOO_PLAY
+    // (En Google Play las actualizaciones las hace la tienda)
     menu.addItem (11, txt ("Buscar actualizaciones"));
     menu.addItem (12, txt ("Buscar actualizaciones al abrir Studoo"), true, settings->getBoolValue ("autoUpdate", true));
+   #endif
    #if ! JUCE_ANDROID
     menu.addSeparator();
     menu.addItem (10, txt ("Salir"));
@@ -511,6 +558,7 @@ void MainComponent::showFileMenu()
                 saveProject ([this] { shareFile (project.getFile()); });
                 break;
             case 14: importProject(); break;
+            case 30: proScreen.show ({}); break;
             case 12:
                 settings->setValue ("autoUpdate", ! settings->getBoolValue ("autoUpdate", true));
                 settings->saveIfNeeded();
@@ -693,13 +741,43 @@ juce::File MainComponent::findLame()
     return {};
 }
 
-void MainComponent::exportSong (bool mp3)
+void MainComponent::exportSong (bool mp3, double maxSeconds)
 {
     if (project.playlist().getNumChildren() == 0)
     {
         showMessage (txt ("La playlist está vacía"),
                      txt ("Se exporta la canción de la PLAYLIST. Coloca primero tus patrones en la playlist (F5)."));
         return;
+    }
+
+    // Versión gratis: se exporta como mucho 1 minuto
+    if (maxSeconds < 0.0)
+    {
+        const double bpm = project.getState().getProperty (ids::bpm, 140.0);
+        const double songSeconds = project.getSongLengthSteps() * 60.0 / juce::jmax (40.0, bpm) / stepsPerBeat;
+        if (pro::isUnlocked() || songSeconds <= pro::freeExportSeconds)
+        {
+            maxSeconds = 0.0;
+        }
+        else
+        {
+            juce::Component::SafePointer<MainComponent> safe (this);
+            juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                              .withIconType (juce::MessageBoxIconType::NoIcon)
+                                              .withTitle (txt ("Tu canción dura más de 1 minuto"))
+                                              .withMessage (txt ("La versión gratis exporta el primer minuto de la canción. "
+                                                                 "Con Studoo Pro puedes exportarla entera, dure lo que dure."))
+                                              .withButton (txt ("Exportar 1 minuto"))
+                                              .withButton (txt ("Ver Studoo Pro"))
+                                              .withButton (txt ("Cancelar")),
+                                          [safe, mp3] (int r)
+            {
+                if (safe == nullptr) return;
+                if (r == 1)      safe->exportSong (mp3, pro::freeExportSeconds);
+                else if (r == 2) safe->proScreen.show (txt ("Exportar canciones enteras es de Studoo Pro"));
+            });
+            return;
+        }
     }
 
     juce::File lame;
@@ -751,7 +829,7 @@ void MainComponent::exportSong (bool mp3)
                                               .withButton (txt ("Compartir"))
                                               .withButton (txt ("Cerrar")),
                                           [safe, f] (int r) { if (safe != nullptr && r == 1) safe->shareFile (f); });
-        });
+        }, maxSeconds);
         job->launchThread();
         return;
     }
@@ -763,7 +841,7 @@ void MainComponent::exportSong (bool mp3)
                                                    "*" + ext);
     chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
                               | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this, lame, ext] (const juce::FileChooser& fc)
+                          [this, lame, ext, maxSeconds] (const juce::FileChooser& fc)
     {
         auto f = fc.getResult();
         if (f == juce::File())
@@ -783,7 +861,7 @@ void MainComponent::exportSong (bool mp3)
             {
                 showMessage (txt ("No se pudo exportar"), error);
             }
-        });
+        }, maxSeconds);
         job->launchThread();
     });
 }
@@ -1030,6 +1108,7 @@ void MainComponent::startTutorial()
 
     juce::ignoreUnused (rowOf);
     tutorial.setBounds (getLocalBounds());
+    proScreen.setBounds (getLocalBounds());
     tutorial.start (std::move (steps));
 }
 
@@ -1412,6 +1491,8 @@ void MainComponent::requestQuit (std::function<void()> quit)
 
 void MainComponent::timerCallback()
 {
+    pro::poll();
+
     if (++autosaveCounter >= 60)
     {
         autosaveCounter = 0;
@@ -1516,6 +1597,7 @@ void MainComponent::resized()
         for (auto* v : views)
             v->setBounds (content);
         tutorial.setBounds (getLocalBounds());
+    proScreen.setBounds (getLocalBounds());
         return;
     }
 
@@ -1537,6 +1619,7 @@ void MainComponent::resized()
         v->setBounds (content);
 
     tutorial.setBounds (getLocalBounds());
+    proScreen.setBounds (getLocalBounds());
 }
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)

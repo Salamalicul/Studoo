@@ -134,8 +134,18 @@ jobs:
   #  de versión, por ejemplo v1.0.0
   # --------------------------------------------------------------------------
   android:
-    name: Android (tablet)
+    name: Android (${{ matrix.nombre }})
     runs-on: ubuntu-22.04
+    # Dos versiones: la de GitHub (APK con actualizador) y la de Google Play
+    # (AAB con Studoo Pro y donaciones, sin actualizador)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nombre: GitHub
+            play: "0"
+          - nombre: Google Play
+            play: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -164,6 +174,8 @@ jobs:
       - name: Crear el proyecto de Android
         env:
           STUDOO_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          STUDOO_PLAY: ${{ matrix.play }}
+          STUDOO_PLAY_LICENSE_KEY: ${{ secrets.PLAY_LICENSE_KEY }}
         run: |
           python3 packaging/android/generate_jucer.py
           projucer-build/extras/Projucer/Projucer_artefacts/Release/Projucer --resave packaging/android/Studoo.jucer
@@ -171,7 +183,7 @@ jobs:
       - name: Instalar NDK y CMake de Android
         run: |
           NDK=$(sed -n 's/.*ndkVersionString = "\(.*\)".*/\1/p' packaging/android/Builds/Android/app/build.gradle)
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK" "cmake;3.22.1" > /dev/null
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK" "cmake;3.22.1" "platforms;android-36" > /dev/null
 
       # La firma de la app. Si el repositorio tiene el secreto ANDROID_KEYSTORE_BASE64 (una clave
       # con alias "studoo" y la contraseña del secreto ANDROID_KEYSTORE_PASSWORD, o "android" si no
@@ -191,6 +203,7 @@ jobs:
           fi
 
       - name: Compilar la app (APK)
+        if: matrix.play == '0'
         working-directory: packaging/android/Builds/Android
         run: |
           chmod +x gradlew
@@ -199,9 +212,26 @@ jobs:
           cp "$(find app/build/outputs/apk -name '*.apk' | head -1)" "$GITHUB_WORKSPACE/dist/Studoo-Android.apk"
 
       - uses: actions/upload-artifact@v4
+        if: matrix.play == '0'
         with:
           name: Studoo-Android
           path: dist/Studoo-Android.apk
+
+      # El archivo que se sube a la Play Console (Producción o Pruebas)
+      - name: Compilar para Google Play (AAB)
+        if: matrix.play == '1'
+        working-directory: packaging/android/Builds/Android
+        run: |
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon --stacktrace
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp "$(find app/build/outputs/bundle -name '*.aab' | head -1)" "$GITHUB_WORKSPACE/dist/Studoo-GooglePlay.aab"
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.play == '1'
+        with:
+          name: Studoo-GooglePlay
+          path: dist/Studoo-GooglePlay.aab
 
   release:
     name: Publicar release

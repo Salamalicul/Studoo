@@ -1,6 +1,7 @@
 #include "ChannelRack.h"
 #include "HelpTexts.h"
 #include "model/GenreBeats.h"
+#include "Pro.h"
 
 namespace studoo
 {
@@ -422,7 +423,8 @@ ChannelRack::ChannelRack (AppContext& c)
         menu.addSectionHeader (txt ("Bases de géneros (batería, bajo y acordes)"));
         int item = 100;
         for (auto& genre : genres::all())
-            menu.addItem (item++, txt (genre.name) + "  (" + juce::String (juce::roundToInt (genre.bpm)) + " BPM)");
+            menu.addItem (item++, txt (genre.name) + "  (" + juce::String (juce::roundToInt (genre.bpm)) + " BPM)"
+                                      + (pro::isGenreFree (genre.id) ? juce::String() : txt ("  · Pro")));
         juce::Component::SafePointer<ChannelRack> safe (this);
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&exampleButton),
                             [safe] (int result)
@@ -433,7 +435,16 @@ ChannelRack::ChannelRack (AppContext& c)
                                 if (result == 1)
                                     safe->ctx.project.loadExampleBeat (safe->getPattern());
                                 else if (result >= 100 && result - 100 < (int) genres::all().size())
-                                    genres::load (safe->ctx.project, safe->getPattern(), genres::all()[(size_t) (result - 100)].id);
+                                {
+                                    const auto& genre = genres::all()[(size_t) (result - 100)];
+                                    if (! pro::isGenreFree (genre.id))
+                                    {
+                                        if (safe->ctx.showPro)
+                                            safe->ctx.showPro (txt ("La base de ") + txt (genre.name) + txt (" es de Studoo Pro"));
+                                        return;
+                                    }
+                                    genres::load (safe->ctx.project, safe->getPattern(), genre.id);
+                                }
                             });
     };
     makeNonFocusing (exampleButton);
@@ -808,7 +819,8 @@ void ChannelRack::showAddMenu()
         sub.addSeparator();
         for (size_t i = 0; i < kit.sounds.size(); ++i)
             sub.addItem (1000 + (int) k * 50 + (int) i, txt ("Añadir solo: ") + txt (kit.sounds[i].name));
-        drumKits.addSubMenu (txt (kit.name) + "  (" + juce::String ((int) kit.sounds.size()) + ")", sub);
+        drumKits.addSubMenu (txt (kit.name) + "  (" + juce::String ((int) kit.sounds.size()) + ")"
+                                 + (pro::isKitFree (kit.id) ? juce::String() : txt ("  · Pro")), sub);
     }
 
     juce::PopupMenu synths;
@@ -816,17 +828,19 @@ void ChannelRack::showAddMenu()
     synths.addSeparator();
     synths.addSectionHeader (txt ("Sonidos ya preparados"));
     for (size_t i = 0; i < kits::synthPresets().size(); ++i)
-        synths.addItem (3000 + (int) i, txt (kits::synthPresets()[i].name) + "  -  " + txt (kits::synthPresets()[i].description));
+        synths.addItem (3000 + (int) i, txt (kits::synthPresets()[i].name) + "  -  " + txt (kits::synthPresets()[i].description)
+                                            + (pro::isSynthPresetFree ((int) i) ? juce::String() : txt ("  · Pro")));
 
     juce::PopupMenu basses;
     for (size_t i = 0; i < kits::bass808Presets().size(); ++i)
-        basses.addItem (4000 + (int) i, txt (kits::bass808Presets()[i].name) + "  -  " + txt (kits::bass808Presets()[i].description));
+        basses.addItem (4000 + (int) i, txt (kits::bass808Presets()[i].name) + "  -  " + txt (kits::bass808Presets()[i].description)
+                                            + (pro::is808PresetFree ((int) i) ? juce::String() : txt ("  · Pro")));
 
     menu.addSectionHeader (txt ("Sonidos incluidos en Studoo"));
     menu.addSubMenu (txt ("Kits de batería"), drumKits);
     menu.addSubMenu ("808", basses);
     menu.addSubMenu (txt ("Sintetizador"), synths);
-    menu.addSubMenu (txt ("Efectos (FX)"), effects);
+    menu.addSubMenu (txt ("Efectos (FX)") + (pro::isKitFree ("fx") ? juce::String() : txt ("  · Pro")), effects);
     menu.addSeparator();
     menu.addSectionHeader (txt ("Tus propios sonidos"));
     menu.addItem (1, txt ("Sample (WAV, MP3...)"));
@@ -846,6 +860,26 @@ void ChannelRack::showAddMenu()
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addButton), [this, instruments] (int result)
     {
+        // Versión gratis: lo que es de Studoo Pro abre su pantalla
+        {
+            juce::String locked;
+            const auto& all = kits::all();
+            if (result >= 200 && result < 200 + (int) all.size() * 2 && ! pro::isKitFree (all[(size_t) (result - 200) / 2].id))
+                locked = txt ("El kit ") + txt (all[(size_t) (result - 200) / 2].name) + txt (" es de Studoo Pro");
+            else if (result >= 1000 && result < 3000 && (size_t) (result - 1000) / 50 < all.size()
+                     && ! pro::isKitFree (all[(size_t) (result - 1000) / 50].id))
+                locked = txt ("Los sonidos del kit ") + txt (all[(size_t) (result - 1000) / 50].name) + txt (" son de Studoo Pro");
+            else if (result >= 3000 && result < 4000 && ! pro::isSynthPresetFree (result - 3000))
+                locked = txt ("Este sonido de sintetizador es de Studoo Pro");
+            else if (result >= 4000 && result < 5000 && ! pro::is808PresetFree (result - 4000))
+                locked = txt ("Este tipo de 808 es de Studoo Pro");
+            if (locked.isNotEmpty())
+            {
+                if (ctx.showPro) ctx.showPro (locked);
+                return;
+            }
+        }
+
         if (result == 1)
         {
             chooser = std::make_unique<juce::FileChooser> (txt ("Elige uno o varios samples"), juce::File(),

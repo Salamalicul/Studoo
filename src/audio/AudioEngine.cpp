@@ -440,7 +440,7 @@ AudioEngine::RecordingResult AudioEngine::stopRecording()
 //  Exportación
 // ============================================================================
 bool AudioEngine::renderSongToFile (const juce::File& wavFile, double exportRate,
-                                    std::function<bool (float)> keepGoing, juce::String& error)
+                                    std::function<bool (float)> keepGoing, juce::String& error, double maxSeconds)
 {
     const double oldRate = sampleRate;
     const int oldBlock = blockSize;
@@ -481,7 +481,9 @@ bool AudioEngine::renderSongToFile (const juce::File& wavFile, double exportRate
         playing.store (true);
 
         const double samplesPerStep = exportRate * 60.0 / bpm / stepsPerBeat;
-        const auto songSamples = (juce::int64) (songLength * samplesPerStep);
+        auto songSamples = (juce::int64) (songLength * samplesPerStep);
+        if (maxSeconds > 0.0)
+            songSamples = juce::jmin (songSamples, (juce::int64) (maxSeconds * exportRate));
         const auto totalSamples = songSamples + (juce::int64) (exportRate * 2.0); // 2 s de cola (reverb, delay...)
 
         juce::AudioBuffer<float> out (2, chunk);

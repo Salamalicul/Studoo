@@ -7,6 +7,7 @@
 #include "LearnQuiz.h"
 #include "LearnStyle.h"
 #include "LearnTexts.h"
+#include "Pro.h"
 #include <iterator>
 
 namespace studoo
@@ -85,6 +86,19 @@ namespace
         g.setFont (font);
         g.drawText (text, r, juce::Justification::centred);
         return r;
+    }
+
+    // Candado pequeño (cosas de Studoo Pro)
+    void drawLock (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c)
+    {
+        const float s = juce::jmin (r.getWidth(), r.getHeight());
+        auto body = juce::Rectangle<float> (s * 0.64f, s * 0.46f).withCentre ({ r.getCentreX(), r.getCentreY() + s * 0.14f });
+        juce::Path shackle;
+        shackle.addCentredArc (r.getCentreX(), body.getY(), s * 0.2f, s * 0.22f, 0.0f,
+                               -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, true);
+        g.setColour (c);
+        g.strokePath (shackle, juce::PathStrokeType (s * 0.1f));
+        g.fillRoundedRectangle (body, s * 0.08f);
     }
 
     // Dibujo de cada medalla
@@ -958,7 +972,7 @@ private:
         g.drawText (done == total ? txt ("✓") : juce::String (level + 1), numberArea, juce::Justification::centred);
         r.removeFromLeft (10.0f);
 
-        auto progressText = juce::String (done) + "/" + juce::String (total);
+        auto progressText = pro::isLearnLevelFree (level) ? juce::String (done) + "/" + juce::String (total) : txt ("PRO");
         g.setColour (Colours::textDim);
         g.setFont (Fonts::bold (fs (12.0f)));
         auto right = r.removeFromRight (fs (40.0f));
@@ -991,7 +1005,14 @@ private:
 
         const float d = fs (22.0f);
         auto badge = juce::Rectangle<float> (d, d).withCentre ({ r.getX() + 10.0f + d * 0.5f, r.getCentreY() });
-        if (done)
+        const bool locked = ! pro::isLearnLevelFree (levelOf (lesson));
+        if (locked)
+        {
+            g.setColour (Colours::accent.withAlpha (0.18f));
+            g.fillEllipse (badge);
+            drawLock (g, badge.reduced (d * 0.24f), Colours::accentLight);
+        }
+        else if (done)
         {
             Draw::colourFill (g, badge, Colours::green, d * 0.5f);
             juce::Path tick;
@@ -1481,7 +1502,7 @@ void LearnView::setSettings (juce::PropertiesFile* s)
     progress.setSettings (s);
     // Volvemos a la primera lección sin terminar
     for (int i = 0; i < numLessons; ++i)
-        if (! isDone (i))
+        if (! isDone (i) && pro::isLearnLevelFree (levelOf (i)))
         {
             showLesson (i, false);
             break;
@@ -1520,6 +1541,13 @@ void LearnView::playCelebration()
 
 void LearnView::showTab (Tab t)
 {
+    if ((t == Tab::games && ! pro::areGamesFree()) || (t == Tab::achievements && ! pro::areAchievementsFree()))
+    {
+        if (ctx.showPro)
+            ctx.showPro (t == Tab::games ? txt ("Los juegos de oído son de Studoo Pro")
+                                         : txt ("Los logros y la racha son de Studoo Pro"));
+        t = tab;   // nos quedamos donde estábamos
+    }
     tab = t;
     for (int i = 0; i < tabButtons.size(); ++i)
         tabButtons[i]->setToggleState (i == (int) t, juce::dontSendNotification);
@@ -1530,7 +1558,16 @@ void LearnView::showTab (Tab t)
 
 void LearnView::showLesson (int lesson, bool openOnPhone)
 {
-    lessonIndex = juce::jlimit (0, numLessons - 1, lesson);
+    lesson = juce::jlimit (0, numLessons - 1, lesson);
+    if (! pro::isLearnLevelFree (levelOf (lesson)))
+    {
+        if (openOnPhone && ctx.showPro)
+            ctx.showPro (txt ("El nivel \"") + levelName (levelOf (lesson)) + txt ("\" es de Studoo Pro"));
+        if (lessonIndex >= 0)
+            return;
+        lesson = 0;
+    }
+    lessonIndex = lesson;
     article->setLesson (lessonIndex);
     if (openOnPhone)
         phoneShowsArticle = true;
@@ -1651,6 +1688,8 @@ void LearnView::updateLayout()
     {
         auto t = tabsArea;
         const int w = phone ? t.getWidth() / 4 : juce::jmin (150, t.getWidth() / 4);
+        tabButtons[1]->setButtonText (pro::areGamesFree() ? txt ("Juegos") : txt ("Juegos · Pro"));
+        tabButtons[2]->setButtonText (pro::areAchievementsFree() ? txt ("Logros") : txt ("Logros · Pro"));
         for (auto* b : tabButtons)
         {
             b->setBounds (t.removeFromLeft (w).reduced (2, 0));

@@ -63,6 +63,8 @@ target_sources(Studoo PRIVATE
     src/Main.cpp
     src/MainComponent.cpp
     src/Updater.cpp
+    src/Pro.cpp
+    src/ui/ProScreen.cpp
     src/ui/StudooLookAndFeel.cpp
     src/ui/Widgets.cpp
     src/ui/HelpButton.cpp
