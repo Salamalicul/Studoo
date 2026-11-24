@@ -27,6 +27,18 @@ void MixerTrack::prepare (double sampleRate, int maxBlockSize)
 
     reverb.setSampleRate (sampleRate);
     reverb.reset();
+
+    filter.prepare (spec);
+    filter.setResonance (0.9f);
+    lastFilter = 0.0f;
+    chorus.prepare (spec);
+    chorus.setRate (0.8f);
+    chorus.setDepth (0.35f);
+    chorus.setCentreDelay (8.0f);
+    chorus.setFeedback (0.0f);
+    limiter.prepare (spec);
+    limiter.setThreshold (-1.0f);
+    limiter.setRelease (120.0f);
 }
 
 void MixerTrack::reset()
@@ -37,6 +49,9 @@ void MixerTrack::reset()
     compressor.reset();
     delayLine.clear();
     reverb.reset();
+    filter.reset();
+    chorus.reset();
+    limiter.reset();
 }
 
 void MixerTrack::updateEq (const TrackParams& p)
@@ -82,6 +97,42 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         }
     }
 
+    // --- Filtro: hacia la izquierda quita agudos, hacia la derecha quita graves ---
+    if (std::abs (p.filter) > 0.02f)
+    {
+        if (! juce::approximatelyEqual (p.filter, lastFilter))
+        {
+            lastFilter = p.filter;
+            if (p.filter < 0.0f)
+            {
+                filter.setType (juce::dsp::StateVariableTPTFilterType::lowpass);
+                filter.setCutoffFrequency ((float) juce::jmin (sr * 0.45, 20000.0 * std::pow (0.005, (double) -p.filter)));
+            }
+            else
+            {
+                filter.setType (juce::dsp::StateVariableTPTFilterType::highpass);
+                filter.setCutoffFrequency ((float) juce::jmin (sr * 0.45, 20.0 * std::pow (250.0, (double) p.filter)));
+            }
+        }
+        juce::dsp::AudioBlock<float> block (buffer);
+        auto sub = block.getSubBlock (0, (size_t) n);
+        filter.process (juce::dsp::ProcessContextReplacing<float> (sub));
+    }
+
+    // --- Distorsión (saturación suave) ---------------------------------------------
+    if (p.distortion > 0.01f)
+    {
+        const float k = 1.0f + p.distortion * 14.0f;
+        const float norm = 1.0f / std::tanh (k);
+        const float makeup = 1.0f / (1.0f + p.distortion * 0.6f);
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            float* d = buffer.getWritePointer (ch);
+            for (int i = 0; i < n; ++i)
+                d[i] = std::tanh (d[i] * k) * norm * makeup;
+        }
+    }
+
     // --- Compresor --------------------------------------------------------------
     if (p.compOn)
     {
@@ -93,6 +144,15 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         // Ganancia de compensación aproximada
         const float makeup = juce::Decibels::decibelsToGain (-p.compThreshold * (1.0f - 1.0f / juce::jmax (1.0f, p.compRatio)) * 0.5f);
         buffer.applyGain (0, n, makeup);
+    }
+
+    // --- Chorus (sonido más ancho y "doble") -------------------------------------------
+    if (p.chorusMix > 0.01f)
+    {
+        chorus.setMix (juce::jlimit (0.0f, 1.0f, p.chorusMix) * 0.6f);
+        juce::dsp::AudioBlock<float> block (buffer);
+        auto sub = block.getSubBlock (0, (size_t) n);
+        chorus.process (juce::dsp::ProcessContextReplacing<float> (sub));
     }
 
     // --- Delay (eco sincronizado con el BPM) --------------------------------------
@@ -169,6 +229,14 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         const float gr = p.volume * std::sin (angle) * juce::MathConstants<float>::sqrt2;
         buffer.applyGain (0, 0, n, gl);
         buffer.applyGain (1, 0, n, gr);
+    }
+
+    // --- Limitador: nada pasa de -1 dB (el Master lo trae encendido) ---------------------
+    if (p.limiter && ! silenced)
+    {
+        juce::dsp::AudioBlock<float> block (buffer);
+        auto sub = block.getSubBlock (0, (size_t) n);
+        limiter.process (juce::dsp::ProcessContextReplacing<float> (sub));
     }
 
     // --- Medidor ---------------------------------------------------------------------------

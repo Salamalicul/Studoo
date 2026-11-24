@@ -65,6 +65,28 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
                                   ids::root, 24, 96, 60);
             root->getSlider().setRange (24, 96, 1);
             root->setDisplayFunction ([] (double v) { return noteName ((int) v); });
+
+            auto* tune = addKnob ("Tono", txt ("Sube o baja el tono del sample en semitonos (12 = una octava)."),
+                                  ids::sampleTune, -24.0, 24.0, 0.0);
+            tune->getSlider().setRange (-24.0, 24.0, 1.0);
+            tune->setDisplayFunction ([] (double v) { const int s = (int) std::round (v); return (s > 0 ? "+" : "") + juce::String (s) + " st"; });
+            auto pct = [] (double v) { return juce::String ((int) std::round (v * 100.0)) + "%"; };
+            addKnob ("Inicio", txt ("Desde dónde empieza a sonar el sample. Súbelo para quitar el principio."),
+                     ids::sampleStart, 0.0, 1.0, 0.0)->setDisplayFunction (pct);
+            addKnob ("Final", txt ("Dónde termina el sample. Bájalo para cortarlo antes."),
+                     ids::sampleEnd, 0.0, 1.0, 1.0)->setDisplayFunction (pct);
+            auto* slices = addKnob ("Trozos", txt ("Corta el sample en trozos iguales (chops). Cada nota del piano roll toca un trozo distinto: "
+                                                   "la nota base es el trozo 1, la siguiente el 2..."),
+                                    ids::slices, 1.0, 16.0, 1.0);
+            slices->getSlider().setRange (1.0, 16.0, 1.0);
+            slices->setDisplayFunction ([] (double v) { const int n = (int) std::round (v); return n <= 1 ? txt ("Entero") : juce::String (n) + " trozos"; });
+
+            auto* reverse = new juce::ToggleButton (txt ("Al revés"));
+            reverse->setTooltip (txt ("El sample suena del final al principio (efecto \"reverse\")."));
+            reverse->getToggleStateValue().referTo (channel.getPropertyAsValue (ids::reverse, ctx.project.um()));
+            makeNonFocusing (*reverse);
+            controls.add (reverse);
+            addAndMakeVisible (reverse);
             break;
         }
         case ChannelType::synth:
@@ -95,6 +117,12 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
             addKnob ("Resonancia", txt ("Realza la zona del filtro (sonido más \"chillón\")."), ids::resonance, 0.0, 1.0, 0.2);
             addKnob ("Desafinar", txt ("Separa los dos osciladores: sonido más ancho."), ids::detune, 0.0, 50.0, 8.0)
                 ->setValueSuffix (" cents", 0);
+            addKnob ("LFO vel.", txt ("Velocidad del LFO: lo rápido que el filtro sube y baja solo (el \"wobble\" del dubstep)."),
+                     ids::lfoRate, 0.1, 20.0, 4.0, 3.0)
+                ->setDisplayFunction ([] (double v) { return juce::String (v, 1) + " Hz"; });
+            addKnob ("LFO cant.", txt ("Cuánto mueve el LFO el filtro. A 0 no hace nada."),
+                     ids::lfoAmount, 0.0, 1.0, 0.0)
+                ->setDisplayFunction ([] (double v) { return juce::String ((int) std::round (v * 100.0)) + "%"; });
             break;
         }
         case ChannelType::bass808:
@@ -223,7 +251,8 @@ void InstrumentPanel::resized()
     {
         int w = 60;
         if (dynamic_cast<juce::TextButton*> (c) != nullptr)   w = 130;
-        if (dynamic_cast<juce::ToggleButton*> (c) != nullptr) w = 190;
+        if (auto* tb = dynamic_cast<juce::ToggleButton*> (c))
+            w = juce::GlyphArrangement::getStringWidthInt (juce::FontOptions (15.0f), tb->getButtonText()) + 44;
         if (dynamic_cast<juce::ComboBox*> (c) != nullptr)     w = 110;
 
         auto slot = area.removeFromLeft (w);

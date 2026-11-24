@@ -35,7 +35,8 @@ namespace studoo
     struct AutomationTarget
     {
         enum class Kind { mixer, channel, invalid };
-        enum class Param { volume, pan, reverbMix, delayMix, cutoff, eqLow, eqHigh, invalid };
+        enum class Param { volume, pan, reverbMix, delayMix, cutoff, eqLow, eqHigh,
+                           eqMid, trackFilter, distortion, chorusMix, invalid };
 
         Kind kind = Kind::invalid;
         int index = 0;  // número de pista del mezclador o uid del canal

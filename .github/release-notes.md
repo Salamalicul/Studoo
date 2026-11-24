@@ -1,6 +1,17 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.9
+### 🆕 Novedades de la versión 2.0: más cerca de un estudio profesional
+- 🎚️ **Velocity de cada nota**: debajo del Piano roll hay un carril con una barra por nota. Arrástrala para que suene más fuerte o más suave.
+- 🧲 **Cuantizar**: un botón coloca todas las notas justo en la cuadrícula.
+- 💃 **Swing**: el ritmo "baila" (arriba en el Secuenciador). Las bases de lo-fi y boom bap ya lo traen.
+- 🔊 **Sidechain de verdad**: el famoso "bombeo". En el Mezclador eliges la pista del bombo y cuánto se agacha cada pista. Las bases de house y techno ya lo traen puesto.
+- 🎛️ **Efectos nuevos en cada pista**: filtro (quita agudos o graves), distorsión, chorus y limitador (el Master lo trae encendido para que nada se rompa).
+- ✂️ **Editar samples**: tono, inicio, final, **al revés** y **trozos (chops)** para tocar cada parte del sample con una nota distinta.
+- 🌊 **LFO en el sintetizador**: el filtro se mueve solo (el "wobble").
+- 📈 **Automatiza más cosas**: medios de la EQ, filtro, distorsión y chorus.
+- 🎓 **Aprende**: 2 lecciones nuevas (Chops y Efectos creativos), lecciones actualizadas, 5 retos nuevos, 6 preguntas y 6 palabras nuevas en el diccionario.
+
+### Novedades de la versión 1.9
 - 🏪 **Studoo se prepara para Google Play**: nueva versión para la tienda (archivo `.aab`) con **Studoo Pro** (pago único) y **donaciones** para apoyar al creador. En el ordenador y en el APK de GitHub todo sigue gratis y desbloqueado.
 - 📱 Preparado para **Android 16**.
 - 📥 Las descargas y actualizaciones pasan a un repositorio propio, **Studoo-descargas**. Tu Studoo lo encuentra solo, no tienes que hacer nada.

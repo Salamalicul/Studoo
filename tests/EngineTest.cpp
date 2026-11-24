@@ -281,6 +281,117 @@ int main (int argc, char* argv[])
     }
 
     // --- Exportar ------------------------------------------------------------------------------
+    // --- Studoo 2.0: sampler, swing, sidechain y efectos nuevos ----------------------------------
+    std::cout << "Funciones nuevas (sampler, swing, sidechain, efectos)\n";
+    {
+        // Prepara un proyecto con solo el bombo en los pasos indicados y lo hace sonar
+        auto renderKick = [&cache] (std::function<void (Project&, juce::ValueTree kick)> setup, double seconds)
+        {
+            Project p;
+            auto kick = p.findChannelByBuiltin ("builtin:kick");
+            setup (p, kick);
+            AudioEngine e;
+            e.prepare (sampleRate, blockSize);
+            e.updateFromProject (p.getState(), cache);
+            e.play();
+            return renderSeconds (e, seconds);
+        };
+        auto lastSound = [] (const juce::AudioBuffer<float>& b)
+        {
+            for (int i = b.getNumSamples(); --i >= 0;)
+                if (std::abs (b.getSample (0, i)) > 1.0e-3f)
+                    return i;
+            return 0;
+        };
+        auto firstSound = [] (const juce::AudioBuffer<float>& b)
+        {
+            for (int i = 0; i < b.getNumSamples(); ++i)
+                if (std::abs (b.getSample (0, i)) > 1.0e-2f)
+                    return i;
+            return -1;
+        };
+        auto stepAt = [] (Project& p, const juce::ValueTree& ch, int step) { p.setStep (p.getCurrentPattern(), ch[ids::uid], step, true); };
+
+        auto normal = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); }, 1.0);
+        auto reversed = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); k.setProperty (ids::reverse, true, nullptr); }, 1.0);
+        check (normal.getMagnitude (0, 0, 1500) > reversed.getMagnitude (0, 0, 1500) * 2.0f,
+               "Sample al revés: empieza flojo (por la cola)");
+        auto higher = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); k.setProperty (ids::sampleTune, 12.0f, nullptr); }, 1.0);
+        check (lastSound (higher) < lastSound (normal) * 0.7, "Tono +12: el sample suena más agudo y dura la mitad");
+        auto sliced = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); k.setProperty (ids::slices, 4, nullptr); }, 1.0);
+        check (lastSound (sliced) < lastSound (normal) * 0.45, "Trocear en 4: cada nota toca un trozo");
+        auto trimmed = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); k.setProperty (ids::sampleEnd, 0.3f, nullptr); }, 1.0);
+        check (lastSound (trimmed) < lastSound (normal) * 0.5, "Recortar el final del sample");
+        check (isFinite (reversed) && isFinite (higher) && isFinite (sliced), "El sampler nuevo no da valores raros");
+
+        // Swing: el paso 2 (una semicorchea "par") se retrasa medio paso
+        const double samplesPerStep = sampleRate * 60.0 / 140.0 / 4.0;
+        auto straight = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 1); }, 0.6);
+        auto swung = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 1); p.getState().setProperty (ids::swing, 1.0f, nullptr); }, 0.6);
+        check (std::abs (firstSound (straight) - samplesPerStep) < 200, "Sin swing, el paso 2 suena a su hora");
+        check (std::abs (firstSound (swung) - samplesPerStep * 1.5) < 200, "Con swing, el paso 2 se retrasa");
+
+        // Sidechain: un pad largo se agacha cuando suena el bombo
+        auto withPad = [&] (float amount)
+        {
+            return renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                for (int s : { 0, 4, 8, 12 }) stepAt (p, k, s);
+                auto pad = p.findChannelByType (ChannelType::synth);
+                pad.setProperty (ids::sustain, 1.0f, nullptr);
+                p.addNote (p.getCurrentPattern(), pad[ids::uid], 0.0, 16.0, 60);
+                auto padTrack = p.getMixerTrack ((int) pad[ids::mixer]);
+                padTrack.setProperty (ids::sidechain, amount, nullptr);
+                padTrack.setProperty (ids::sidechainSource, (int) k[ids::mixer], nullptr);
+                // La pista del bombo, en silencio: así se oye solo el pad (el sidechain la sigue "oyendo")
+                p.getMixerTrack ((int) k[ids::mixer]).setProperty (ids::muted, true, nullptr);
+            }, 1.5);
+        };
+        auto dry = withPad (0.0f), ducked = withPad (1.0f);
+        check (ducked.getRMSLevel (0, 0, ducked.getNumSamples()) < dry.getRMSLevel (0, 0, dry.getNumSamples()) * 0.95f,
+               "Sidechain: el pad baja cuando suena el bombo");
+
+        // Limitador del Master: con todo a tope no hay picos recortados
+        auto loud = [&] (bool limiter)
+        {
+            return renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                for (int s : { 0, 4, 8, 12 }) stepAt (p, k, s);
+                k.setProperty (ids::volume, 1.25f, nullptr);
+                p.getMixerTrack ((int) k[ids::mixer]).setProperty (ids::volume, 1.25f, nullptr);
+                p.getMixerTrack (0).setProperty (ids::volume, 1.25f, nullptr);
+                p.getMixerTrack (0).setProperty (ids::limiter, limiter, nullptr);
+            }, 1.0);
+        };
+        auto countClipped = [] (const juce::AudioBuffer<float>& b)
+        {
+            int n = 0;
+            for (int i = 0; i < b.getNumSamples(); ++i)
+                n += std::abs (b.getSample (0, i)) >= 0.999f ? 1 : 0;
+            return n;
+        };
+        const int clippedOff = countClipped (loud (false)), clippedOn = countClipped (loud (true));
+        check (clippedOff > 50 && clippedOn < clippedOff / 10, "El limitador evita que el sonido se recorte");
+
+        // Filtro, distorsión y chorus de pista
+        auto withFx = [&] (const juce::Identifier& id, float value)
+        {
+            return renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                auto hat = p.findChannelByBuiltin ("builtin:hihat");
+                for (int s = 0; s < 16; s += 2) stepAt (p, hat, s);
+                p.getMixerTrack ((int) hat[ids::mixer]).setProperty (id, value, nullptr);
+                juce::ignoreUnused (k);
+            }, 1.0);
+        };
+        auto hats = withFx (ids::trackFilter, 0.0f), dark = withFx (ids::trackFilter, -1.0f);
+        check (dark.getRMSLevel (0, 0, dark.getNumSamples()) < hats.getRMSLevel (0, 0, hats.getNumSamples()) * 0.3f,
+               "Filtro de pista: quita los agudos del hi-hat");
+        auto dist = withFx (ids::distortion, 1.0f), chorus = withFx (ids::chorusMix, 1.0f);
+        check (isFinite (dist) && isFinite (chorus) && dist.getRMSLevel (0, 0, dist.getNumSamples()) > 0.01f
+               && chorus.getRMSLevel (0, 0, chorus.getNumSamples()) > 0.01f, "Distorsión y chorus suenan sin romper nada");
+    }
+
     // --- Sonidos de los juegos de oído ------------------------------------------------------
     std::cout << "Juegos de oído\n";
     {

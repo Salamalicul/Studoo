@@ -26,8 +26,9 @@ namespace studoo
         const int index;
         juce::OwnedArray<Knob> knobs;
         Knob *eqLow, *eqMid, *eqHigh, *compThreshold, *compRatio, *delayMix, *delayTime, *delayFeedback,
-             *reverbMix, *reverbSize, *pan;
-        juce::ToggleButton compOn;
+             *reverbMix, *reverbSize, *pan, *filter, *distortion, *chorus, *sidechain;
+        juce::ToggleButton compOn, limiterOn;
+        juce::ComboBox sidechainSource;
         juce::TextButton muteButton, soloButton, pluginButton;
         juce::Slider fader;
         float meterL = 0.0f, meterR = 0.0f;

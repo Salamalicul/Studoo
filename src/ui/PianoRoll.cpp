@@ -323,8 +323,79 @@ void PianoRollGrid::mouseUp (const juce::MouseEvent&)
 // ============================================================================
 //  PianoRoll
 // ============================================================================
+//  VelocityLane
+// ============================================================================
+VelocityLane::VelocityLane (AppContext& c, PianoRoll& r) : ctx (c), roll (r)
+{
+    setTooltip (txt ("Velocity: lo fuerte que suena cada nota. Arrastra las barras hacia arriba (más fuerte) "
+                     "o hacia abajo (más suave). Si arrastras de lado, cambias varias notas seguidas."));
+    makeNonFocusing (*this);
+}
+
+void VelocityLane::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colour (0xff15181c));
+    auto area = getLocalBounds().toFloat().reduced (0.0f, 4.0f);
+    g.setColour (Colours::outline.withAlpha (0.4f));
+    for (float f : { 0.25f, 0.5f, 0.75f })
+        g.drawHorizontalLine ((int) (area.getBottom() - f * area.getHeight()), 0.0f, (float) getWidth());
+
+    g.setColour (Colours::textDim);
+    g.setFont (Fonts::bold (11.0f));
+    g.drawFittedText ("VELOCITY", juce::Rectangle<int> (0, 0, PianoRollGrid::keyboardWidth, getHeight()),
+                      juce::Justification::centred, 2);
+
+    const int uid = roll.getChannelUid();
+    const auto colour = Colours::forChannelType (roll.getChannelType());
+    for (auto n : roll.getPattern())
+    {
+        if (! n.hasType (ids::NOTE) || (int) n[ids::channel] != uid)
+            continue;
+        const float x = roll.gridStepsToX (n[ids::start]);
+        const float vel = juce::jlimit (0.0f, 1.0f, (float) n.getProperty (ids::velocity, 0.8f));
+        const float top = area.getBottom() - vel * area.getHeight();
+        g.setColour (colour.withAlpha (0.35f + 0.65f * vel));
+        g.fillRect (juce::Rectangle<float> (x, top, 3.0f, area.getBottom() - top));
+        g.fillEllipse (x - 3.0f, top - 4.5f, 9.0f, 9.0f);
+    }
+}
+
+void VelocityLane::mouseDown (const juce::MouseEvent& e)
+{
+    ctx.project.beginTransaction();
+    setVelocityAt (e.position);
+}
+
+void VelocityLane::mouseDrag (const juce::MouseEvent& e) { setVelocityAt (e.position); }
+
+void VelocityLane::setVelocityAt (juce::Point<float> p)
+{
+    auto area = getLocalBounds().toFloat().reduced (0.0f, 4.0f);
+    const float vel = juce::jlimit (0.05f, 1.0f, (area.getBottom() - p.y) / juce::jmax (1.0f, area.getHeight()));
+    const int uid = roll.getChannelUid();
+
+    // La nota (o acorde) cuyo inicio está más cerca del ratón, a menos de 10 píxeles
+    float best = 10.0f;
+    double bestStart = -1.0;
+    for (auto n : roll.getPattern())
+        if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid)
+        {
+            const float d = std::abs (roll.gridStepsToX (n[ids::start]) - p.x);
+            if (d < best) { best = d; bestStart = n[ids::start]; }
+        }
+    if (bestStart < 0.0)
+        return;
+    for (auto n : roll.getPattern())
+        if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid
+            && juce::approximatelyEqual ((double) n[ids::start], bestStart))
+            n.setProperty (ids::velocity, vel, ctx.project.um());
+    repaint();
+}
+
+// ============================================================================
 PianoRoll::PianoRoll (AppContext& c)
-    : ctx (c), helpButton (txt (help::pianoRollTitle), txt (help::pianoRollText)), grid (c, *this)
+    : ctx (c), helpButton (txt (help::pianoRollTitle), txt (help::pianoRollText)), grid (c, *this),
+      velocityLane (c, *this)
 {
     addAndMakeVisible (helpButton);
 
@@ -375,6 +446,15 @@ PianoRoll::PianoRoll (AppContext& c)
                 p.removeChild (i, ctx.project.um());
     };
     makeNonFocusing (clearButton);
+
+    addAndMakeVisible (quantizeButton);
+    quantizeButton.setButtonText ("Cuantizar");
+    quantizeButton.setTooltip (txt ("Cuantizar: coloca todas las notas de este canal justo en la cuadrícula del \"Ajuste\". "
+                                    "Arregla las notas que grabaste o pusiste un poco fuera de tiempo."));
+    quantizeButton.onClick = [this] { quantize(); };
+    makeNonFocusing (quantizeButton);
+
+    addAndMakeVisible (velocityLane);
 
     addAndMakeVisible (viewport);
     viewport.setViewedComponent (&grid, false);
@@ -436,6 +516,7 @@ void PianoRoll::changeListenerCallback (juce::ChangeBroadcaster*)
 {
     refreshChannels();
     grid.repaint();
+    velocityLane.repaint();
 }
 
 void PianoRoll::refreshChannels()
@@ -485,6 +566,25 @@ void PianoRoll::timerCallback()
     grid.setPlayhead (show ? ctx.engine.getPlayPosition() : -1.0);
 }
 
+float PianoRoll::gridStepsToX (double steps) const { return grid.stepsToX (steps); }
+double PianoRoll::gridXToSteps (float x) const { return grid.xToSteps (x); }
+
+void PianoRoll::quantize()
+{
+    const double s = getSnap();
+    const int uid = getChannelUid();
+    const int length = Project::getPatternLength (getPattern());
+    ctx.project.beginTransaction();
+    for (auto n : getPattern())
+        if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid)
+        {
+            const double start = juce::jlimit (0.0, juce::jmax (0.0, length - s), std::round ((double) n[ids::start] / s) * s);
+            const double len = juce::jmax (s, std::round ((double) n[ids::length] / s) * s);
+            n.setProperty (ids::start, start, ctx.project.um());
+            n.setProperty (ids::length, len, ctx.project.um());
+        }
+}
+
 void PianoRoll::paint (juce::Graphics& g)
 {
     drawPanel (g, getLocalBounds(), headerArea, "Piano roll");
@@ -501,9 +601,14 @@ void PianoRoll::resized()
     snapBox.setBounds (h.removeFromLeft (170)); h.removeFromLeft (8);
     chordBox.setBounds (h.removeFromLeft (200)); h.removeFromLeft (8);
     clearButton.setBounds (h.removeFromRight (110)); h.removeFromRight (8);
+    quantizeButton.setBounds (h.removeFromRight (96)); h.removeFromRight (8);
     patternLabel.setBounds (h);
 
-    viewport.setBounds (area.reduced (6));
+    area.reduce (6, 6);
+    auto lane = area.removeFromBottom (area.getHeight() > 300 ? 64 : 44);
+    area.removeFromBottom (4);
+    viewport.setBounds (area);
+    velocityLane.setBounds (lane.withTrimmedRight (viewport.getScrollBarThickness()));
     const int rows = PianoRollGrid::highestNote - PianoRollGrid::lowestNote + 1;
     grid.setSize (viewport.getWidth() - viewport.getScrollBarThickness(), rows * PianoRollGrid::rowHeight);
 }

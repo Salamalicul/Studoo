@@ -2,8 +2,9 @@
 // ============================================================================
 //  MixerTrack: una pista del mezclador con su cadena de efectos:
 //
-//     EQ (graves/medios/agudos) -> Compresor -> Delay -> Reverb
-//        -> Plugin VST3 (opcional) -> Volumen y panorama -> Medidor
+//     EQ (graves/medios/agudos) -> Filtro -> Distorsión -> Compresor
+//        -> Chorus -> Delay -> Reverb -> Plugin VST3 (opcional)
+//        -> Volumen y panorama -> Limitador -> Medidor
 // ============================================================================
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
@@ -46,6 +47,11 @@ namespace studoo
 
         juce::Reverb reverb;
         juce::Reverb::Parameters lastReverb;
+
+        juce::dsp::StateVariableTPTFilter<float> filter;
+        float lastFilter = 0.0f;
+        juce::dsp::Chorus<float> chorus;
+        juce::dsp::Limiter<float> limiter;
 
         juce::AudioPluginInstance* plugin = nullptr;
         std::array<std::atomic<float>, 2> peak { 0.0f, 0.0f };

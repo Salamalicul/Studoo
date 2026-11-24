@@ -25,6 +25,29 @@ MixerStrip::MixerStrip (AppContext& c, int trackIndex) : ctx (c), index (trackIn
     reverbMix = makeKnob ("Mezcla", txt ("Reverb: cuánta reverberación se oye."));
     reverbSize = makeKnob (txt ("Tamaño"), txt ("Reverb: tamaño de la sala."));
     pan = makeKnob ("PAN", txt ("Panorama: coloca el sonido a la izquierda o a la derecha."));
+    filter = makeKnob ("Filtro", txt ("Filtro de pista: a la izquierda quita agudos (sonido apagado), a la derecha quita graves (sonido fino). En el centro no hace nada."));
+    distortion = makeKnob ("Distor.", txt ("Ensucia y satura el sonido: más fuerte y agresivo."));
+    chorus = makeKnob ("Chorus", txt ("Chorus: el sonido se hace más ancho, como si sonaran varios a la vez."));
+    sidechain = makeKnob ("Bajada", txt ("Sidechain: cuánto baja esta pista cuando suena la pista de origen (normalmente el bombo). Es el famoso \"bombeo\"."));
+    filter->setDisplayFunction ([] (double v)
+    {
+        if (std::abs (v) < 0.02) return txt ("Sin filtro");
+        return v < 0 ? txt ("Quita agudos ") + juce::String ((int) (-v * 100.0)) + "%" : txt ("Quita graves ") + juce::String ((int) (v * 100.0)) + "%";
+    });
+    for (auto* k : { distortion, chorus, sidechain })
+        k->setDisplayFunction ([] (double v) { return juce::String ((int) (v * 100.0)) + "%"; });
+
+    addAndMakeVisible (sidechainSource);
+    sidechainSource.setTooltip (txt ("Pista que manda (normalmente el bombo): cuando suena, esta pista baja su volumen."));
+    for (int t = 1; t < numMixerTracks; ++t)
+        if (t != index)
+            sidechainSource.addItem ("Pista " + juce::String (t), t);
+    makeNonFocusing (sidechainSource);
+
+    addAndMakeVisible (limiterOn);
+    limiterOn.setButtonText (txt ("Limitador"));
+    limiterOn.setTooltip (txt ("Limitador: nada pasa del máximo. Evita que el sonido se rompa (distorsione) cuando todo suena muy fuerte."));
+    makeNonFocusing (limiterOn);
 
     auto db = [] (double v) { return (v > 0 ? "+" : "") + juce::String (v, 1) + " dB"; };
     for (auto* k : { eqLow, eqMid, eqHigh })
@@ -93,6 +116,18 @@ void MixerStrip::bind()
     reverbMix->bind (track, ids::reverbMix, um, 0.0, 1.0, 0.0);
     reverbSize->bind (track, ids::reverbSize, um, 0.0, 1.0, 0.6);
     pan->bind (track, ids::pan, um, -1.0, 1.0, 0.0);
+    filter->bind (track, ids::trackFilter, um, -1.0, 1.0, 0.0);
+    distortion->bind (track, ids::distortion, um, 0.0, 1.0, 0.0);
+    chorus->bind (track, ids::chorusMix, um, 0.0, 1.0, 0.0);
+    sidechain->bind (track, ids::sidechain, um, 0.0, 1.0, 0.0);
+    sidechainSource.getSelectedIdAsValue().referTo (track.getPropertyAsValue (ids::sidechainSource, um));
+    if (sidechainSource.getSelectedId() == 0)
+        sidechainSource.setSelectedId (index == 1 ? 2 : 1, juce::dontSendNotification);
+    if (! track.hasProperty (ids::limiter))
+        track.setProperty (ids::limiter, index == 0, nullptr);   // el Master lo trae encendido
+    limiterOn.getToggleStateValue().referTo (track.getPropertyAsValue (ids::limiter, um));
+    sidechain->setVisible (index != 0);
+    sidechainSource.setVisible (index != 0);
 
     compOn.getToggleStateValue().referTo (track.getPropertyAsValue (ids::compOn, um));
     muteButton.getToggleStateValue().referTo (track.getPropertyAsValue (ids::muted, um));
@@ -189,6 +224,8 @@ void MixerStrip::paint (juce::Graphics& g)
     label (compThreshold, "COMPRESOR");
     label (delayMix, "DELAY");
     label (reverbMix, "REVERB");
+    label (filter, "FILTRO · SUCIO · CHORUS");
+    label (index == 0 ? (juce::Component*) &limiterOn : (juce::Component*) sidechain, index == 0 ? "MASTER" : "SIDECHAIN · LIMITADOR");
 
     // Medidor de nivel con LEDs
     auto drawBar = [&] (juce::Rectangle<int> r, float level)
@@ -242,6 +279,23 @@ void MixerStrip::resized()
     }
     row ({ delayMix, delayTime, delayFeedback });
     row ({ reverbMix, reverbSize });
+    row ({ filter, distortion, chorus });
+    {
+        auto r = area.removeFromTop (knobHeight);
+        const int w = r.getWidth() / 3;
+        if (index != 0)
+        {
+            sidechain->setBounds (r.removeFromLeft (w));
+            auto right = r.reduced (2, 0);
+            sidechainSource.setBounds (right.removeFromTop (22));
+            limiterOn.setBounds (right.withTrimmedTop (2));
+        }
+        else
+        {
+            limiterOn.setBounds (r.withSizeKeepingCentre (r.getWidth(), 26));
+        }
+        area.removeFromTop (12);
+    }
     area.removeFromTop (-8);
     pluginButton.setBounds (area.removeFromTop (24));
     area.removeFromTop (6);
@@ -272,7 +326,7 @@ MixerView::MixerView (AppContext& c) : ctx (c), helpButton (txt (help::mixerTitl
 
     addAndMakeVisible (viewport);
     viewport.setViewedComponent (&stripHolder, false);
-    viewport.setScrollBarsShown (false, true);
+    viewport.setScrollBarsShown (true, true);
 
     for (int i = 0; i < numMixerTracks; ++i)
         stripHolder.addAndMakeVisible (strips.add (new MixerStrip (ctx, i)));
@@ -322,7 +376,7 @@ void MixerView::resized()
     infoLabel.setBounds (h);
 
     viewport.setBounds (area.reduced (6));
-    const int height = juce::jmax (560, viewport.getHeight() - viewport.getScrollBarThickness());
+    const int height = juce::jmax (690, viewport.getHeight() - viewport.getScrollBarThickness());
     stripHolder.setSize (stripWidth * numMixerTracks, height);
     for (int i = 0; i < strips.size(); ++i)
         strips[i]->setBounds (i * stripWidth, 0, stripWidth, height);

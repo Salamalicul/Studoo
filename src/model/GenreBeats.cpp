@@ -269,8 +269,9 @@ bool load (Project& project, juce::ValueTree pattern, const juce::String& id)
     };
 
     // Bajo
+    juce::ValueTree bass, keys;
     if (recipe->bassKind != BassKind::none)
-        if (auto bass = instrument (recipe->bassKind, recipe->bassPreset, recipe->bassName); bass.isValid())
+        if (bass = instrument (recipe->bassKind, recipe->bassPreset, recipe->bassName); bass.isValid())
             forEachNote (recipe->bassLine, [&] (int s, int len, char c)
             {
                 const int root = recipe->bassRoots[s / 16];
@@ -280,7 +281,7 @@ bool load (Project& project, juce::ValueTree pattern, const juce::String& id)
 
     // Acordes
     if (recipe->chordPreset != nullptr)
-        if (auto keys = instrument (BassKind::synth, recipe->chordPreset, recipe->chordName); keys.isValid())
+        if (keys = instrument (BassKind::synth, recipe->chordPreset, recipe->chordName); keys.isValid())
             forEachNote (recipe->chordRhythm, [&] (int s, int len, char)
             {
                 for (int note : recipe->chords[s / 16])
@@ -288,6 +289,63 @@ bool load (Project& project, juce::ValueTree pattern, const juce::String& id)
                         project.addNote (pattern, keys[ids::uid], (double) s, (double) len, note,
                                          s % 16 == 0 ? 0.8f : 0.68f);
             });
+
+    // Swing: el lo-fi y el boom bap "bailan"; el resto va recto
+    const juce::String gid (recipe->info.id);
+    project.getState().setProperty (ids::swing, gid == "lofi" ? 0.3 : gid == "boombap" ? 0.2 : 0.0, um);
+
+    // Sidechain: en house y techno el bajo y los acordes "bombean" con el bombo
+    if ((gid == "house" || gid == "techno") && ! recipe->drums.empty())
+        if (auto kick = kitChannel (recipe->drums.front().sound); kick.isValid())
+        {
+            // ¿Suena algo de esta pista en el patrón? (sin contar al canal 'except')
+            auto trackInUse = [&] (int track, const juce::ValueTree& except)
+            {
+                for (auto ch : project.channels())
+                {
+                    if ((int) ch[ids::mixer] != track || ch == except)
+                        continue;
+                    for (auto item : pattern)
+                        if ((int) item[ids::channel] == (int) ch[ids::uid]
+                            && (item.hasType (ids::NOTE) || (item.hasType (ids::STEPSET) && item[ids::data].toString().containsChar ('1'))))
+                            return true;
+                }
+                return false;
+            };
+            // Para que el sidechain funcione, el bombo, el bajo y los acordes necesitan pista propia
+            auto ownTrack = [&] (juce::ValueTree ch, int avoid)
+            {
+                if (! ch.isValid())
+                    return;
+                const int current = ch[ids::mixer];
+                if (current > 0 && current != avoid && ! trackInUse (current, ch))
+                    return;
+                for (int t = numMixerTracks - 1; t >= 1; --t)
+                    if (t != avoid && ! trackInUse (t, ch))
+                    {
+                        ch.setProperty (ids::mixer, t, um);
+                        rename (ch, ch[ids::name].toString());
+                        return;
+                    }
+            };
+            ownTrack (kick, 0);
+            const int kickTrack = kick[ids::mixer];
+            ownTrack (bass, kickTrack);
+            ownTrack (keys, kickTrack);
+            if (keys.isValid() && bass.isValid() && (int) keys[ids::mixer] == (int) bass[ids::mixer])
+                keys = {};   // comparten pista: el sidechain del bajo ya los agacha a los dos
+
+            for (auto& ch : { bass, keys })
+            {
+                const int track = ch.isValid() ? (int) ch[ids::mixer] : 0;
+                if (kickTrack > 0 && track > 0 && track != kickTrack)
+                {
+                    auto t = project.getMixerTrack (track);
+                    t.setProperty (ids::sidechainSource, kickTrack, um);
+                    t.setProperty (ids::sidechain, ch == bass ? 0.7 : 0.5, um);
+                }
+            }
+        }
 
     return true;
 }

@@ -151,6 +151,7 @@ namespace studoo
         std::atomic<double> currentBpm { 140.0 };
         std::atomic<int> liveChannelUid { 0 };
         std::array<std::atomic<float>, 256> channelActivity {};
+        std::array<float, numMixerTracks> sidechainEnv {};   // seguidor del sidechain de cada pista
 
         SharedBuffer audition;            // sonido de los juegos de oído
         double auditionPos = 0.0, auditionStep = 1.0;

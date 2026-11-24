@@ -89,6 +89,16 @@ namespace
         }
         else if (id == "grabacion")      p.addChannel (ChannelType::audio, "Voz", 7);
         else if (id == "base_genero")    genres::load (p, p.addPattern ("Base House"), "house");
+        else if (id == "swing")          p.getState().setProperty (ids::swing, 0.3, nullptr);
+        else if (id == "velocity")       p.addNote (pattern, synth[ids::uid], 0.0, 1.0, 60, 0.3f);
+        else if (id == "sidechain")      p.getMixerTrack (5).setProperty (ids::sidechain, 0.6, nullptr);
+        else if (id == "efectos_creativos") p.getMixerTrack (6).setProperty (ids::chorusMix, 0.5, nullptr);
+        else if (id == "chops")
+        {
+            kick.setProperty (ids::slices, 8, nullptr);
+            for (int n = 0; n < 3; ++n)
+                p.addNote (pattern, kick[ids::uid], n * 4.0, 1.0, 60 + n, 0.8f);
+        }
         else                             std::cout << "  (reto sin prueba: " << id << ")\n";
     }
 
@@ -119,6 +129,24 @@ int main()
         Project p;
         doChallenge (p, c.id);
         check (c.check (p), u ("Al hacerlo, \"") + c.id + "\" se detecta");
+    }
+
+    // --- Bases con swing y sidechain ------------------------------------------------------
+    std::cout << "Bases con swing y sidechain\n";
+    {
+        Project p;
+        genres::load (p, p.addPattern ("Base House"), "house");
+        int withSidechain = 0;
+        for (int t = 1; t < numMixerTracks; ++t)
+            if ((float) p.getMixerTrack (t).getProperty (ids::sidechain, 0.0f) > 0.3f)
+            {
+                ++withSidechain;
+                std::cout << "    pista " << t << " escucha a la " << (int) p.getMixerTrack (t)[ids::sidechainSource] << "\n";
+            }
+        check (withSidechain >= 1, u ("La base de House trae sidechain"));
+        Project q;
+        genres::load (q, q.addPattern ("Base Lo-fi"), "lofi");
+        check ((double) q.getState()[ids::swing] > 0.2, u ("La base de Lo-fi trae swing"));
     }
 
     // --- Sonidos de los juegos ------------------------------------------------------------

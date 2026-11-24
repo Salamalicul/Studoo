@@ -30,6 +30,7 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
     auto snap = std::make_shared<Snapshot>();
 
     snap->bpm = num (state, ids::bpm, 40.0f, 250.0f, 140.0f);
+    snap->swing = num (state, ids::swing, 0.0f, 1.0f, 0.0f);
     snap->metronome = (bool) state[ids::metronome];
     snap->songMode = state[ids::playMode].toString() == "song";
 
@@ -56,6 +57,14 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         c.synth.cutoff = num (ch, ids::cutoff, 20.0f, 20000.0f, 5000.0f);
         c.synth.resonance = num (ch, ids::resonance, 0.0f, 1.0f, 0.2f);
         c.synth.detune = num (ch, ids::detune, 0.0f, 50.0f, 8.0f);
+        c.synth.lfoRate = num (ch, ids::lfoRate, 0.1f, 20.0f, 4.0f);
+        c.synth.lfoAmount = num (ch, ids::lfoAmount, 0.0f, 1.0f, 0.0f);
+
+        c.sampler.tune = num (ch, ids::sampleTune, -24.0f, 24.0f, 0.0f);
+        c.sampler.start = num (ch, ids::sampleStart, 0.0f, 0.99f, 0.0f);
+        c.sampler.end = juce::jmax (c.sampler.start + 0.01f, num (ch, ids::sampleEnd, 0.01f, 1.0f, 1.0f));
+        c.sampler.reverse = (bool) ch[ids::reverse];
+        c.sampler.slices = juce::jlimit (1, 16, (int) ch.getProperty (ids::slices, 1));
 
         c.bass.decay = num (ch, ids::decay, 0.1f, 4.0f, 1.5f);
         c.bass.glide = num (ch, ids::glide, 0.0f, 0.5f, 0.08f);
@@ -171,6 +180,13 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         m.delayFeedback = num (t, ids::delayFeedback, 0.0f, 0.9f, 0.35f);
         m.reverbMix = num (t, ids::reverbMix, 0.0f, 1.0f, 0.0f);
         m.reverbSize = num (t, ids::reverbSize, 0.0f, 1.0f, 0.6f);
+        m.filter = num (t, ids::trackFilter, -1.0f, 1.0f, 0.0f);
+        m.distortion = num (t, ids::distortion, 0.0f, 1.0f, 0.0f);
+        m.chorusMix = num (t, ids::chorusMix, 0.0f, 1.0f, 0.0f);
+        m.sidechain = num (t, ids::sidechain, 0.0f, 1.0f, 0.0f);
+        m.sidechainSource = juce::jlimit (1, numMixerTracks - 1, (int) t.getProperty (ids::sidechainSource, 1));
+        // El Master trae el limitador encendido (protege de que suene a tope)
+        m.limiter = (bool) t.getProperty (ids::limiter, i == 0);
     }
 
     // --- Automatización -------------------------------------------------------------

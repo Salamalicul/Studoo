@@ -586,7 +586,15 @@ void AudioEngine::collectPatternEvents (const Snapshot& snap, const PatternSnap&
             const double base = rep * len;
             for (const auto& note : pattern.notesPerChannel[ci])
             {
-                const double t = base + note.start;
+                // Swing: las semicorcheas "pares" (2, 4, 6...) se retrasan un poco
+                double start = note.start;
+                if (snap.swing > 0.001f)
+                {
+                    const double inPair = std::fmod (start, 2.0);
+                    if (std::abs (inPair - 1.0) < 0.01)
+                        start += snap.swing * 0.5;
+                }
+                const double t = base + start;
                 if (t < localFrom || t >= localTo || t >= localEnd)
                     continue;
 
@@ -797,6 +805,10 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
                 case AutomationTarget::Param::delayMix:  tp.delayMix = v; break;
                 case AutomationTarget::Param::eqLow:     tp.eqLow = v; break;
                 case AutomationTarget::Param::eqHigh:    tp.eqHigh = v; break;
+                case AutomationTarget::Param::eqMid:     tp.eqMid = v; break;
+                case AutomationTarget::Param::trackFilter: tp.filter = v; break;
+                case AutomationTarget::Param::distortion:  tp.distortion = v; break;
+                case AutomationTarget::Param::chorusMix:   tp.chorusMix = v; break;
                 default: break;
             }
         }
@@ -850,6 +862,30 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         auto& dest = mixer[(size_t) ch.mixer].getBuffer();
         dest.addFrom (0, 0, rt.buffer, 0, 0, n, gl);
         dest.addFrom (1, 0, rt.buffer, 1, 0, n, gr);
+    }
+
+    // --- Sidechain: cada pista puede "agacharse" cuando suena otra (normalmente el bombo) -------
+    for (int t = 1; t < numMixerTracks; ++t)
+    {
+        const auto& tp = trackParams[(size_t) t];
+        if (tp.sidechain < 0.01f || tp.sidechainSource == t)
+            continue;
+        const auto& src = mixer[(size_t) tp.sidechainSource].getBuffer();
+        auto& dst = mixer[(size_t) t].getBuffer();
+        float& env = sidechainEnv[(size_t) t];
+        const float release = (float) std::exp (-1.0 / (0.16 * sampleRate));   // vuelve a subir en ~160 ms
+        const float* sl = src.getReadPointer (0);
+        const float* sr_ = src.getReadPointer (1);
+        float* dl = dst.getWritePointer (0);
+        float* dr = dst.getWritePointer (1);
+        for (int i = 0; i < n; ++i)
+        {
+            const float level = juce::jmin (1.0f, juce::jmax (std::abs (sl[i]), std::abs (sr_[i])) * 2.0f);
+            env = level > env ? level : env * release;
+            const float gain = 1.0f - tp.sidechain * 0.9f * env;
+            dl[i] *= gain;
+            dr[i] *= gain;
+        }
     }
 
     // --- Mezclador -----------------------------------------------------------------------------

@@ -51,6 +51,10 @@ AutomationTarget AutomationTarget::parse (const juce::String& s)
     else if (p == "cutoff")    t.param = Param::cutoff;
     else if (p == "eqLow")     t.param = Param::eqLow;
     else if (p == "eqHigh")    t.param = Param::eqHigh;
+    else if (p == "eqMid")     t.param = Param::eqMid;
+    else if (p == "trackFilter") t.param = Param::trackFilter;
+    else if (p == "distortion")  t.param = Param::distortion;
+    else if (p == "chorusMix")   t.param = Param::chorusMix;
     return t;
 }
 
@@ -71,6 +75,10 @@ juce::Identifier AutomationTarget::paramId (Param p)
         case Param::cutoff:    return ids::cutoff;
         case Param::eqLow:     return ids::eqLow;
         case Param::eqHigh:    return ids::eqHigh;
+        case Param::eqMid:     return ids::eqMid;
+        case Param::trackFilter: return ids::trackFilter;
+        case Param::distortion:  return ids::distortion;
+        case Param::chorusMix:   return ids::chorusMix;
         case Param::invalid:   break;
     }
     return ids::volume;
@@ -87,6 +95,10 @@ juce::String AutomationTarget::paramName (Param p)
         case Param::cutoff:    return "Filtro";
         case Param::eqLow:     return "Graves (EQ)";
         case Param::eqHigh:    return "Agudos (EQ)";
+        case Param::eqMid:     return "Medios (EQ)";
+        case Param::trackFilter: return "Filtro de pista";
+        case Param::distortion:  return juce::String::fromUTF8 ("Distorsión");
+        case Param::chorusMix:   return "Chorus";
         case Param::invalid:   break;
     }
     return {};
@@ -97,9 +109,11 @@ float AutomationTarget::fromNormalised (Param p, float v)
     v = juce::jlimit (0.0f, 1.0f, v);
     switch (p)
     {
-        case Param::pan:    return v * 2.0f - 1.0f;
+        case Param::pan:
+        case Param::trackFilter: return v * 2.0f - 1.0f;
         case Param::cutoff: return 20.0f * std::pow (1000.0f, v);
         case Param::eqLow:
+        case Param::eqMid:
         case Param::eqHigh: return v * 24.0f - 12.0f;
         default:            return v;
     }
@@ -109,9 +123,11 @@ float AutomationTarget::toNormalised (Param p, float x)
 {
     switch (p)
     {
-        case Param::pan:    return juce::jlimit (0.0f, 1.0f, (x + 1.0f) * 0.5f);
+        case Param::pan:
+        case Param::trackFilter: return juce::jlimit (0.0f, 1.0f, (x + 1.0f) * 0.5f);
         case Param::cutoff: return juce::jlimit (0.0f, 1.0f, std::log (juce::jmax (20.0f, x) / 20.0f) / std::log (1000.0f));
         case Param::eqLow:
+        case Param::eqMid:
         case Param::eqHigh: return juce::jlimit (0.0f, 1.0f, (x + 12.0f) / 24.0f);
         default:            return juce::jlimit (0.0f, 1.0f, x);
     }

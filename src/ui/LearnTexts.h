@@ -273,7 +273,10 @@ El **swing** es retrasar un poquito los golpes que caen entre pulsos. Así el ri
 
 [anim:swing|Arriba: recto (robot). Abajo: con swing (los pasos pares se retrasan)]
 
-> En Studoo puedes conseguir un efecto parecido con la velocidad de las notas (lección siguiente) y poniendo el hi-hat solo en algunos pasos.
+## El swing en Studoo
+Arriba en el **Secuenciador** hay un desplegable **Swing**. Empieza con **Swing 20%** o **30%** y escucha cómo los hi-hats empiezan a "bailar". Afecta a todo el proyecto (también a las notas del piano roll).
+
+> El boom bap y el lo-fi suelen llevar entre 20% y 40% de swing. El trap y el techno casi siempre van rectos (0%).
 
 ? Haz un boom bap y compáralo con tu ritmo de trap. Fíjate en que en el boom bap la caja suena dos veces por compás y en el trap solo una.
 
@@ -289,9 +292,10 @@ R"TXT(Un ritmo que se repite exactamente igual durante 3 minutos cansa. Estos tr
 1. **Variaciones**: duplica el patrón (menú "Patrón..." → Duplicar) y cambia 2 o 3 golpes. Alterna los dos en la playlist.
 2. **Fills**: al final de cada 4 u 8 compases, añade algo especial (un roll, toms, quitar el bombo).
 3. **Silencios**: quitar la batería durante 1 compás antes del estribillo da mucha fuerza a la vuelta.
-4. **Velocidad**: en el piano roll, las notas con menos velocidad suenan más suaves. Alterna hi-hats fuertes y suaves.
-5. **Capas**: pon una palmada a la vez que la caja para que suene más gorda.
-6. **Percusiones**: un shaker o una conga de fondo dan movimiento sin molestar.
+4. **Velocity (fuerza de cada nota)**: debajo del Piano roll está el carril **VELOCITY**, con una barra por nota. Arrástrala hacia abajo y esa nota suena más suave. Alterna hi-hats fuertes y suaves.
+5. **Swing**: con el desplegable **Swing** del Secuenciador los pasos pares se retrasan un poquito y el ritmo suena más humano.
+6. **Capas**: pon una palmada a la vez que la caja para que suene más gorda.
+7. **Percusiones**: un shaker o una conga de fondo dan movimiento sin molestar.
 
 > Cuantos menos sonidos, más fuerte suena cada uno. Antes de añadir algo, prueba a quitar algo.
 
@@ -451,6 +455,10 @@ R"TXT(Un **sample** es un trozo de audio grabado: un golpe de batería, una voz,
 ## Ajustes del sampler
 - **One-shot**: el sample suena entero aunque la nota sea corta. Actívalo para la batería.
 - **Nota base**: la nota en la que el sample suena con su tono original.
+- **Tono**: sube o baja el sample en semitonos (+12 = una octava más agudo).
+- **Inicio** y **Final**: recortan el sample. Sube el Inicio para quitar el silencio del principio, baja el Final para cortarlo antes.
+- **Al revés**: el sample suena del final al principio. Un platillo al revés es la entrada perfecta para un estribillo.
+- **Trozos**: corta el sample en partes iguales (chops). Lo vemos en el Nivel 9.
 
 ! Usa solo samples gratis o "royalty free" (libres de derechos) si vas a publicar tu música. Usar trozos de canciones de otros sin permiso puede darte problemas.
 
@@ -1242,16 +1250,81 @@ R"TXT(¿Has notado que en el house y en la música electrónica todo parece "res
 2. Se le dice que "escuche" al bombo (eso es la cadena lateral, *sidechain*).
 3. Cada golpe de bombo hace que el compresor baje el volumen del bajo un instante.
 
-## Cómo conseguirlo en Studoo
-Studoo todavía no tiene compresor con sidechain, pero hay dos trucos que funcionan muy bien:
-1. **Sidechain "natural"**: pon el bajo **entre** los bombos, nunca encima. Es lo que hace la base de House: el bajo suena a contratiempo y nunca choca con el bombo.
-2. **Bombeo con automatización**: en Automatización, crea una línea de volumen para la pista del pad. Haz una forma de **V** en cada tiempo: abajo justo cuando suena el bombo y arriba antes del siguiente.
+## Cómo hacerlo en Studoo
+Cada pista del **Mezclador** tiene su sección **SIDECHAIN**:
+1. Asegúrate de que el bombo va a su propia pista (en el Secuenciador, la columna "Pista").
+2. En el Mezclador, busca la pista del **bajo** o del **pad**.
+3. En **SIDECHAIN**, elige en el desplegable la pista del **bombo** (la que "manda").
+4. Sube la rueda **Bajada**: cuanto más alta, más se agacha el sonido con cada bombo. Empieza por un **50%**.
 
-[base:house|Cargar la base de House (bajo a contratiempo)]
+[base:house|Cargar la base de House (ya trae el sidechain puesto)]
 
-> Con plugins VST3 de compresor que tengan sidechain (hay gratuitos) se puede hacer el bombeo "de verdad" en el ordenador.
+## Otros trucos
+- **Sidechain "natural"**: pon el bajo **entre** los bombos, nunca encima. Así nunca chocan.
+- **Bombeo con automatización**: una línea de volumen en forma de **V** en cada tiempo da un efecto parecido.
 
-? Carga la base de House y escucha el Bajo house: mueve una nota para que caiga encima de un bombo y compara. ¿Oyes cómo se tapan?)TXT" },
+[ir:mezclador|Ir al Mezclador]
+
+? Carga la base de House, ve al Mezclador y baja a 0 la **Bajada** del Bajo house. Luego súbela al 100%. ¿Oyes cómo "respira"?
+
+[reto:sidechain])TXT" },
+
+    // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Chops: trocear un sample", "7 min",
+      "como hacer chops de samples",
+R"TXT(Hacer **chops** (trocear) es cortar un sample en trocitos y volver a tocarlos en otro orden. Así se hizo el hip-hop clásico: de una frase de soul salían melodías nuevas. Hoy se hace con voces, acordes, guitarras...
+
+[anim:sampler|Cada trozo del sample es una nota distinta del piano roll]
+
+## Trocear en Studoo
+1. Carga un sample largo (un acorde, una frase de voz o un loop) en un canal **Sampler**.
+2. Abajo, en el panel del sonido, sube **Trozos**: por ejemplo **8 trozos**.
+3. Ve al **Piano roll** con ese canal. La **Nota base** toca el trozo 1, la nota de encima el trozo 2, la siguiente el 3...
+4. Pon notas de distintas alturas y escucha: cada una suena un trozo diferente.
+5. Desactiva **One-shot** si quieres que cada trozo se corte al acabar la nota.
+
+## Ideas para tus chops
+- **Reordena**: toca los trozos en otro orden y crea una melodía nueva.
+- **Repite**: el mismo trozo 2 o 3 veces seguidas da un efecto "tartamudo" muy usado.
+- **Al revés**: activa **Al revés** para que los trozos suenen del final al principio.
+- **Tono**: con **Tono** puedes subir o bajar todos los trozos (sin cambiar el orden).
+
+> Si el sample tiene un silencio al principio, sube un poco el **Inicio** antes de trocear: así los trozos caen justo en los golpes.
+
+! Para publicar, usa samples libres de derechos o graba los tuyos (tu voz, una guitarra, un objeto de casa).
+
+? Graba tu voz diciendo una frase, ponla en 8 trozos y haz un ritmo de 1 compás con los trozos desordenados.
+
+[reto:chops])TXT" },
+
+    { "Nivel 9 · Producción avanzada", "Efectos creativos: filtro, distorsión y chorus", "7 min",
+      "efectos creativos filtro distorsion chorus produccion",
+R"TXT(Además de EQ, compresor, delay y reverb, cada pista del **Mezclador** tiene tres efectos para **cambiar el carácter** del sonido.
+
+[anim:filtro|El filtro deja pasar unas frecuencias y quita otras]
+
+## Filtro
+La rueda **Filtro** tiene dos lados:
+- **Hacia la izquierda**: quita agudos. El sonido se vuelve apagado, como si viniera de otra habitación.
+- **Hacia la derecha**: quita graves. El sonido se vuelve fino, como de radio o de teléfono.
+- **En el centro**: no hace nada.
+
+> El truco más usado en la electrónica: **automatiza el Filtro** de la batería antes del drop (de "apagado" a normal). La subida se nota muchísimo. En Automatización está como "Filtro".
+
+## Sucio (distorsión)
+La rueda **Distor.** satura el sonido: más fuerte, más agresivo y con más armónicos. Va genial en 808, bajos, guitarras y voces con efecto. Un poco (10-30%) da calor; mucho la rompe a propósito.
+
+## Chorus
+El **Chorus** copia el sonido varias veces con pequeñas diferencias: suena **más ancho**, como si tocaran varios a la vez. Perfecto para pads, acordes y coros. Evítalo en el bombo y en el bajo (se debilitan).
+
+## LFO del sintetizador
+En el panel del **Sintetizador** hay dos ruedas más: **LFO vel.** y **LFO cant.** El LFO mueve el filtro del sinte arriba y abajo solo: es el "wobble" del dubstep. Prueba LFO vel. a 2 Hz y LFO cant. al 60%.
+
+[ir:mezclador|Ir al Mezclador]
+
+? Pon un pad con acordes, súbele el **Chorus** al 60% y compara. Después automatiza su **Filtro** de -100% a 0% durante 4 compases.
+
+[reto:efectos_creativos])TXT" },
 
     // =========================================================================
     { "Nivel 9 · Producción avanzada", "Mezclar voces", "8 min",
@@ -1288,7 +1361,7 @@ R"TXT(**Masterizar** es el último paso antes de publicar: la canción ya está 
 ## Qué se hace al masterizar
 - **EQ general**: pequeños ajustes de graves y agudos a toda la canción.
 - **Compresión suave**: une todo y lo hace sonar más compacto.
-- **Limitador**: sube el volumen al máximo posible **sin pasar del rojo** (sin distorsionar).
+- **Limitador**: sube el volumen al máximo posible **sin pasar del rojo** (sin distorsionar). En Studoo, la pista **Master** trae el **Limitador** encendido.
 - **Comprobar en varios sitios**: escuchar en el móvil, en auriculares y en un altavoz.
 
 ## Masterizar en Studoo

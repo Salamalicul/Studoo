@@ -53,6 +53,7 @@ void SamplerInstrument::setParameters (const ChannelSnap& c)
 {
     root = c.root;
     oneShot = c.oneShot;
+    params = c.sampler;
 }
 
 SamplePtr SamplerInstrument::setSample (SamplePtr newSample)
@@ -88,10 +89,31 @@ void SamplerInstrument::noteOn (int note, float velocity)
                 voice = &v;
     }
 
+    // Parte del sample que suena: inicio/final y, si está troceado, el trozo de esta nota
+    const double length = (double) sample->buffer.getNumSamples();
+    double from = juce::jlimit (0.0, length - 1.0, (double) params.start * length);
+    double to = juce::jlimit (from + 1.0, length, (double) params.end * length);
+    double semitones = params.tune;
+    if (params.slices > 1)
+    {
+        const int slice = ((note - root) % params.slices + params.slices) % params.slices;
+        const double size = (to - from) / params.slices;
+        from = from + size * slice;
+        to = from + size;
+    }
+    else
+    {
+        semitones += (double) (note - root);
+    }
+
     voice->active = true;
     voice->note = note;
-    voice->position = 0.0;
-    voice->increment = sample->sampleRate / sr * std::pow (2.0, (note - root) / 12.0);
+    voice->regionStart = from;
+    voice->regionEnd = to;
+    voice->increment = sample->sampleRate / sr * std::pow (2.0, semitones / 12.0);
+    voice->position = params.reverse ? to - 1.0 - 1.0e-6 : from;
+    if (params.reverse)
+        voice->increment = -voice->increment;
     voice->gain = velocity;
     voice->env = 1.0f;
     voice->releasing = false;
@@ -128,8 +150,14 @@ void SamplerInstrument::renderVoices (juce::AudioBuffer<float>& out, int start, 
 
         for (int i = 0; i < num; ++i)
         {
+            // Fuera de su parte del sample (o del sample entero): la voz termina
+            if (v.position < v.regionStart || v.position >= v.regionEnd - 1.0)
+            {
+                v.active = false;
+                break;
+            }
             const int idx = (int) v.position;
-            if (idx + 1 >= length)
+            if (idx < 0 || idx + 1 >= length)
             {
                 v.active = false;
                 break;
@@ -138,7 +166,10 @@ void SamplerInstrument::renderVoices (juce::AudioBuffer<float>& out, int start, 
             const float frac = (float) (v.position - idx);
             const float l = srcL[idx] + (srcL[idx + 1] - srcL[idx]) * frac;
             const float r = srcR[idx] + (srcR[idx + 1] - srcR[idx]) * frac;
-            const float g = v.gain * v.env;
+            // Pequeño fundido al final de su parte (sin "clics" al trocear o recortar)
+            const double remaining = v.increment > 0.0 ? v.regionEnd - v.position : v.position - v.regionStart;
+            const float fade = (float) juce::jmin (1.0, remaining / (0.004 * sr * std::abs (v.increment) + 1.0));
+            const float g = v.gain * v.env * fade;
             outL[i] += l * g;
             outR[i] += r * g;
 
@@ -267,6 +298,30 @@ void SynthInstrument::renderVoices (juce::AudioBuffer<float>& out, int start, in
     float* outL = out.getWritePointer (0, start);
     float* outR = out.getWritePointer (1, start);
 
+    if (params.lfoAmount < 0.001f)
+    {
+        renderVoiceRange (outL, outR, num);
+        return;
+    }
+
+    // Con LFO: el filtro se mueve cada 32 muestras (suficiente para que suene suave)
+    const float baseCutoff = juce::jlimit (20.0f, (float) (sr * 0.45), params.cutoff);
+    for (int done = 0; done < num;)
+    {
+        const int n = juce::jmin (32, num - done);
+        const float lfo = (float) std::sin (juce::MathConstants<double>::twoPi * lfoPhase);
+        const float cutoff = juce::jlimit (20.0f, (float) (sr * 0.45), baseCutoff * std::pow (2.0f, lfo * params.lfoAmount * 3.0f));
+        for (auto& v : voices)
+            if (v.note >= 0)
+                v.filter.setCutoffFrequency (cutoff);
+        renderVoiceRange (outL + done, outR + done, n);
+        lfoPhase = std::fmod (lfoPhase + params.lfoRate * n / sr, 1.0);
+        done += n;
+    }
+}
+
+void SynthInstrument::renderVoiceRange (float* outL, float* outR, int num)
+{
     for (auto& v : voices)
     {
         if (v.note < 0)

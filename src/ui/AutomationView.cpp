@@ -118,7 +118,10 @@ void AutomationEditor::paint (juce::Graphics& g)
             case AutomationTarget::Param::cutoff: return juce::String ((int) v) + " Hz";
             case AutomationTarget::Param::pan:    return std::abs (v) < 0.01f ? juce::String ("Centro") : (v < 0 ? juce::String ("Izquierda") : juce::String ("Derecha"));
             case AutomationTarget::Param::eqLow:
+            case AutomationTarget::Param::eqMid:
             case AutomationTarget::Param::eqHigh: return juce::String (v, 1) + " dB";
+            case AutomationTarget::Param::trackFilter:
+                return std::abs (v) < 0.02f ? juce::String ("Sin filtro") : (v < 0 ? juce::String ("Quita agudos") : juce::String ("Quita graves"));
             default:                              return juce::String ((int) (v * 100.0f)) + "%";
         }
     };
@@ -324,7 +327,8 @@ void AutomationView::showNewLaneMenu()
     for (int track = 0; track < numMixerTracks; ++track)
     {
         juce::PopupMenu sub;
-        for (auto p : { P::volume, P::pan, P::reverbMix, P::delayMix, P::eqLow, P::eqHigh })
+        for (auto p : { P::volume, P::pan, P::reverbMix, P::delayMix, P::eqLow, P::eqMid, P::eqHigh,
+                        P::trackFilter, P::distortion, P::chorusMix })
             add (sub, AutomationTarget::Kind::mixer, track, p);
         const auto name = track == 0 ? juce::String ("Master")
                                      : "Pista " + juce::String (track) + " (" + ctx.project.getMixerTrack (track)[ids::name].toString() + ")";

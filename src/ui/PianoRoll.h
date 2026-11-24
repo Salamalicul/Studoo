@@ -29,10 +29,11 @@ namespace studoo
         void setPlayhead (double steps);
         int yForNote (int note) const { return (highestNote - note) * rowHeight; }
 
-    private:
-        double stepWidth() const;
         double xToSteps (float x) const;
         float stepsToX (double steps) const;
+
+    private:
+        double stepWidth() const;
         int yToNote (float y) const;
         juce::ValueTree noteAt (juce::Point<float>, bool& onRightEdge);
         double snap (double steps) const;
@@ -45,6 +46,21 @@ namespace studoo
         int dragStartNote = 0, dragNotePitch = 0;
         double lastLength = 1.0;
         double playhead = -1.0;
+    };
+
+    // Debajo del piano roll: una barra por nota. Arrástrala para cambiar lo fuerte que suena (velocity).
+    class VelocityLane : public juce::Component, public juce::SettableTooltipClient
+    {
+    public:
+        VelocityLane (AppContext&, PianoRoll&);
+        void paint (juce::Graphics&) override;
+        void mouseDown (const juce::MouseEvent&) override;
+        void mouseDrag (const juce::MouseEvent&) override;
+
+    private:
+        void setVelocityAt (juce::Point<float>);
+        AppContext& ctx;
+        PianoRoll& roll;
     };
 
     class PianoRoll : public juce::Component,
@@ -67,6 +83,9 @@ namespace studoo
 
         juce::Component& getGridComponent() { return grid; }
         juce::Component& getChannelSelector() { return channelBox; }
+        float gridStepsToX (double steps) const;   // posición x (en el carril de velocity)
+        double gridXToSteps (float x) const;
+        void quantize();
 
     private:
         void changeListenerCallback (juce::ChangeBroadcaster*) override;
@@ -78,9 +97,10 @@ namespace studoo
         HelpButton helpButton;
         juce::ComboBox channelBox, snapBox, chordBox;
         juce::Label patternLabel;
-        juce::TextButton clearButton;
+        juce::TextButton clearButton, quantizeButton;
         juce::Viewport viewport;
         PianoRollGrid grid;
+        VelocityLane velocityLane;
         juce::Rectangle<int> headerArea;
         juce::Array<int> channelUids;
         int lastChannel = -1;

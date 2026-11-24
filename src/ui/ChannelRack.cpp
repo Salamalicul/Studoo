@@ -407,6 +407,18 @@ ChannelRack::ChannelRack (AppContext& c)
     };
     makeNonFocusing (lengthBox);
 
+    addAndMakeVisible (swingBox);
+    for (int pc = 0; pc <= 70; pc += 10)
+        swingBox.addItem ("Swing " + juce::String (pc) + "%", pc + 1);
+    swingBox.setTooltip (txt ("Swing: retrasa un poco los pasos pares (2, 4, 6...) para que el ritmo \"baile\" en vez de sonar a robot. "
+                              "Muy usado en hip hop, lo-fi y house. 0% = recto."));
+    swingBox.onChange = [this]
+    {
+        ctx.project.beginTransaction();
+        ctx.project.getState().setProperty (ids::swing, (swingBox.getSelectedId() - 1) / 100.0, ctx.project.um());
+    };
+    makeNonFocusing (swingBox);
+
     addAndMakeVisible (addButton);
     addButton.setButtonText (txt ("+ Añadir"));
     addButton.setTooltip (txt ("Añadir un canal: tu propio sample, un kit de batería, un sintetizador, un 808 o un plugin VST3."));
@@ -578,6 +590,8 @@ void ChannelRack::refreshHeader()
         patternBox.addItem (p[ids::name].toString(), i++);
     patternBox.setSelectedId (ctx.project.patterns().indexOf (getPattern()) + 1, juce::dontSendNotification);
     lengthBox.setSelectedId (getPatternLength(), juce::dontSendNotification);
+    const int swingPc = juce::jlimit (0, 70, (int) std::round ((double) ctx.project.getState().getProperty (ids::swing, 0.0) * 10.0) * 10);
+    swingBox.setSelectedId (swingPc + 1, juce::dontSendNotification);
 }
 
 void ChannelRack::rebuildRows()
@@ -717,6 +731,10 @@ void ChannelRack::resized()
         patternBox.setBounds (h.removeFromLeft (150)); h.removeFromLeft (4);
         patternMenuButton.setBounds (h.removeFromLeft (84)); h.removeFromLeft (8);
         lengthBox.setBounds (h.removeFromLeft (170));
+        const bool swingFits = h.getWidth() > (compact ? 528 : 448);
+        if (swingFits) h.removeFromLeft (8);
+        swingBox.setBounds (swingFits ? h.removeFromLeft (120) : juce::Rectangle<int>());
+        swingBox.setVisible (swingFits);
         clearButton.setBounds (h.removeFromRight (80)); h.removeFromRight (6);
         exampleButton.setBounds (h.removeFromRight (130)); h.removeFromRight (6);
         addButton.setBounds (h.removeFromRight (100));
@@ -1039,6 +1057,15 @@ void ChannelRack::showPatternMenu()
     menu.addItem (3, txt ("Renombrar..."));
     menu.addSeparator();
     menu.addItem (4, txt ("Eliminar este patrón"), ctx.project.patterns().getNumChildren() > 1);
+    if (! swingBox.isVisible())   // en pantallas estrechas el Swing está aquí
+    {
+        juce::PopupMenu swing;
+        const int current = swingBox.getSelectedId() - 1;
+        for (int pc = 0; pc <= 70; pc += 10)
+            swing.addItem (100 + pc, juce::String (pc) + "%", true, pc == current);
+        menu.addSeparator();
+        menu.addSubMenu (txt ("Swing (el ritmo baila)"), swing);
+    }
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&patternMenuButton), [this] (int result)
     {
@@ -1057,6 +1084,8 @@ void ChannelRack::showPatternMenu()
             });
         else if (result == 4)
             ctx.project.removePattern (current[ids::uid]);
+        else if (result >= 100 && result <= 170)
+            swingBox.setSelectedId (result - 100 + 1);   // dispara onChange: guarda el swing
     });
 }
 

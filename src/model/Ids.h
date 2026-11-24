@@ -97,5 +97,21 @@ namespace studoo::ids
     STUDOO_ID (time)
     STUDOO_ID (value)
 
+    // Studoo 2.0
+    STUDOO_ID (swing)             // proyecto: 0..1
+    STUDOO_ID (sampleTune)        // sampler: semitonos -24..24
+    STUDOO_ID (sampleStart)       // sampler: 0..1
+    STUDOO_ID (sampleEnd)         // sampler: 0..1
+    STUDOO_ID (reverse)           // sampler: al revés
+    STUDOO_ID (slices)            // sampler: 1..16 trozos (chops)
+    STUDOO_ID (lfoRate)           // sinte: Hz
+    STUDOO_ID (lfoAmount)         // sinte: 0..1 (mueve el filtro)
+    STUDOO_ID (trackFilter)       // pista: -1 (paso bajo) .. 0 .. 1 (paso alto)
+    STUDOO_ID (distortion)        // pista: 0..1
+    STUDOO_ID (chorusMix)         // pista: 0..1
+    STUDOO_ID (sidechain)         // pista: 0..1 (cuánto se agacha)
+    STUDOO_ID (sidechainSource)   // pista: de qué pista escucha (1..)
+    STUDOO_ID (limiter)           // pista: limitador encendido
+
 #undef STUDOO_ID
 }
