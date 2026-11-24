@@ -93,6 +93,16 @@ namespace
         else if (id == "velocity")       p.addNote (pattern, synth[ids::uid], 0.0, 1.0, 60, 0.3f);
         else if (id == "sidechain")      p.getMixerTrack (5).setProperty (ids::sidechain, 0.6, nullptr);
         else if (id == "efectos_creativos") p.getMixerTrack (6).setProperty (ids::chorusMix, 0.5, nullptr);
+        else if (id == "envio")
+        {
+            p.getMixerTrack (3).setProperty (ids::sendTo, 16, nullptr);
+            p.getMixerTrack (3).setProperty (ids::sendLevel, 0.5, nullptr);
+        }
+        else if (id == "editar_grabacion")
+        {
+            auto voice = p.addChannel (ChannelType::audio, "Voz", 7);
+            p.addClip ("audio", voice[ids::uid], 1, 0.0, 16.0, 2.0);
+        }
         else if (id == "chops")
         {
             kick.setProperty (ids::slices, 8, nullptr);

@@ -96,7 +96,10 @@ namespace
             ids::drive, ids::pluginDesc, ids::pluginState, ids::length, ids::channel, ids::data, ids::start,
             ids::pitch, ids::velocity, ids::kind, ids::ref, ids::track, ids::offset, ids::index, ids::solo, ids::eqLow,
             ids::eqMid, ids::eqHigh, ids::compOn, ids::compThreshold, ids::compRatio, ids::delayMix, ids::delayTime,
-            ids::delayFeedback, ids::reverbMix, ids::reverbSize, ids::target, ids::time, ids::value, ids::colour };
+            ids::delayFeedback, ids::reverbMix, ids::reverbSize, ids::target, ids::time, ids::value, ids::colour,
+            ids::swing, ids::sampleTune, ids::sampleStart, ids::sampleEnd, ids::reverse, ids::slices, ids::lfoRate,
+            ids::lfoAmount, ids::trackFilter, ids::distortion, ids::chorusMix, ids::sidechain, ids::sidechainSource,
+            ids::limiter, ids::sendTo, ids::sendLevel, ids::sendOnly, ids::clipGain, ids::fadeIn, ids::fadeOut };
 
         // Recorre todo el árbol y cambia, borra o duplica cosas al azar
         std::function<void (juce::ValueTree)> mutate = [&] (juce::ValueTree t)

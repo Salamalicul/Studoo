@@ -5,6 +5,7 @@
 #include "AppContext.h"
 #include "HelpButton.h"
 #include "Widgets.h"
+#include <map>
 
 namespace studoo
 {
@@ -40,12 +41,16 @@ namespace studoo
         juce::ValueTree clipAt (juce::Point<float>, bool& onRightEdge);
         juce::Rectangle<float> clipBounds (const juce::ValueTree& clip) const;
         double snap (double steps) const;
+        void showAudioClipMenu (juce::ValueTree clip, double atSteps);
+        const std::vector<float>& peaksFor (const juce::String& path, double& sampleRate);
+        static constexpr int samplesPerPeak = 256;
+        std::map<juce::String, std::pair<double, std::vector<float>>> peakCache;
 
         AppContext& ctx;
         Playlist& playlist;
         juce::ValueTree dragClip;
-        enum class DragMode { none, move, resize, ruler } dragMode = DragMode::none;
-        double dragStartSteps = 0.0, clipStart = 0.0, clipLength = 0.0;
+        enum class DragMode { none, move, resize, trimStart, ruler } dragMode = DragMode::none;
+        double dragStartSteps = 0.0, clipStart = 0.0, clipLength = 0.0, clipOffset = 0.0;
         int dragStartTrack = 0, clipTrack = 0;
     };
 

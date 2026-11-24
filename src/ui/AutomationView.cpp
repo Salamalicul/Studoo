@@ -116,6 +116,8 @@ void AutomationEditor::paint (juce::Graphics& g)
         switch (target.param)
         {
             case AutomationTarget::Param::cutoff: return juce::String ((int) v) + " Hz";
+            case AutomationTarget::Param::lfoRate: return juce::String (v, 1) + " Hz";
+            case AutomationTarget::Param::sampleTune: return (v > 0 ? "+" : "") + juce::String ((int) v) + " st";
             case AutomationTarget::Param::pan:    return std::abs (v) < 0.01f ? juce::String ("Centro") : (v < 0 ? juce::String ("Izquierda") : juce::String ("Derecha"));
             case AutomationTarget::Param::eqLow:
             case AutomationTarget::Param::eqMid:
@@ -328,7 +330,7 @@ void AutomationView::showNewLaneMenu()
     {
         juce::PopupMenu sub;
         for (auto p : { P::volume, P::pan, P::reverbMix, P::delayMix, P::eqLow, P::eqMid, P::eqHigh,
-                        P::trackFilter, P::distortion, P::chorusMix })
+                        P::trackFilter, P::distortion, P::chorusMix, P::sendLevel })
             add (sub, AutomationTarget::Kind::mixer, track, p);
         const auto name = track == 0 ? juce::String ("Master")
                                      : "Pista " + juce::String (track) + " (" + ctx.project.getMixerTrack (track)[ids::name].toString() + ")";
@@ -341,8 +343,14 @@ void AutomationView::showNewLaneMenu()
         juce::PopupMenu sub;
         add (sub, AutomationTarget::Kind::channel, ch[ids::uid], P::volume);
         add (sub, AutomationTarget::Kind::channel, ch[ids::uid], P::pan);
-        if (ch[ids::type].toString() == "synth")
-            add (sub, AutomationTarget::Kind::channel, ch[ids::uid], P::cutoff);
+        const auto type = ch[ids::type].toString();
+        if (type == "synth")
+            for (auto p : { P::cutoff, P::resonance, P::lfoRate, P::lfoAmount })
+                add (sub, AutomationTarget::Kind::channel, ch[ids::uid], p);
+        else if (type == "808")
+            add (sub, AutomationTarget::Kind::channel, ch[ids::uid], P::drive);
+        else if (type == "sampler")
+            add (sub, AutomationTarget::Kind::channel, ch[ids::uid], P::sampleTune);
         menu.addSubMenu (ch[ids::name].toString(), sub);
     }
 

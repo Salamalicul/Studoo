@@ -342,6 +342,35 @@ const std::vector<Challenge>& challenges()
                   for (auto& n : notesOf (p, ch)) pitches.insert ((int) n[ids::pitch]);
                   return pitches.size() >= 3; }); } },
 
+        { "envio", "Una pista de efectos",
+          "En el Mezclador, manda (ENVÍO) una pista a otra con la rueda Envío al 20% o más.",
+          "En la sección ENVÍO elige la pista de destino en el desplegable y gira la rueda.",
+          View::mixer,
+          [] (Project& p) {
+              for (int t = 1; t < numMixerTracks; ++t)
+              {
+                  auto tr = p.getMixerTrack (t);
+                  const int to = tr.getProperty (ids::sendTo, 0);
+                  if (to > t && to < numMixerTracks && (float) tr.getProperty (ids::sendLevel, 0.0f) >= 0.2f)
+                      return true;
+              }
+              return false; } },
+
+        { "editar_grabacion", "Edita tu grabación",
+          "En la Playlist, corta una grabación en dos o quítale el principio arrastrando su borde izquierdo.",
+          "Clic derecho (o mantener pulsado) sobre la grabación → Cortar aquí.",
+          View::playlist,
+          [] (Project& p) {
+              int audioClips = 0;
+              for (auto clip : p.playlist())
+                  if (clip[ids::kind].toString() == "audio")
+                  {
+                      ++audioClips;
+                      if ((double) clip[ids::offset] > 0.0)
+                          return true;
+                  }
+              return audioClips >= 2; } },
+
         { "efectos_creativos", "Efectos creativos",
           "En el Mezclador, usa el Filtro, el Sucio (Distor.) o el Chorus de una pista (al 20% o más).",
           "Son las tres ruedas de la sección \"FILTRO · SUCIO · CHORUS\".",

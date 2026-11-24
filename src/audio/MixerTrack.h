@@ -54,6 +54,7 @@ namespace studoo
         juce::dsp::Limiter<float> limiter;
 
         juce::AudioPluginInstance* plugin = nullptr;
+        juce::int64 silentSamples = 0;   // cuánto lleva la pista en silencio (para no gastar CPU)
         std::array<std::atomic<float>, 2> peak { 0.0f, 0.0f };
     };
 }

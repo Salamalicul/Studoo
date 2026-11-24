@@ -139,6 +139,9 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         cs.start = pos (c[ids::start], maxSong);
         cs.length = juce::jmax (0.25, pos (c[ids::length], maxSong));
         cs.offset = pos (c[ids::offset], maxSong);
+        cs.gain = num (c, ids::clipGain, 0.0f, 2.0f, 1.0f);
+        cs.fadeIn = juce::jmin (cs.length * 0.5, pos (c[ids::fadeIn], maxSong));
+        cs.fadeOut = juce::jmin (cs.length * 0.5, pos (c[ids::fadeOut], maxSong));
 
         if (cs.isAudio)
         {
@@ -185,6 +188,11 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         m.chorusMix = num (t, ids::chorusMix, 0.0f, 1.0f, 0.0f);
         m.sidechain = num (t, ids::sidechain, 0.0f, 1.0f, 0.0f);
         m.sidechainSource = juce::jlimit (1, numMixerTracks - 1, (int) t.getProperty (ids::sidechainSource, 1));
+        // Envíos: solo hacia una pista de número mayor (evita bucles infinitos); el Master no envía
+        const int sendTo = t.getProperty (ids::sendTo, 0);
+        m.sendTo = (i > 0 && sendTo > i && sendTo < numMixerTracks) ? sendTo : 0;
+        m.sendLevel = m.sendTo > 0 ? num (t, ids::sendLevel, 0.0f, 1.0f, 0.0f) : 0.0f;
+        m.sendOnly = m.sendTo > 0 && (bool) t.getProperty (ids::sendOnly, false);
         // El Master trae el limitador encendido (protege de que suene a tope)
         m.limiter = (bool) t.getProperty (ids::limiter, i == 0);
     }

@@ -83,6 +83,16 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
     float* l = buffer.getWritePointer (0);
     float* r = buffer.getWritePointer (1);
 
+    // Pista en silencio desde hace rato (más que el eco más largo): no hace falta procesar nada.
+    // Ahorra mucha CPU con 16 pistas, sobre todo en el móvil.
+    constexpr float quiet = 1.0e-5f;
+    const bool inputSilent = buffer.getMagnitude (0, 0, n) < quiet && buffer.getMagnitude (1, 0, n) < quiet;
+    if (inputSilent && plugin == nullptr && silentSamples > delayLine.getNumSamples() + (juce::int64) sr)
+    {
+        buffer.clear (0, n);
+        return;
+    }
+
     // --- EQ ------------------------------------------------------------------
     updateEq (p);
     for (size_t band = 0; band < 3; ++band)
@@ -238,6 +248,12 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         auto sub = block.getSubBlock (0, (size_t) n);
         limiter.process (juce::dsp::ProcessContextReplacing<float> (sub));
     }
+
+    // Lleva la cuenta del silencio (entrada y salida)
+    if (inputSilent && buffer.getMagnitude (0, 0, n) < quiet && buffer.getMagnitude (1, 0, n) < quiet)
+        silentSamples += n;
+    else
+        silentSamples = 0;
 
     // --- Medidor ---------------------------------------------------------------------------
     for (int ch = 0; ch < 2; ++ch)

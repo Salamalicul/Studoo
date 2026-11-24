@@ -390,6 +390,143 @@ int main (int argc, char* argv[])
         auto dist = withFx (ids::distortion, 1.0f), chorus = withFx (ids::chorusMix, 1.0f);
         check (isFinite (dist) && isFinite (chorus) && dist.getRMSLevel (0, 0, dist.getNumSamples()) > 0.01f
                && chorus.getRMSLevel (0, 0, chorus.getNumSamples()) > 0.01f, "Distorsión y chorus suenan sin romper nada");
+
+        // 16 pistas y envíos
+        auto rms = [] (const juce::AudioBuffer<float>& b) { return b.getRMSLevel (0, 0, b.getNumSamples()); };
+        auto kickOn = [&] (std::function<void (Project&, juce::ValueTree)> extra)
+        {
+            return renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                for (int s : { 0, 4, 8, 12 }) stepAt (p, k, s);
+                extra (p, k);
+            }, 1.0);
+        };
+        {
+            Project p;
+            check (p.getMixerTrack (16).isValid() && (int) p.getMixerTrack (16)[ids::index] == 16, "El mezclador tiene 16 pistas (más el Master)");
+        }
+        auto onLast = kickOn ([] (Project&, juce::ValueTree k) { k.setProperty (ids::mixer, 16, nullptr); });
+        check (rms (onLast) > 0.01f, "Un canal en la pista 16 suena");
+        auto direct = kickOn ([] (Project&, juce::ValueTree) {});
+        auto bussed = kickOn ([] (Project& p, juce::ValueTree k)
+        {
+            auto t = p.getMixerTrack ((int) k[ids::mixer]);
+            t.setProperty (ids::sendTo, 12, nullptr);
+            t.setProperty (ids::sendLevel, 1.0f, nullptr);
+            t.setProperty (ids::sendOnly, true, nullptr);
+            p.getMixerTrack (12).setProperty (ids::volume, 0.8f, nullptr);
+        });
+        check (std::abs (rms (bussed) - rms (direct) * 0.8f) < rms (direct) * 0.15f, "Solo envío: el bombo suena a través de la pista 12");
+        auto bussedMuted = kickOn ([] (Project& p, juce::ValueTree k)
+        {
+            auto t = p.getMixerTrack ((int) k[ids::mixer]);
+            t.setProperty (ids::sendTo, 12, nullptr);
+            t.setProperty (ids::sendLevel, 1.0f, nullptr);
+            t.setProperty (ids::sendOnly, true, nullptr);
+            p.getMixerTrack (12).setProperty (ids::muted, true, nullptr);
+        });
+        check (rms (bussedMuted) < 1.0e-4f, "Si la pista de destino está en silencio, el envío tampoco suena");
+        auto doubled = kickOn ([] (Project& p, juce::ValueTree k)
+        {
+            auto t = p.getMixerTrack ((int) k[ids::mixer]);
+            t.setProperty (ids::sendTo, 12, nullptr);
+            t.setProperty (ids::sendLevel, 1.0f, nullptr);
+        });
+        check (rms (doubled) > rms (direct) * 1.3f, "Envío normal: se oye la pista y además la copia");
+        auto loop = kickOn ([] (Project& p, juce::ValueTree k)
+        {
+            const int t = k[ids::mixer];
+            p.getMixerTrack (t).setProperty (ids::sendTo, t, nullptr);           // a sí misma: no se permite
+            p.getMixerTrack (t).setProperty (ids::sendLevel, 1.0f, nullptr);
+            p.getMixerTrack (12).setProperty (ids::sendTo, 3, nullptr);          // hacia atrás: no se permite
+            p.getMixerTrack (12).setProperty (ids::sendLevel, 1.0f, nullptr);
+        });
+        check (isFinite (loop) && std::abs (rms (loop) - rms (direct)) < rms (direct) * 0.05f, "Los envíos imposibles (bucles) se ignoran");
+        auto soloSend = kickOn ([] (Project& p, juce::ValueTree k)
+        {
+            auto t = p.getMixerTrack ((int) k[ids::mixer]);
+            t.setProperty (ids::sendTo, 12, nullptr);
+            t.setProperty (ids::sendLevel, 1.0f, nullptr);
+            t.setProperty (ids::sendOnly, true, nullptr);
+            t.setProperty (ids::solo, true, nullptr);
+        });
+        check (rms (soloSend) > 0.01f, "Solo en una pista con envío: también se oye su destino");
+
+        // Proyecto antiguo con 8 pistas: se abre con 16
+        {
+            Project old;
+            auto mix = old.getState().getChildWithName (ids::MIXER);
+            for (int i = mix.getNumChildren(); --i >= 9;)
+                mix.removeChild (i, nullptr);
+            juce::String error;
+            Project p;
+            check (p.loadFromXmlString (old.toXmlString(), error) && p.getMixerTrack (16).isValid(),
+                   "Un proyecto de antes (8 pistas) se abre con 16 pistas");
+        }
+
+        // Grabaciones: volumen y fundidos del clip
+        auto audioClip = [&] (float gain, double fadeIn)
+        {
+            Project p;
+            auto voice = p.addChannel (ChannelType::audio, "Voz", 7);
+            voice.setProperty (ids::sample, "builtin:kick", nullptr);
+            auto clip = p.addClip ("audio", voice[ids::uid], 0, 0.0, 8.0);
+            clip.setProperty (ids::clipGain, gain, nullptr);
+            clip.setProperty (ids::fadeIn, fadeIn, nullptr);
+            p.getState().setProperty (ids::playMode, "song", nullptr);
+            for (auto ch : p.channels())
+                if (ch != voice) ch.setProperty (ids::muted, true, nullptr);
+            AudioEngine e;
+            e.prepare (sampleRate, blockSize);
+            e.updateFromProject (p.getState(), cache);
+            e.play();
+            return renderSeconds (e, 0.5);
+        };
+        auto full = audioClip (1.0f, 0.0), half = audioClip (0.5f, 0.0), faded = audioClip (1.0f, 4.0);
+        check (rms (full) > 0.01f, "Una grabación en la playlist suena");
+        check (std::abs (rms (half) - rms (full) * 0.5f) < rms (full) * 0.1f, "Volumen del clip al 50%");
+        check (faded.getMagnitude (0, 0, 2000) < full.getMagnitude (0, 0, 2000) * 0.3f, "Fundido de entrada: empieza bajito");
+
+        // Automatizar controles de instrumentos
+        {
+            using P = AutomationTarget::Param;
+            bool ok = true;
+            for (auto param : { P::resonance, P::lfoRate, P::lfoAmount, P::drive, P::sampleTune, P::sendLevel })
+            {
+                AutomationTarget t;
+                t.kind = AutomationTarget::Kind::channel;
+                t.index = 7;
+                t.param = param;
+                ok = ok && AutomationTarget::parse (t.toString()).param == param;
+                const float v = AutomationTarget::fromNormalised (param, 0.6f);
+                ok = ok && std::abs (AutomationTarget::toNormalised (param, v) - 0.6f) < 0.03f;
+            }
+            check (ok, "Las automatizaciones nuevas (LFO, resonancia, 808, tono, envío) se guardan y se leen bien");
+
+            auto withLane = [&] (float value)
+            {
+                Project p;
+                auto bass = p.findChannelByType (ChannelType::bass808);
+                p.addNote (p.getCurrentPattern(), bass[ids::uid], 0.0, 8.0, 36);
+                p.getState().setProperty (ids::playMode, "song", nullptr);
+                AutomationTarget t;
+                t.kind = AutomationTarget::Kind::channel;
+                t.index = bass[ids::uid];
+                t.param = P::drive;
+                auto lane = p.addAutomationLane (t);
+                for (auto point : lane)
+                    point.setProperty (ids::value, value, nullptr);
+                for (auto ch : p.channels())
+                    if (ch != bass) ch.setProperty (ids::muted, true, nullptr);
+                AudioEngine e;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (p.getState(), cache);
+                e.play();
+                return renderSeconds (e, 0.8);
+            };
+            auto clean = withLane (0.0f), dirty = withLane (1.0f);
+            check (rms (dirty) > rms (clean) * 1.2f, "Automatizar la distorsión del 808 cambia el sonido");
+        }
     }
 
     // --- Sonidos de los juegos de oído ------------------------------------------------------

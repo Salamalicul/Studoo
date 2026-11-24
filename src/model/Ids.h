@@ -111,6 +111,12 @@ namespace studoo::ids
     STUDOO_ID (chorusMix)         // pista: 0..1
     STUDOO_ID (sidechain)         // pista: 0..1 (cuánto se agacha)
     STUDOO_ID (sidechainSource)   // pista: de qué pista escucha (1..)
+    STUDOO_ID (sendTo)            // pista: a qué pista manda una copia (0 = a ninguna; solo a pistas de número mayor)
+    STUDOO_ID (sendLevel)         // pista: 0..1, cuánto manda
+    STUDOO_ID (clipGain)          // clip de audio: volumen 0..2
+    STUDOO_ID (fadeIn)            // clip de audio: fundido de entrada (en pasos)
+    STUDOO_ID (fadeOut)           // clip de audio: fundido de salida (en pasos)
+    STUDOO_ID (sendOnly)          // pista: true = solo suena a través del envío (no va directa al Master)
     STUDOO_ID (limiter)           // pista: limitador encendido
 
 #undef STUDOO_ID

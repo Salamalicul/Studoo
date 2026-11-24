@@ -681,8 +681,14 @@ void AudioEngine::renderAudioClips (const Snapshot& snap, double from, double to
             if (srcPos >= (double) (srcLength - 1)) break;  // antes de convertir a int (sin desbordes)
             const int idx = (int) srcPos;
             const float frac = (float) (srcPos - idx);
-            outL[i] += srcL[idx] + (srcL[idx + 1] - srcL[idx]) * frac;
-            outR[i] += srcR[idx] + (srcR[idx + 1] - srcR[idx]) * frac;
+            // Volumen del clip y fundidos (siempre un fundido mínimo para que los cortes no hagan "clic")
+            const double inClip = songTime - clip.start;
+            constexpr double minFade = 0.03;
+            const double fin = juce::jmax (minFade, clip.fadeIn), fout = juce::jmax (minFade, clip.fadeOut);
+            const float env = clip.gain * (float) juce::jmin (1.0, inClip / fin, (clip.length - inClip) / fout);
+            if (env <= 0.0f) continue;
+            outL[i] += (srcL[idx] + (srcL[idx + 1] - srcL[idx]) * frac) * env;
+            outR[i] += (srcR[idx] + (srcR[idx + 1] - srcR[idx]) * frac) * env;
         }
     }
 }
@@ -809,6 +815,7 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
                 case AutomationTarget::Param::trackFilter: tp.filter = v; break;
                 case AutomationTarget::Param::distortion:  tp.distortion = v; break;
                 case AutomationTarget::Param::chorusMix:   tp.chorusMix = v; break;
+                case AutomationTarget::Param::sendLevel:   tp.sendLevel = v; break;
                 default: break;
             }
         }
@@ -823,12 +830,31 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
 
         if (rt.instrument != nullptr)
         {
-            if (automate && ch.type == ChannelType::synth)
+            bool instrumentAutomated = false;
+            if (automate)
+                for (const auto& lane : snap->lanes)
+                    instrumentAutomated = instrumentAutomated
+                        || (lane.channelIndex == (int) i && AutomationTarget::isInstrumentParam (lane.target.param));
+            if (instrumentAutomated)
             {
+                using P = AutomationTarget::Param;
                 ChannelSnap tmp = ch;
                 for (const auto& lane : snap->lanes)
-                    if (lane.channelIndex == (int) i && lane.target.param == AutomationTarget::Param::cutoff)
-                        tmp.synth.cutoff = AutomationTarget::fromNormalised (lane.target.param, lane.valueAt (chunkStartPos));
+                {
+                    if (lane.channelIndex != (int) i)
+                        continue;
+                    const float v = AutomationTarget::fromNormalised (lane.target.param, lane.valueAt (chunkStartPos));
+                    switch (lane.target.param)
+                    {
+                        case P::cutoff:     tmp.synth.cutoff = v; break;
+                        case P::resonance:  tmp.synth.resonance = v; break;
+                        case P::lfoRate:    tmp.synth.lfoRate = v; break;
+                        case P::lfoAmount:  tmp.synth.lfoAmount = v; break;
+                        case P::drive:      tmp.bass.drive = v; break;
+                        case P::sampleTune: tmp.sampler.tune = v; break;
+                        default: break;
+                    }
+                }
                 rt.instrument->setParameters (tmp);
             }
             else
@@ -889,18 +915,37 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     }
 
     // --- Mezclador -----------------------------------------------------------------------------
+    // Solo: una pista que recibe el envío de una pista en solo también se oye
+    std::array<bool, numMixerTracks> soloed {};
     bool anySolo = false;
     for (int t = 1; t < numMixerTracks; ++t)
-        anySolo = anySolo || trackParams[(size_t) t].solo;
+    {
+        const auto& tp = trackParams[(size_t) t];
+        soloed[(size_t) t] = soloed[(size_t) t] || tp.solo;
+        anySolo = anySolo || tp.solo;
+        if (soloed[(size_t) t] && tp.sendTo > t && tp.sendLevel > 0.0f)
+            soloed[(size_t) tp.sendTo] = true;
+    }
 
     auto& master = mixer[0].getBuffer();
     for (int t = 1; t < numMixerTracks; ++t)
     {
         const auto& tp = trackParams[(size_t) t];
-        const bool silenced = tp.mute || (anySolo && ! tp.solo);
+        const bool silenced = tp.mute || (anySolo && ! soloed[(size_t) t]);
+        auto& out = mixer[(size_t) t].getBuffer();
         mixer[(size_t) t].process (n, tp, snap->bpm, silenced);
-        master.addFrom (0, 0, mixer[(size_t) t].getBuffer(), 0, 0, n);
-        master.addFrom (1, 0, mixer[(size_t) t].getBuffer(), 1, 0, n);
+
+        // Envío: una copia (después del volumen) va a otra pista, que aún no se ha procesado
+        if (tp.sendTo > t && tp.sendTo < numMixerTracks && tp.sendLevel > 0.0f)
+        {
+            auto& dest = mixer[(size_t) tp.sendTo].getBuffer();
+            dest.addFrom (0, 0, out, 0, 0, n, tp.sendLevel);
+            dest.addFrom (1, 0, out, 1, 0, n, tp.sendLevel);
+        }
+        if (tp.sendOnly && tp.sendTo > t)
+            continue;
+        master.addFrom (0, 0, out, 0, 0, n);
+        master.addFrom (1, 0, out, 1, 0, n);
     }
     mixer[0].process (n, trackParams[0], snap->bpm, trackParams[0].mute);
     metronome.render (master, n);

@@ -83,7 +83,9 @@ namespace studoo::help
         "- Clic derecho en un bloque: borrarlo. Doble clic: abrir ese patrón en el secuenciador.\n"
         "- Clic en la regla de arriba: mueve el cursor de reproducción.\n\n"
         "IMPORTANTE: para escuchar la playlist pulsa CANCIÓN en la barra superior (o la tecla L).\n\n"
-        "Las grabaciones de voz aparecen aquí como bloques verdes.\n\n"
+        "Las grabaciones de voz aparecen aquí como bloques verdes, con su forma de onda. Para editarlas:\n"
+        "- Arrastra su borde izquierdo para quitar el principio (o el derecho para quitar el final).\n"
+        "- Clic derecho (o mantener pulsado): cortar en dos, duplicar, volumen y fundidos de entrada y salida.\n\n"
         "Idea de estructura: Intro (4 compases) - Estribillo (8) - Estrofa (16) - Estribillo (8) - Final (4).";
 
     inline constexpr const char* mixerTitle = "Mezclador";
@@ -100,6 +102,8 @@ namespace studoo::help
         "Chorus: lo hace más ancho.\n"
         "- Sidechain: elige la pista del bombo y sube la Bajada; esta pista se agachará con cada golpe (el \"bombeo\").\n"
         "- Limitador: no deja que el sonido pase del máximo. El Master lo trae encendido.\n"
+        "- Envío: manda una copia del sonido a otra pista (por ejemplo, una pista solo con reverb). "
+        "Con \"Solo envío\" la pista suena únicamente a través de la otra: así agrupas, por ejemplo, toda la batería.\n"
         "- Plugin: añade un efecto VST3.\n"
         "- PAN: izquierda/derecha. M = silenciar. S = escuchar solo esa pista.\n"
         "- Fader: el volumen. La barra de color muestra el nivel. Si llega arriba del todo, baja el volumen.";
@@ -117,7 +121,7 @@ namespace studoo::help
     inline constexpr const char* learnTitle = "Aprende";
     inline constexpr const char* learnText =
         "Todo para aprender a producir, de cero a terminar canciones. Tiene cuatro pestañas:\n\n"
-        "- Ruta: 58 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
+        "- Ruta: 59 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
         "un test al final y bases de 11 géneros para cargar y cambiar.\n"
         "- Juegos: entrena el oído (instrumentos, notas, acordes y géneros).\n"
         "- Logros: tu racha de días practicando, tus estadísticas y tus medallas.\n"

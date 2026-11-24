@@ -3,6 +3,162 @@
 
 namespace studoo
 {
+// ============================================================================
+//  SampleWaveform
+// ============================================================================
+SampleWaveform::SampleWaveform (AppContext& c, juce::ValueTree ch) : ctx (c), channel (ch)
+{
+    setTooltip (txt ("La forma de onda del sample. Arrastra la marca verde (inicio) o la roja (final) para recortarlo. "
+                     "Las líneas finas son los trozos (chops)."));
+    makeNonFocusing (*this);
+    channel.addListener (this);
+    rebuildPeaks();
+}
+
+SampleWaveform::~SampleWaveform() { channel.removeListener (this); }
+
+void SampleWaveform::valueTreePropertyChanged (juce::ValueTree& t, const juce::Identifier& id)
+{
+    if (t != channel)
+        return;
+    if (id == ids::sample)
+        rebuildPeaks();
+    if (id == ids::sample || id == ids::sampleStart || id == ids::sampleEnd || id == ids::slices || id == ids::reverse)
+        repaint();
+}
+
+void SampleWaveform::rebuildPeaks()
+{
+    const auto path = channel[ids::sample].toString();
+    if (path == peaksPath && ! peaks.empty())
+        return;
+    peaksPath = path;
+    peaks.clear();
+    auto sample = path.isNotEmpty() ? ctx.samples.get (path) : nullptr;
+    if (sample == nullptr || sample->buffer.getNumSamples() == 0)
+        return;
+
+    constexpr int numPeaks = 400;
+    const auto& b = sample->buffer;
+    const int len = b.getNumSamples();
+    peaks.resize (numPeaks, 0.0f);
+    float maxPeak = 0.0001f;
+    for (int i = 0; i < numPeaks; ++i)
+    {
+        const int from = (int) ((juce::int64) len * i / numPeaks);
+        const int to = juce::jmax (from + 1, (int) ((juce::int64) len * (i + 1) / numPeaks));
+        float m = 0.0f;
+        for (int ch = 0; ch < b.getNumChannels(); ++ch)
+            m = juce::jmax (m, b.getMagnitude (ch, from, juce::jmin (to, len) - from));
+        peaks[(size_t) i] = m;
+        maxPeak = juce::jmax (maxPeak, m);
+    }
+    for (auto& p : peaks)
+        p /= maxPeak;   // normalizado para que se vea bien aunque el sample sea flojo
+}
+
+juce::Rectangle<float> SampleWaveform::waveArea() const
+{
+    return getLocalBounds().toFloat().reduced (2.0f, 4.0f).withTrimmedBottom (12.0f);
+}
+
+void SampleWaveform::paint (juce::Graphics& g)
+{
+    auto area = waveArea();
+    g.setColour (juce::Colour (0xff121417));
+    g.fillRoundedRectangle (area, 5.0f);
+    g.setColour (Colours::outline);
+    g.drawRoundedRectangle (area, 5.0f, 1.0f);
+
+    const auto colour = Colours::forChannelType (channel[ids::type].toString());
+    if (peaks.empty())
+    {
+        g.setColour (Colours::textDim);
+        g.setFont (Fonts::regular (11.0f));
+        g.drawFittedText (txt ("Sin sample"), area.toNearestInt(), juce::Justification::centred, 1);
+        return;
+    }
+
+    const float start = juce::jlimit (0.0f, 1.0f, (float) channel.getProperty (ids::sampleStart, 0.0f));
+    const float end = juce::jlimit (0.0f, 1.0f, (float) channel.getProperty (ids::sampleEnd, 1.0f));
+    const auto inner = area.reduced (3.0f, 3.0f);
+    const float cy = inner.getCentreY(), half = inner.getHeight() * 0.5f;
+    const float step = inner.getWidth() / (float) peaks.size();
+    for (size_t i = 0; i < peaks.size(); ++i)
+    {
+        const float pos = (float) i / (float) peaks.size();
+        const bool inside = pos >= start && pos <= end;
+        g.setColour (inside ? colour.withAlpha (0.9f) : Colours::textDim.withAlpha (0.25f));
+        const float h = juce::jmax (0.5f, peaks[i] * half);
+        g.fillRect (inner.getX() + (float) i * step, cy - h, juce::jmax (1.0f, step), h * 2.0f);
+    }
+
+    // Trozos (chops)
+    const int slices = juce::jlimit (1, 16, (int) channel.getProperty (ids::slices, 1));
+    if (slices > 1 && end > start)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        for (int s = 1; s < slices; ++s)
+        {
+            const float x = inner.getX() + inner.getWidth() * (start + (end - start) * (float) s / (float) slices);
+            g.drawVerticalLine ((int) x, inner.getY(), inner.getBottom());
+        }
+    }
+
+    // Marcas de inicio (verde) y final (rojo)
+    auto marker = [&] (float pos, juce::Colour c)
+    {
+        const float x = inner.getX() + inner.getWidth() * pos;
+        g.setColour (c);
+        g.fillRect (x - 1.0f, area.getY(), 2.0f, area.getHeight());
+        juce::Path tri;
+        tri.addTriangle (x - 5.0f, area.getY(), x + 5.0f, area.getY(), x, area.getY() + 7.0f);
+        g.fillPath (tri);
+    };
+    marker (start, Colours::green);
+    marker (end, juce::Colour (0xffef5350));
+
+    g.setColour (Colours::textDim);
+    g.setFont (Fonts::regular (10.0f));
+    auto caption = getLocalBounds().toFloat().removeFromBottom (13.0f);
+    juce::String text = txt ("Arrastra las marcas para recortar");
+    if ((bool) channel.getProperty (ids::reverse, false))
+        text = txt ("◀ Suena al revés");
+    else if (slices > 1)
+        text = juce::String (slices) + txt (" trozos: cada nota toca uno");
+    g.drawFittedText (text, caption.toNearestInt(), juce::Justification::centred, 1);
+}
+
+void SampleWaveform::mouseDown (const juce::MouseEvent& e)
+{
+    if (peaks.empty())
+        return;
+    const auto inner = waveArea().reduced (3.0f, 3.0f);
+    const float pos = juce::jlimit (0.0f, 1.0f, (e.position.x - inner.getX()) / juce::jmax (1.0f, inner.getWidth()));
+    const float start = channel.getProperty (ids::sampleStart, 0.0f);
+    const float end = channel.getProperty (ids::sampleEnd, 1.0f);
+    draggingStart = std::abs (pos - start) < std::abs (pos - end);
+    ctx.project.beginTransaction();
+    mouseDrag (e);
+}
+
+void SampleWaveform::mouseDrag (const juce::MouseEvent& e)
+{
+    if (peaks.empty())
+        return;
+    const auto inner = waveArea().reduced (3.0f, 3.0f);
+    const float pos = juce::jlimit (0.0f, 1.0f, (e.position.x - inner.getX()) / juce::jmax (1.0f, inner.getWidth()));
+    const float start = channel.getProperty (ids::sampleStart, 0.0f);
+    const float end = channel.getProperty (ids::sampleEnd, 1.0f);
+    if (draggingStart)
+        channel.setProperty (ids::sampleStart, juce::jmin (pos, end - 0.01f), ctx.project.um());
+    else
+        channel.setProperty (ids::sampleEnd, juce::jmax (pos, start + 0.01f), ctx.project.um());
+}
+
+// ============================================================================
+//  InstrumentPanel
+// ============================================================================
 InstrumentPanel::InstrumentPanel (AppContext& c)
     : ctx (c), helpButton (txt (help::instrumentTitle), txt (help::instrumentText))
 {
@@ -52,6 +208,10 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
             makeNonFocusing (*load);
             controls.add (load);
             addAndMakeVisible (load);
+
+            auto* wave = new SampleWaveform (ctx, channel);
+            controls.add (wave);
+            addAndMakeVisible (wave);
 
             auto* oneShot = new juce::ToggleButton (txt ("One-shot (suena entero)"));
             oneShot->setTooltip (txt ("Activado: el sample suena completo aunque la nota sea corta (ideal para batería). "
@@ -247,16 +407,38 @@ void InstrumentPanel::resized()
         if (auto* k = dynamic_cast<Knob*> (c))
             k->getSlider().setColour (juce::Slider::rotarySliderFillColourId, colour);
 
+    // ¿Cuánto ocupa todo menos la forma de onda? Ella usa lo que sobre (y se esconde si no cabe)
+    auto widthOf = [] (juce::Component* c)
+    {
+        if (dynamic_cast<juce::TextButton*> (c) != nullptr) return 130;
+        if (auto* tb = dynamic_cast<juce::ToggleButton*> (c))
+            return juce::GlyphArrangement::getStringWidthInt (juce::FontOptions (15.0f), tb->getButtonText()) + 44;
+        if (dynamic_cast<juce::ComboBox*> (c) != nullptr) return 110;
+        if (dynamic_cast<SampleWaveform*> (c) != nullptr) return 0;
+        return 60;
+    };
+    int fixed = 0;
+    for (auto* c : controls)
+        fixed += widthOf (c) + 6;
+    const int waveWidth = juce::jmin (230, area.getWidth() - fixed - 6);
+
     for (auto* c : controls)
     {
+        if (dynamic_cast<SampleWaveform*> (c) != nullptr)
+        {
+            c->setVisible (waveWidth >= 110);
+            if (waveWidth < 110)
+                continue;
+        }
         int w = 60;
         if (dynamic_cast<juce::TextButton*> (c) != nullptr)   w = 130;
         if (auto* tb = dynamic_cast<juce::ToggleButton*> (c))
             w = juce::GlyphArrangement::getStringWidthInt (juce::FontOptions (15.0f), tb->getButtonText()) + 44;
         if (dynamic_cast<juce::ComboBox*> (c) != nullptr)     w = 110;
+        if (dynamic_cast<SampleWaveform*> (c) != nullptr)     w = waveWidth;
 
         auto slot = area.removeFromLeft (w);
-        if (dynamic_cast<Knob*> (c) != nullptr)
+        if (dynamic_cast<Knob*> (c) != nullptr || dynamic_cast<SampleWaveform*> (c) != nullptr)
             c->setBounds (slot);
         else
             c->setBounds (slot.withSizeKeepingCentre (w - 8, 28));

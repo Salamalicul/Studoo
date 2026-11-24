@@ -456,7 +456,7 @@ R"TXT(Un **sample** es un trozo de audio grabado: un golpe de batería, una voz,
 - **One-shot**: el sample suena entero aunque la nota sea corta. Actívalo para la batería.
 - **Nota base**: la nota en la que el sample suena con su tono original.
 - **Tono**: sube o baja el sample en semitonos (+12 = una octava más agudo).
-- **Inicio** y **Final**: recortan el sample. Sube el Inicio para quitar el silencio del principio, baja el Final para cortarlo antes.
+- **Inicio** y **Final**: recortan el sample. También puedes arrastrar las marcas **verde** (inicio) y **roja** (final) de la forma de onda.
 - **Al revés**: el sample suena del final al principio. Un platillo al revés es la entrada perfecta para un estribillo.
 - **Trozos**: corta el sample en partes iguales (chops). Lo vemos en el Nivel 9.
 
@@ -754,7 +754,17 @@ R"TXT(Puedes grabar tu voz (o una guitarra) con un micrófono y ponerla encima d
 - Si las luces del mezclador llegan arriba del todo, aléjate o baja la ganancia.
 - Graba varias tomas y quédate con la mejor.
 
-? Graba 8 compases hablando o cantando encima de tu beat y ponle un poco de reverb y compresor.
+## Editar la grabación
+En la playlist la grabación se ve con su **forma de onda** (los picos son las partes fuertes).
+- **Quitar el principio**: arrastra el **borde izquierdo** del bloque hacia la derecha. Para quitar el final, el borde derecho.
+- **Cortar en dos**: clic derecho (o mantén pulsado) donde quieras cortar → **Cortar aquí**. Luego puedes mover o borrar cada trozo.
+- **Duplicar**: pone una copia justo detrás (genial para repetir un coro).
+- **Volumen**: sube o baja solo ese trozo.
+- **Fundidos**: el sonido entra o se va poco a poco, sin cortes bruscos.
+
+? Graba 8 compases hablando o cantando encima de tu beat, quita el silencio del principio y ponle un poco de reverb y compresor.
+
+[reto:editar_grabacion]
 
 [reto:grabacion])TXT" },
 
@@ -1278,7 +1288,7 @@ R"TXT(Hacer **chops** (trocear) es cortar un sample en trocitos y volver a tocar
 
 ## Trocear en Studoo
 1. Carga un sample largo (un acorde, una frase de voz o un loop) en un canal **Sampler**.
-2. Abajo, en el panel del sonido, sube **Trozos**: por ejemplo **8 trozos**.
+2. Abajo, en el panel del sonido, sube **Trozos**: por ejemplo **8 trozos**. En la **forma de onda** verás las líneas de cada trozo.
 3. Ve al **Piano roll** con ese canal. La **Nota base** toca el trozo 1, la nota de encima el trozo 2, la siguiente el 3...
 4. Pon notas de distintas alturas y escucha: cada una suena un trozo diferente.
 5. Desactiva **One-shot** si quieres que cada trozo se corte al acabar la nota.
@@ -1289,7 +1299,7 @@ R"TXT(Hacer **chops** (trocear) es cortar un sample en trocitos y volver a tocar
 - **Al revés**: activa **Al revés** para que los trozos suenen del final al principio.
 - **Tono**: con **Tono** puedes subir o bajar todos los trozos (sin cambiar el orden).
 
-> Si el sample tiene un silencio al principio, sube un poco el **Inicio** antes de trocear: así los trozos caen justo en los golpes.
+> Si el sample tiene un silencio al principio, arrastra la **marca verde** de la forma de onda (o sube el **Inicio**) antes de trocear: así los trozos caen justo en los golpes.
 
 ! Para publicar, usa samples libres de derechos o graba los tuyos (tu voz, una guitarra, un objeto de casa).
 
@@ -1320,11 +1330,42 @@ El **Chorus** copia el sonido varias veces con pequeñas diferencias: suena **m�
 ## LFO del sintetizador
 En el panel del **Sintetizador** hay dos ruedas más: **LFO vel.** y **LFO cant.** El LFO mueve el filtro del sinte arriba y abajo solo: es el "wobble" del dubstep. Prueba LFO vel. a 2 Hz y LFO cant. al 60%.
 
+> Todo esto se puede **automatizar**: en Automatización encontrarás el filtro, la resonancia y el LFO del sinte, la distorsión del 808, el tono del sampler y los envíos.
+
 [ir:mezclador|Ir al Mezclador]
 
 ? Pon un pad con acordes, súbele el **Chorus** al 60% y compara. Después automatiza su **Filtro** de -100% a 0% durante 4 compases.
 
 [reto:efectos_creativos])TXT" },
+
+    { "Nivel 9 · Producción avanzada", "Envíos y buses", "7 min",
+      "que son los envios y buses en la mezcla",
+R"TXT(Hasta ahora cada pista tenía sus propios efectos. Los productores usan además **envíos**: mandar una **copia** del sonido de varias pistas a una pista especial.
+
+[anim:volumenes|Varias pistas mandan una copia a la misma pista de efectos]
+
+## Pista de efectos (reverb compartida)
+En vez de poner una reverb en cada pista, se crea **una sola pista de reverb** y las demás le mandan un poco de sonido. Así todo suena en la **misma sala** y la mezcla queda más unida.
+1. En el **Mezclador**, elige una pista libre del final (por ejemplo, la **16**). Renómbrala "Reverb" con doble clic.
+2. En esa pista, sube la **Mezcla** de la reverb al **100%** y el **Tamaño** a tu gusto.
+3. En la pista de la voz o de los acordes, en **ENVÍO**, elige **→ 16. Reverb** y gira la rueda **Envío**.
+4. Cuanto más envío, más reverb tiene ese sonido.
+
+## Bus (agrupar pistas)
+Un **bus** es una pista que junta varias. Por ejemplo, toda la batería:
+1. Renombra una pista del final como "Batería".
+2. En el bombo, la caja y los hi-hats: **ENVÍO → Batería**, rueda al 100% y activa **Solo envío**.
+3. Ahora el fader de "Batería" sube o baja toda la batería a la vez, y puedes ponerle un compresor a todo junto.
+
+! Solo se puede enviar a pistas con un **número mayor** (para que el sonido no dé vueltas sin fin). Por eso las pistas de efectos y los buses se ponen al **final**.
+
+> Studoo tiene **16 pistas** en el mezclador: sobra sitio para tus sonidos, pistas de efectos y buses.
+
+[ir:mezclador|Ir al Mezclador]
+
+? Crea una pista "Reverb" en la 16 y mándale un poco de la voz y de los acordes. Compara con el envío a 0.
+
+[reto:envio])TXT" },
 
     // =========================================================================
     { "Nivel 9 · Producción avanzada", "Mezclar voces", "8 min",

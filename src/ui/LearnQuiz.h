@@ -546,6 +546,16 @@ namespace studoo::learn
       { "Con el bajo y los pads", "Con el bombo", "Con el metrónomo" }, 0,
       "Lo que choca con el bombo (bajo, pads) es lo que se agacha." },
 
+    { "Envíos y buses", "¿Para qué sirve una pista de efectos con reverb?",
+      { "Para que varias pistas compartan la misma reverb", "Para subir el BPM", "Para grabar la voz" }, 0,
+      "Todas suenan en la misma \"sala\" y la mezcla queda más unida (y gasta menos)." },
+    { "Envíos y buses", "¿Qué hace \"Solo envío\"?",
+      { "La pista solo suena a través de la pista de destino", "Silencia la pista", "Sube el volumen al máximo" }, 0,
+      "Así agrupas pistas en un bus: un solo fader controla todo el grupo." },
+    { "Envíos y buses", "¿A qué pistas se puede mandar un envío?",
+      { "A pistas con un número mayor", "A cualquiera, también a sí misma", "Solo al Master" }, 0,
+      "Así el sonido nunca da vueltas sin fin. Pon las pistas de efectos al final." },
+
     { "Chops: trocear un sample", "¿Qué es hacer chops?",
       { "Cortar un sample en trozos y tocarlos en otro orden", "Subir el volumen", "Borrar el sample" }, 0,
       "Así nació el hip-hop: de una frase de un disco salían melodías nuevas." },

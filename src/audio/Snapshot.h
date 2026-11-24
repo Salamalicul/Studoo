@@ -70,6 +70,8 @@ namespace studoo
         int patternIndex = -1; // si es un clip de patrón
         int channelIndex = -1; // si es un clip de audio
         double start = 0.0, length = 16.0, offset = 0.0;
+        float gain = 1.0f;                     // clips de audio: volumen
+        double fadeIn = 0.0, fadeOut = 0.0;    // clips de audio: fundidos (en pasos)
     };
 
     struct TrackParams
@@ -85,6 +87,9 @@ namespace studoo
         float distortion = 0.0f, chorusMix = 0.0f;
         float sidechain = 0.0f;     // 0..1: cuánto se agacha cuando suena la pista de origen
         int sidechainSource = 1;
+        int sendTo = 0;             // 0 = sin envío; si no, una pista de número MAYOR (así no hay bucles)
+        float sendLevel = 0.0f;
+        bool sendOnly = false;      // solo suena por el envío (agrupar pistas en un "bus")
         bool limiter = false;
     };
 

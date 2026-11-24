@@ -39,12 +39,13 @@ Studoo es tu estudio de música en el bolsillo: crea beats, escribe melodías, m
 • Graba tu voz con el micrófono.
 
 🎚️ MEZCLA COMO UN PRODUCTOR
-• Mezclador con ecualizador, compresor, reverb, delay, filtro, distorsión, chorus, limitador y sidechain (el bombeo).
+• Mezclador de 16 pistas con ecualizador, compresor, reverb, delay, filtro, distorsión, chorus, limitador, sidechain (el bombeo) y envíos.
+• Edita tus grabaciones: corta, recorta, duplica y ponles fundidos.
 • Automatización para que los controles se muevan solos.
 • Exporta tu canción y compártela por WhatsApp, Drive o donde quieras.
 
 🎓 APRENDE PRODUCCIÓN MUSICAL
-• 58 lecciones en 9 niveles, de cero a terminar canciones.
+• 59 lecciones en 9 niveles, de cero a terminar canciones.
 • Ilustraciones animadas, pasos claros y vídeos recomendados.
 • Retos que Studoo comprueba solo: haz el ritmo y la app te dice "¡Reto superado!".
 • Test al final de cada lección, juegos para entrenar el oído, logros y racha diaria.
