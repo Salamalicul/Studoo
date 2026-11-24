@@ -342,6 +342,12 @@ const std::vector<Challenge>& challenges()
                   for (auto& n : notesOf (p, ch)) pitches.insert ((int) n[ids::pitch]);
                   return pitches.size() >= 3; }); } },
 
+        { "escala", "Elige una escala",
+          "En el Piano roll, pulsa Herramientas → Escala y elige una (por ejemplo, Menor).",
+          "Las filas que no son de la escala se verán más oscuras.",
+          View::pianoRoll,
+          [] (Project& p) { return (int) p.getState().getProperty (ids::scaleType, 0) > 0; } },
+
         { "envio", "Una pista de efectos",
           "En el Mezclador, manda (ENVÍO) una pista a otra con la rueda Envío al 20% o más.",
           "En la sección ENVÍO elige la pista de destino en el desplegable y gira la rueda.",

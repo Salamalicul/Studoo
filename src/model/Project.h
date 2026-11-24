@@ -25,6 +25,11 @@ namespace studoo
     ChannelType  channelTypeFromString (const juce::String&);
 
     constexpr int numMixerTracks    = 17; // 0 = Master, 1..16 = pistas
+    constexpr int numFxSlots        = 4;  // huecos de plugins de efecto en cada pista
+
+    // Dónde se guarda el plugin de cada hueco (el hueco 0 usa los nombres de siempre)
+    inline juce::Identifier fxDescId (int slot)  { return slot == 0 ? juce::Identifier ("pluginDesc")  : juce::Identifier ("pluginDesc" + juce::String (slot)); }
+    inline juce::Identifier fxStateId (int slot) { return slot == 0 ? juce::Identifier ("pluginState") : juce::Identifier ("pluginState" + juce::String (slot)); }
     constexpr int numPlaylistTracks = 16;
     constexpr int stepsPerBar       = 16; // 16 semicorcheas = 1 compás
     constexpr int stepsPerBeat      = 4;

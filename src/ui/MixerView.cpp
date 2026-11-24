@@ -166,9 +166,15 @@ void MixerStrip::bind()
     fader.getValueObject().referTo (track.getPropertyAsValue (ids::volume, um));
 
     soloButton.setVisible (index != 0);
-    pluginButton.setButtonText (ctx.engine.getMixerPlugin (index) != nullptr
-                                    ? ctx.engine.getMixerPlugin (index)->getName().substring (0, 14)
-                                    : txt ("+ Plugin"));
+    juce::StringArray names;
+    for (int slot = 0; slot < numFxSlots; ++slot)
+        if (auto* p = ctx.engine.getMixerPlugin (index, slot))
+            names.add (p->getName());
+    pluginButton.setButtonText (names.isEmpty() ? txt ("+ Plugin")
+                                : names.size() == 1 ? names[0].substring (0, 14)
+                                                    : juce::String (names.size()) + " plugins");
+    pluginButton.setTooltip (names.isEmpty() ? txt ("Añade hasta 4 efectos VST3 a esta pista.")
+                                             : txt ("Efectos (en orden): ") + names.joinIntoString (", "));
     repaint();
 }
 

@@ -87,7 +87,7 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
     // Ahorra mucha CPU con 16 pistas, sobre todo en el móvil.
     constexpr float quiet = 1.0e-5f;
     const bool inputSilent = buffer.getMagnitude (0, 0, n) < quiet && buffer.getMagnitude (1, 0, n) < quiet;
-    if (inputSilent && plugin == nullptr && silentSamples > delayLine.getNumSamples() + (juce::int64) sr)
+    if (inputSilent && ! hasPlugins() && silentSamples > delayLine.getNumSamples() + (juce::int64) sr)
     {
         buffer.clear (0, n);
         return;
@@ -206,9 +206,11 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         reverb.processStereo (l, r, n);
     }
 
-    // --- Plugin de efecto -------------------------------------------------------------
-    if (plugin != nullptr)
+    // --- Plugins de efecto (hasta 4, en orden) -------------------------------------------
+    for (auto* plugin : plugins)
     {
+        if (plugin == nullptr)
+            continue;
         const int channels = juce::jmax (2, plugin->getTotalNumInputChannels(), plugin->getTotalNumOutputChannels());
         if (channels <= pluginBuffer.getNumChannels())
         {

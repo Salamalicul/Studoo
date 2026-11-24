@@ -8,6 +8,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "audio/AudioEngine.h"
 #include "model/Project.h"
+#include "model/MidiIO.h"
 
 #include <iostream>
 
@@ -487,6 +488,94 @@ int main (int argc, char* argv[])
         check (std::abs (rms (half) - rms (full) * 0.5f) < rms (full) * 0.1f, "Volumen del clip al 50%");
         check (faded.getMagnitude (0, 0, 2000) < full.getMagnitude (0, 0, 2000) * 0.3f, "Fundido de entrada: empieza bajito");
 
+        // Estirar al tempo y cambiar el tono de una grabación (con un "la" de 440 Hz de 1 segundo)
+        {
+            auto wav = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("studoo-tono-440.wav");
+            {
+                juce::AudioBuffer<float> tone (1, 44100);
+                for (int i = 0; i < tone.getNumSamples(); ++i)
+                    tone.setSample (0, i, 0.5f * (float) std::sin (juce::MathConstants<double>::twoPi * 440.0 * i / 44100.0));
+                wav.deleteFile();
+                juce::WavAudioFormat fmt;
+                std::unique_ptr<juce::AudioFormatWriter> w (fmt.createWriterFor (new juce::FileOutputStream (wav), 44100.0, 1, 16, {}, 0));
+                if (w != nullptr) w->writeFromAudioSampleBuffer (tone, 0, tone.getNumSamples());
+            }
+            auto play = [&] (bool stretch, int semis, double bpm)
+            {
+                Project p;
+                p.getState().setProperty (ids::bpm, bpm, nullptr);
+                auto voice = p.addChannel (ChannelType::audio, "Tono", 7);
+                voice.setProperty (ids::sample, wav.getFullPathName(), nullptr);
+                auto clip = p.addClip ("audio", voice[ids::uid], 0, 0.0, 32.0);
+                clip.setProperty (ids::stretch, stretch, nullptr);
+                clip.setProperty (ids::recordBpm, 120.0, nullptr);
+                clip.setProperty (ids::clipPitch, semis, nullptr);
+                p.getState().setProperty (ids::playMode, "song", nullptr);
+                for (auto ch : p.channels())
+                    if (ch != voice) ch.setProperty (ids::muted, true, nullptr);
+                AudioEngine e;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (p.getState(), cache);
+                e.play();
+                return renderSeconds (e, 2.5);
+            };
+            auto lastLoud = [] (const juce::AudioBuffer<float>& b)
+            {
+                for (int i = b.getNumSamples(); --i >= 0;)
+                    if (std::abs (b.getSample (0, i)) > 0.05f) return i;
+                return 0;
+            };
+            // Frecuencia aproximada contando cruces por cero entre 0,2 s y 0,7 s
+            auto freq = [] (const juce::AudioBuffer<float>& b)
+            {
+                int crossings = 0;
+                for (int i = 8820; i < 30870; ++i)
+                    crossings += (b.getSample (0, i - 1) < 0.0f) != (b.getSample (0, i) < 0.0f) ? 1 : 0;
+                return crossings / 2.0 / 0.5;
+            };
+            auto normal = play (false, 0, 60.0), slow = play (true, 0, 60.0), up = play (false, 12, 120.0);
+            check (std::abs (freq (normal) - 440.0) < 15.0, "La grabación suena a su tono (440 Hz)");
+            check (lastLoud (slow) > lastLoud (normal) * 1.7 && std::abs (freq (slow) - 440.0) < 25.0,
+                   "Seguir el tempo: a la mitad de BPM dura el doble y no cambia el tono");
+            check (std::abs (freq (up) - 880.0) < 40.0 && std::abs (lastLoud (up) - lastLoud (normal)) < 4410,
+                   "Tono +12: una octava más aguda y dura lo mismo");
+            check (isFinite (slow) && isFinite (up), "Estirar y cambiar el tono no da valores raros");
+            wav.deleteFile();
+        }
+
+        // MIDI: exportar un patrón y volver a importarlo
+        {
+            Project p;
+            auto synth = p.findChannelByType (ChannelType::synth);
+            auto kick = p.findChannelByBuiltin ("builtin:kick");
+            p.setStep (p.getCurrentPattern(), kick[ids::uid], 4, true);
+            p.addNote (p.getCurrentPattern(), synth[ids::uid], 0.0, 2.0, 60, 0.5f);
+            p.addNote (p.getCurrentPattern(), synth[ids::uid], 20.0, 1.5, 67, 1.0f);
+            auto midi = midiio::patternToMidi (p, p.getCurrentPattern());
+            juce::MemoryOutputStream out;
+            check (midi.writeTo (out) && midi.getNumTracks() == 3, "Exportar MIDI: una pista de tempo y una por canal con notas");
+
+            juce::MemoryInputStream in (out.getData(), out.getDataSize(), false);
+            juce::MidiFile back;
+            Project q;
+            auto target = q.findChannelByType (ChannelType::synth);
+            auto pattern = q.getCurrentPattern();
+            const int count = back.readFrom (in) ? midiio::importIntoPattern (q, pattern, target[ids::uid], back) : 0;
+            bool found60 = false, found67 = false;
+            for (auto n : pattern)
+                if (n.hasType (ids::NOTE))
+                {
+                    found60 = found60 || ((int) n[ids::pitch] == 60 && std::abs ((double) n[ids::start]) < 0.01 && std::abs ((double) n[ids::length] - 2.0) < 0.3);
+                    found67 = found67 || ((int) n[ids::pitch] == 67 && std::abs ((double) n[ids::start] - 20.0) < 0.01);
+                }
+            check (count == 3 && found60 && found67 && Project::getPatternLength (pattern) == 32,
+                   "Importar MIDI: vuelven las notas en su sitio y el patrón se alarga");
+
+            juce::MidiFile garbage;
+            juce::MemoryInputStream bad ("esto no es un midi", 18, false);
+            check (! garbage.readFrom (bad), "Un archivo que no es MIDI se rechaza");
+        }
+
         // Automatizar controles de instrumentos
         {
             using P = AutomationTarget::Param;
@@ -596,6 +685,26 @@ int main (int argc, char* argv[])
             p.removeChannel (ch[ids::uid]);
             e.updateFromProject (p.getState(), cache);
             check (e.getChannelPlugin (ch[ids::uid]) == nullptr, "El plugin se libera al borrar el canal");
+
+            // Huecos de efectos: un plugin en el hueco 3 de la pista del bombo cambia su sonido
+            // (el plugin de prueba es un sinte: como efecto, deja la pista en silencio)
+            Project q;
+            auto kick = q.findChannelByBuiltin ("builtin:kick");
+            for (int s : { 0, 4, 8, 12 }) q.setStep (q.getCurrentPattern(), kick[ids::uid], s, true);
+            for (auto c : q.channels()) if (c != kick) c.setProperty (ids::muted, true, nullptr);
+            AudioEngine fx;
+            fx.prepare (sampleRate, blockSize);
+            fx.updateFromProject (q.getState(), cache);
+            fx.setMixerPlugin ((int) kick[ids::mixer], formats.createPluginInstance (*types[0], sampleRate, blockSize, error), 2);
+            check (fx.getMixerPlugin ((int) kick[ids::mixer], 2) != nullptr && fx.getMixerPlugin ((int) kick[ids::mixer], 0) == nullptr,
+                   "Un plugin puede ir en el hueco 3 de una pista");
+            fx.play();
+            auto withFx = renderSeconds (fx, 0.5);
+            fx.setMixerPlugin ((int) kick[ids::mixer], nullptr, 2);
+            fx.stop(); fx.setPlayPosition (0.0); fx.play();
+            auto without = renderSeconds (fx, 0.5);
+            check (withFx.getRMSLevel (0, 0, withFx.getNumSamples()) < 0.001f
+                   && without.getRMSLevel (0, 0, without.getNumSamples()) > 0.01f, "El efecto del hueco 3 se aplica y se puede quitar");
         }
     }
 

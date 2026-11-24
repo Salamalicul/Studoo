@@ -93,6 +93,7 @@ namespace
         else if (id == "velocity")       p.addNote (pattern, synth[ids::uid], 0.0, 1.0, 60, 0.3f);
         else if (id == "sidechain")      p.getMixerTrack (5).setProperty (ids::sidechain, 0.6, nullptr);
         else if (id == "efectos_creativos") p.getMixerTrack (6).setProperty (ids::chorusMix, 0.5, nullptr);
+        else if (id == "escala")         p.getState().setProperty (ids::scaleType, 2, nullptr);
         else if (id == "envio")
         {
             p.getMixerTrack (3).setProperty (ids::sendTo, 16, nullptr);

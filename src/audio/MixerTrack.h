@@ -23,8 +23,9 @@ namespace studoo
         // Procesa 'numSamples' muestras del buffer interno
         void process (int numSamples, const TrackParams& params, double bpm, bool silenced);
 
-        void setPlugin (juce::AudioPluginInstance* p) { plugin = p; }
-        juce::AudioPluginInstance* getPlugin() const  { return plugin; }
+        void setPlugin (juce::AudioPluginInstance* p, int slot = 0) { if (juce::isPositiveAndBelow (slot, numFxSlots)) plugins[(size_t) slot] = p; }
+        bool hasPlugins() const { for (auto* p : plugins) if (p != nullptr) return true; return false; }
+        juce::AudioPluginInstance* getPlugin (int slot = 0) const { return juce::isPositiveAndBelow (slot, numFxSlots) ? plugins[(size_t) slot] : nullptr; }
 
         // Nivel para el medidor (0..1), lo lee la interfaz
         float getPeak (int channel) const { return peak[(size_t) juce::jlimit (0, 1, channel)].load(); }
@@ -53,7 +54,7 @@ namespace studoo
         juce::dsp::Chorus<float> chorus;
         juce::dsp::Limiter<float> limiter;
 
-        juce::AudioPluginInstance* plugin = nullptr;
+        std::array<juce::AudioPluginInstance*, numFxSlots> plugins {};   // se procesan en orden
         juce::int64 silentSamples = 0;   // cuánto lleva la pista en silencio (para no gastar CPU)
         std::array<std::atomic<float>, 2> peak { 0.0f, 0.0f };
     };

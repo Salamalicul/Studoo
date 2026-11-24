@@ -205,13 +205,16 @@ void PlaylistGrid::paint (juce::Graphics& g)
             const double start = clip[ids::start], length = clip[ids::length], offset = clip[ids::offset];
             const double fadeIn = clip.getProperty (ids::fadeIn, 0.0), fadeOut = clip.getProperty (ids::fadeOut, 0.0);
             const float gain = juce::jlimit (0.0f, 2.0f, (float) clip.getProperty (ids::clipGain, 1.0f));
+            const bool stretched = (bool) clip.getProperty (ids::stretch, false);
+            const double timeRatio = stretched ? juce::jlimit (0.25, 4.0, bpm / juce::jlimit (40.0, 250.0, (double) clip.getProperty (ids::recordBpm, bpm))) : 1.0;
+            const int semis = juce::jlimit (-12, 12, (int) clip.getProperty (ids::clipPitch, 0));
             juce::Path wave;
             const float cy = body.getCentreY(), amp = body.getHeight() * 0.5f;
             const float x0 = juce::jmax (body.getX(), clipArea.getX() - 2.0f), x1 = juce::jmin (body.getRight(), clipArea.getRight() + 2.0f);
             for (float x = x0; x < x1 && ! pk.empty(); x += 2.0f)
             {
                 const double inClip = xToSteps (x) - start;
-                const double idx = (inClip + offset) * secondsPerStep * sr / samplesPerPeak;
+                const double idx = (inClip + offset) * secondsPerStep * timeRatio * sr / samplesPerPeak;
                 if (idx < 0.0 || idx >= (double) pk.size())
                     continue;
                 double env = gain;
@@ -222,12 +225,15 @@ void PlaylistGrid::paint (juce::Graphics& g)
             }
             g.setColour (colour.brighter (0.4f).withAlpha (0.85f));
             g.fillPath (wave);
-            if (! juce::approximatelyEqual (gain, 1.0f))
+            juce::StringArray tags;
+            if (stretched)  tags.add (txt ("al tempo"));
+            if (semis != 0) tags.add ((semis > 0 ? "+" : "") + juce::String (semis) + " st");
+            if (! juce::approximatelyEqual (gain, 1.0f)) tags.add (juce::String ((int) std::round (gain * 100.0f)) + "%");
+            if (! tags.isEmpty())
             {
                 g.setColour (juce::Colour (0xff140c02));
                 g.setFont (Fonts::bold (9.5f));
-                g.drawText (juce::String ((int) std::round (gain * 100.0f)) + "%", head.reduced (6.0f, 0.0f),
-                            juce::Justification::centredRight, false);
+                g.drawText (tags.joinIntoString (" · "), head.reduced (6.0f, 0.0f), juce::Justification::centredRight, false);
             }
         }
     }
@@ -323,6 +329,14 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
         fadeOut.addItem (500 + f.first, txt (f.second), true, juce::approximatelyEqual (fo, (double) f.first));
     }
     menu.addSubMenu ("Volumen", volume);
+    menu.addItem (600, txt ("Seguir el tempo de la canción (estirar sin cambiar el tono)"), true,
+                  (bool) clip.getProperty (ids::stretch, false));
+    juce::PopupMenu pitch;
+    const int currentPitch = clip.getProperty (ids::clipPitch, 0);
+    for (int st : { 12, 7, 5, 3, 2, 1, 0, -1, -2, -3, -5, -7, -12 })
+        pitch.addItem (700 + st + 12, st == 0 ? txt ("Original") : (st > 0 ? "+" : "") + juce::String (st) + txt (" semitonos"),
+                       true, st == currentPitch);
+    menu.addSubMenu (txt ("Tono (sin cambiar la velocidad)"), pitch);
     menu.addSubMenu (txt ("Fundido de entrada (sube poco a poco)"), fadeIn);
     menu.addSubMenu (txt ("Fundido de salida (baja poco a poco)"), fadeOut);
     menu.addSeparator();
@@ -364,6 +378,19 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
             clip.setProperty (ids::fadeIn, (double) (result - 400), um);
         else if (result >= 500 && result < 600)
             clip.setProperty (ids::fadeOut, (double) (result - 500), um);
+        else if (result == 600)
+        {
+            const bool on = ! (bool) clip.getProperty (ids::stretch, false);
+            if (on && ! clip.hasProperty (ids::recordBpm))
+            {
+                // El tempo "original" de la grabación: el que se guardó al grabar o, si no, el de ahora
+                auto channel = project.findChannel (clip[ids::ref]);
+                clip.setProperty (ids::recordBpm, channel.getProperty (ids::recordBpm, project.getState().getProperty (ids::bpm, 140.0)), um);
+            }
+            clip.setProperty (ids::stretch, on, um);
+        }
+        else if (result >= 700 && result <= 724)
+            clip.setProperty (ids::clipPitch, result - 700 - 12, um);
     });
 }
 

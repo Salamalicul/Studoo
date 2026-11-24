@@ -17,6 +17,7 @@ namespace studoo::learn
         { "808", "Bajo muy grave que viene de la caja de ritmos Roland TR-808. Es la base del trap, el drill y el reggaetón.", "El 808 paso a paso" },
         { "Acorde", "Varias notas (normalmente 3 o más) que suenan a la vez.", "Acordes y progresiones" },
         { "ADSR", "Ataque, Caída (Decay), Sostenido y Relajación (Release): cómo cambia el volumen de una nota desde que empieza hasta que se apaga.", "La envolvente ADSR" },
+        { "Arpegio", "Tocar las notas de un acorde una detrás de otra en vez de a la vez. En el Piano roll: Herramientas → Arpegiador.", "Trucos del piano roll" },
         { "Armonía", "Las notas que suenan a la vez y cómo se combinan (los acordes).", "Acordes y progresiones" },
         { "Ataque", "Lo que tarda un sonido en llegar a su volumen máximo.", "La envolvente ADSR" },
         { "Automatización", "Hacer que un control (volumen, filtro...) se mueva solo a lo largo de la canción.", "Automatización" },
@@ -89,7 +90,9 @@ namespace studoo::learn
         { "Swing", "Retrasar un poco algunos golpes para que el ritmo tenga balanceo.", "Boom bap y el swing" },
         { "Tempo", "La velocidad de la canción, en BPM.", "BPM y tempo" },
         { "Tiempo (pulso)", "Cada golpe que cuentas al seguir la música: 1, 2, 3, 4.", "Compases, tiempos y pasos" },
+        { "Time-stretch (estirar)", "Cambiar la velocidad de un audio sin cambiar su tono. En la Playlist: clic derecho → Seguir el tempo.", "Grabar tu voz" },
         { "Tono (tonalidad)", "La escala principal en la que está una canción, como La menor.", "Escalas: mayor y menor" },
+        { "Transponer", "Subir o bajar varias notas el mismo número de semitonos.", "Trucos del piano roll" },
         { "Velocity", "La fuerza con la que suena una nota.", "Dar vida a la batería" },
         { "WAV / MP3", "Formatos de audio. WAV: calidad máxima. MP3: ocupa menos.", "Exportar y compartir" },
     };

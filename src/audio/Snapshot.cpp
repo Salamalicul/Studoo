@@ -140,6 +140,9 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         cs.length = juce::jmax (0.25, pos (c[ids::length], maxSong));
         cs.offset = pos (c[ids::offset], maxSong);
         cs.gain = num (c, ids::clipGain, 0.0f, 2.0f, 1.0f);
+        if ((bool) c.getProperty (ids::stretch, false))
+            cs.timeRatio = juce::jlimit (0.25, 4.0, (double) snap->bpm / (double) num (c, ids::recordBpm, 40.0f, 250.0f, snap->bpm));
+        cs.pitchRatio = std::pow (2.0, (double) juce::roundToInt (num (c, ids::clipPitch, -12.0f, 12.0f, 0.0f)) / 12.0);
         cs.fadeIn = juce::jmin (cs.length * 0.5, pos (c[ids::fadeIn], maxSong));
         cs.fadeOut = juce::jmin (cs.length * 0.5, pos (c[ids::fadeOut], maxSong));
 

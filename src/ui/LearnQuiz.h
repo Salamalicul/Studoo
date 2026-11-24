@@ -546,6 +546,16 @@ namespace studoo::learn
       { "Con el bajo y los pads", "Con el bombo", "Con el metrónomo" }, 0,
       "Lo que choca con el bombo (bajo, pads) es lo que se agacha." },
 
+    { "Trucos del piano roll", "¿Qué hace el arpegiador?",
+      { "Convierte cada acorde en notas sueltas una detrás de otra", "Sube el volumen", "Borra las notas" }, 0,
+      "Es un clásico del trance, el pop y el trap: el acorde suena nota a nota." },
+    { "Trucos del piano roll", "¿Cómo duplicas las notas seleccionadas justo detrás?",
+      { "Ctrl+B", "Ctrl+Z", "Espacio" }, 0,
+      "Ctrl+B pone una copia justo después. Ctrl+Z deshace y Espacio es play/stop." },
+    { "Trucos del piano roll", "¿Para qué sirve exportar MIDI?",
+      { "Para llevar tus notas a otro programa de música", "Para subir la canción a Spotify", "Para grabar tu voz" }, 0,
+      "Un archivo MIDI guarda las notas (no el sonido): cualquier programa de música lo abre." },
+
     { "Envíos y buses", "¿Para qué sirve una pista de efectos con reverb?",
       { "Para que varias pistas compartan la misma reverb", "Para subir el BPM", "Para grabar la voz" }, 0,
       "Todas suenan en la misma \"sala\" y la mezcla queda más unida (y gasta menos)." },

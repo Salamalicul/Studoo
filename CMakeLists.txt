@@ -41,6 +41,7 @@ endif()
 set(STUDOO_ENGINE_SOURCES
     src/model/Project.cpp
     src/model/GenreBeats.cpp
+    src/model/MidiIO.cpp
     src/audio/AudioEngine.cpp
     src/audio/DrumSounds.cpp
     src/audio/Instruments.cpp

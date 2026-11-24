@@ -343,6 +343,11 @@ Usa **solo teclas blancas** y haz que tu melodía empiece y termine en **La**: s
 
 > La "receta" de la escala menor es: tono, semitono, tono, tono, semitono, tono, tono (un tono = 2 semitonos). Con ella puedes construir la escala menor desde cualquier nota.
 
+## La ayuda de Studoo
+En el Piano roll, pulsa **Herramientas → Escala** y elige, por ejemplo, **Menor**. Luego, en **Nota base de la escala**, elige **La**. Las filas que no son de la escala se ven **más oscuras** y las notas nuevas se **pegan** solas a la escala: así es casi imposible desafinar.
+
+[reto:escala]
+
 ? Escribe una melodía de 8 notas usando solo teclas blancas que empiece y termine en La. Después muévela entera a otras notas y escucha qué pasa.)TXT" },
 
     { "Nivel 3 · Notas y melodía", "Acordes y progresiones", "8 min",
@@ -761,6 +766,8 @@ En la playlist la grabación se ve con su **forma de onda** (los picos son las p
 - **Duplicar**: pone una copia justo detrás (genial para repetir un coro).
 - **Volumen**: sube o baja solo ese trozo.
 - **Fundidos**: el sonido entra o se va poco a poco, sin cortes bruscos.
+- **Seguir el tempo**: si luego cambias el BPM, la grabación se estira o se encoge para ir a tiempo, **sin cambiar el tono**.
+- **Tono**: sube o baja la voz unos semitonos sin cambiar su velocidad (por ejemplo, para hacer coros más agudos).
 
 ? Graba 8 compases hablando o cantando encima de tu beat, quita el silencio del principio y ponle un poco de reverb y compresor.
 
@@ -891,6 +898,32 @@ R"TXT(Es muy normal quedarse atascado con un bucle de 8 compases que suena bien 
 > Los efectos FX incluidos (subida, impacto, caída de sub, platillo al revés...) están hechos justo para las transiciones.
 
 ? Coge el mejor bucle que tengas guardado y conviértelo hoy en una canción de 2 minutos con el método de arriba.)TXT" },
+
+    { "Nivel 7 · Seguir mejorando", "Trucos del piano roll", "7 min",
+      "trucos piano roll seleccionar copiar arpegiador",
+R"TXT(Los productores trabajan **rápido** gracias a unos pocos trucos del piano roll. Con ellos harás en segundos lo que antes te llevaba minutos.
+
+[anim:pianoroll|Selecciona varias notas y muévelas o cópialas todas a la vez]
+
+## Seleccionar varias notas
+- Pulsa **Seleccionar** (o mantén **Ctrl**) y arrastra un rectángulo sobre las notas. Se marcan con un borde blanco.
+- Arrastra una de ellas: **se mueven todas juntas**.
+- **Ctrl+C** copia, **Ctrl+V** pega, **Ctrl+B** las duplica justo detrás y **Supr** las borra.
+- Las **flechas ↑ ↓** suben o bajan su tono (con **Mayús**, una octava entera).
+
+## Herramientas
+- **Arpegiador**: convierte cada acorde en notas sueltas (subiendo, bajando, sube y baja o al azar), al ritmo del **Ajuste**. Pon acordes largos, elige Ajuste 1 paso y prueba.
+- **Escala**: oscurece las notas que no son de la escala y pega las nuevas a ella.
+- **Exportar MIDI**: guarda las notas del patrón en un archivo .mid para usarlas en otro programa. **Importar MIDI** hace lo contrario: trae melodías de otros sitios.
+
+## Grabar tocando
+Con un **teclado MIDI** (o las teclas del piano de la izquierda), pulsa **● Grabar notas**: el patrón suena y todo lo que toques se escribe solo. Después pulsa **Cuantizar** para colocarlo en su sitio.
+
+> Haz un acorde, duplícalo 3 veces con Ctrl+B y sube o baja cada copia con las flechas: acabas de hacer una progresión en 10 segundos.
+
+[ir:pianoroll|Abrir el piano roll]
+
+? Escribe 4 acordes largos en el Piano eléctrico y pásales el **arpegiador** "Sube y baja" con Ajuste 1/2 paso.)TXT" },
 
     { "Nivel 7 · Seguir mejorando", "Tus siguientes pasos", "4 min",
       "teoria musical para productores curso gratis",

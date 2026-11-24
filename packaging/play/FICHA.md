@@ -33,7 +33,7 @@ Studoo es tu estudio de música en el bolsillo: crea beats, escribe melodías, m
 • Bases de géneros listas para cargar y cambiar: aprende cómo se hace cada estilo.
 
 🎹 ESCRIBE MELODÍAS Y ACORDES
-• Piano roll para escribir notas, acordes con un toque y líneas de 808, con la fuerza (velocity) de cada nota y cuantizar.
+• Piano roll para escribir notas, acordes y líneas de 808: velocity, cuantizar, escalas, arpegiador, copiar y pegar, grabar tocando y MIDI.
 • Swing para que el ritmo baile, y samples que puedes trocear (chops), recortar y poner al revés.
 • Playlist para montar la canción completa: intro, estrofa, estribillo...
 • Graba tu voz con el micrófono.
@@ -45,7 +45,7 @@ Studoo es tu estudio de música en el bolsillo: crea beats, escribe melodías, m
 • Exporta tu canción y compártela por WhatsApp, Drive o donde quieras.
 
 🎓 APRENDE PRODUCCIÓN MUSICAL
-• 59 lecciones en 9 niveles, de cero a terminar canciones.
+• 60 lecciones en 9 niveles, de cero a terminar canciones.
 • Ilustraciones animadas, pasos claros y vídeos recomendados.
 • Retos que Studoo comprueba solo: haz el ritmo y la app te dice "¡Reto superado!".
 • Test al final de cada lección, juegos para entrenar el oído, logros y racha diaria.

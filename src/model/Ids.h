@@ -113,6 +113,12 @@ namespace studoo::ids
     STUDOO_ID (sidechainSource)   // pista: de qué pista escucha (1..)
     STUDOO_ID (sendTo)            // pista: a qué pista manda una copia (0 = a ninguna; solo a pistas de número mayor)
     STUDOO_ID (sendLevel)         // pista: 0..1, cuánto manda
+    STUDOO_ID (scaleRoot)         // proyecto: nota base de la escala (0 = Do ... 11 = Si)
+    STUDOO_ID (scaleType)         // proyecto: 0 = sin escala, 1 mayor, 2 menor...
+    STUDOO_ID (scaleLock)         // proyecto: las notas nuevas se pegan a la escala
+    STUDOO_ID (recordBpm)         // grabación/clip: el BPM con el que se grabó (para seguir el tempo)
+    STUDOO_ID (stretch)           // clip de audio: sigue el tempo de la canción sin cambiar el tono
+    STUDOO_ID (clipPitch)         // clip de audio: tono en semitonos (-12..12) sin cambiar la velocidad
     STUDOO_ID (clipGain)          // clip de audio: volumen 0..2
     STUDOO_ID (fadeIn)            // clip de audio: fundido de entrada (en pasos)
     STUDOO_ID (fadeOut)           // clip de audio: fundido de salida (en pasos)

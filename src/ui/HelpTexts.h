@@ -70,6 +70,11 @@ namespace studoo::help
         "- \"Ajuste\": a qué cuadrícula se pegan las notas.\n"
         "- \"Acorde\": añade un acorde completo con un solo clic (mayor = alegre, menor = triste).\n"
         "- \"Cuantizar\": coloca todas las notas del canal justo en la cuadrícula del Ajuste.\n"
+        "- \"Seleccionar\" (o Ctrl + arrastrar): elige varias notas para moverlas juntas. Ctrl+C copia, Ctrl+V pega, "
+        "Ctrl+B duplica, Supr borra y las flechas suben o bajan el tono.\n"
+        "- \"Herramientas\": escalas (las notas que no son de la escala se ven más oscuras), arpegiador, "
+        "transponer y exportar o importar MIDI.\n"
+        "- \"Grabar notas\": toca un teclado MIDI (o las teclas del piano de la izquierda) mientras suena y se escribe solo.\n"
         "- Carril VELOCITY (abajo): una barra por nota. Arrástrala para que la nota suene más fuerte o más suave.\n\n"
         "Arriba eliges qué canal (instrumento) estás editando. Las notas son del patrón actual.\n"
         "Para el 808: haz notas largas, y si solapas dos notas el tono se \"desliza\" (glide).";
@@ -85,7 +90,8 @@ namespace studoo::help
         "IMPORTANTE: para escuchar la playlist pulsa CANCIÓN en la barra superior (o la tecla L).\n\n"
         "Las grabaciones de voz aparecen aquí como bloques verdes, con su forma de onda. Para editarlas:\n"
         "- Arrastra su borde izquierdo para quitar el principio (o el derecho para quitar el final).\n"
-        "- Clic derecho (o mantener pulsado): cortar en dos, duplicar, volumen y fundidos de entrada y salida.\n\n"
+        "- Clic derecho (o mantener pulsado): cortar en dos, duplicar, volumen, fundidos, seguir el tempo "
+        "(estirar sin cambiar el tono) y cambiar el tono.\n\n"
         "Idea de estructura: Intro (4 compases) - Estribillo (8) - Estrofa (16) - Estribillo (8) - Final (4).";
 
     inline constexpr const char* mixerTitle = "Mezclador";
@@ -121,7 +127,7 @@ namespace studoo::help
     inline constexpr const char* learnTitle = "Aprende";
     inline constexpr const char* learnText =
         "Todo para aprender a producir, de cero a terminar canciones. Tiene cuatro pestañas:\n\n"
-        "- Ruta: 59 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
+        "- Ruta: 60 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
         "un test al final y bases de 11 géneros para cargar y cambiar.\n"
         "- Juegos: entrena el oído (instrumentos, notas, acordes y géneros).\n"
         "- Logros: tu racha de días practicando, tus estadísticas y tus medallas.\n"

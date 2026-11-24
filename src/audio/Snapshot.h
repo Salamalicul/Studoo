@@ -71,6 +71,8 @@ namespace studoo
         int channelIndex = -1; // si es un clip de audio
         double start = 0.0, length = 16.0, offset = 0.0;
         float gain = 1.0f;                     // clips de audio: volumen
+        double timeRatio = 1.0;                // > 1: el audio avanza más deprisa (sigue un tempo más rápido)
+        double pitchRatio = 1.0;               // > 1: más agudo (sin cambiar la velocidad)
         double fadeIn = 0.0, fadeOut = 0.0;    // clips de audio: fundidos (en pasos)
     };
 
