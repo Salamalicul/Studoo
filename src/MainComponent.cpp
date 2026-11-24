@@ -146,7 +146,8 @@ MainComponent::MainComponent()
 
     pluginHost = std::make_unique<PluginHost> (*settings);
     pro::start (settings.get());
-    ctx.reset (new AppContext { project, engine, samples, *pluginHost, *settings, {}, {}, {} });
+    ctx.reset (new AppContext { project, engine, samples, *pluginHost, *settings, {}, {}, {}, {}, {} });
+    ctx->shareFile = [this] (const juce::File& f) { shareFile (f); };
     ctx->showView = [this] (View v) { showView (v); };
     ctx->showMixerPluginMenu = [this] (int track) { showMixerPluginMenu (track); };
     ctx->showPro = [this] (const juce::String& reason) { proScreen.show (reason); };
@@ -352,12 +353,13 @@ void MainComponent::storePluginStates()
         }
 
     for (int t = 0; t < numMixerTracks; ++t)
-        if (auto* p = engine.getMixerPlugin (t))
-        {
-            juce::MemoryBlock mb;
-            p->getStateInformation (mb);
-            project.getMixerTrack (t).setProperty (ids::pluginState, mb.toBase64Encoding(), nullptr);
-        }
+        for (int slot = 0; slot < numFxSlots; ++slot)
+            if (auto* p = engine.getMixerPlugin (t, slot))
+            {
+                juce::MemoryBlock mb;
+                p->getStateInformation (mb);
+                project.getMixerTrack (t).setProperty (fxStateId (slot), mb.toBase64Encoding(), nullptr);
+            }
 }
 
 void MainComponent::restorePlugins()
@@ -410,73 +412,126 @@ void MainComponent::restorePlugins()
     for (int t = 0; t < numMixerTracks; ++t)
     {
         auto track = project.getMixerTrack (t);
-        if (engine.getMixerPlugin (t) == nullptr)
-            load (-1000 - t, track[ids::pluginDesc].toString(), track[ids::pluginState].toString(),
-                  [this, t] (std::unique_ptr<juce::AudioPluginInstance> p)
-                  {
-                      engine.setMixerPlugin (t, std::move (p));
-                      mixerView->rebindAll();
-                  });
+        for (int slot = 0; slot < numFxSlots; ++slot)
+            if (engine.getMixerPlugin (t, slot) == nullptr)
+                load (-1000 - t * numFxSlots - slot, track[fxDescId (slot)].toString(), track[fxStateId (slot)].toString(),
+                      [this, t, slot] (std::unique_ptr<juce::AudioPluginInstance> p)
+                      {
+                          engine.setMixerPlugin (t, std::move (p), slot);
+                          mixerView->rebindAll();
+                      });
     }
 }
 
 void MainComponent::showMixerPluginMenu (int track)
 {
-    auto* current = engine.getMixerPlugin (track);
     const auto effects = pluginHost->getEffects();
+    auto trackTree = project.getMixerTrack (track);
+
+    // Una lista de efectos para elegir (cada hueco usa sus propios números)
+    auto effectList = [&effects] (int base)
+    {
+        juce::PopupMenu list;
+        for (int i = 0; i < effects.size(); ++i)
+            list.addItem (base + i, effects[i].name + "  (" + effects[i].manufacturerName + ")");
+        if (effects.isEmpty())
+            list.addItem (-1, txt ("No hay efectos: pulsa \"Plugins\" arriba para buscarlos"), false);
+        return list;
+    };
 
     juce::PopupMenu menu;
-    if (current != nullptr)
+    menu.addSectionHeader (txt ("Efectos de esta pista (suenan en este orden)"));
+    int firstFree = -1;
+    for (int slot = 0; slot < numFxSlots; ++slot)
     {
-        menu.addItem (1, txt ("Abrir ") + current->getName());
-        menu.addItem (2, txt ("Quitar plugin"));
-        menu.addSeparator();
+        auto* p = engine.getMixerPlugin (track, slot);
+        if (p == nullptr)
+        {
+            if (firstFree < 0) firstFree = slot;
+            continue;
+        }
+        juce::PopupMenu sub;
+        sub.addItem (1000 + slot * 10 + 1, txt ("Abrir"));
+        sub.addItem (1000 + slot * 10 + 2, txt ("Quitar"));
+        sub.addItem (1000 + slot * 10 + 3, txt ("Subir (que suene antes)"), slot > 0);
+        sub.addItem (1000 + slot * 10 + 4, txt ("Bajar (que suene después)"), slot < numFxSlots - 1);
+        sub.addSubMenu (txt ("Cambiar por"), effectList (10000 + slot * 1000));
+        menu.addSubMenu (juce::String (slot + 1) + ". " + p->getName(), sub);
     }
-    juce::PopupMenu list;
-    for (int i = 0; i < effects.size(); ++i)
-        list.addItem (100 + i, effects[i].name + "  (" + effects[i].manufacturerName + ")");
-    if (effects.isEmpty())
-        list.addItem (-1, txt ("No hay efectos: pulsa \"Plugins\" arriba para buscarlos"), false);
-    menu.addSubMenu (current != nullptr ? txt ("Cambiar por") : txt ("Añadir efecto VST3"), list);
+    if (firstFree >= 0)
+        menu.addSubMenu (txt ("Añadir efecto VST3"), effectList (10000 + firstFree * 1000));
+    else
+        menu.addItem (-1, txt ("Los 4 huecos están llenos"), false);
 
-    menu.showMenuAsync (juce::PopupMenu::Options(), [this, track, effects] (int result)
+    juce::Component::SafePointer<MainComponent> safe (this);
+    auto install = [safe, track] (int slot, const juce::PluginDescription& desc)
     {
-        auto trackTree = project.getMixerTrack (track);
-        if (result == 1)
+        safe->pluginHost->createInstance (desc, safe->engine.getSampleRate(), safe->engine.getBlockSize(),
+            [safe, track, slot, desc] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error)
         {
-            PluginWindows::show (engine.getMixerPlugin (track), trackTree[ids::name].toString());
-        }
-        else if (result == 2)
-        {
-            engine.setMixerPlugin (track, nullptr);
-            trackTree.setProperty (ids::pluginDesc, "", nullptr);
-            trackTree.setProperty (ids::pluginState, "", nullptr);
-            mixerView->rebindAll();
-        }
-        else if (result >= 100 && result - 100 < effects.size())
-        {
-            const auto desc = effects[result - 100];
-            juce::Component::SafePointer<MainComponent> safe (this);
-            pluginHost->createInstance (desc, engine.getSampleRate(), engine.getBlockSize(),
-                [safe, track, desc] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error)
+            if (safe == nullptr)
+                return;
+            if (instance == nullptr)
             {
-                if (safe == nullptr)
-                    return;
-                if (instance == nullptr)
-                {
-                    showMessage ("Plugin", txt ("No se pudo abrir el plugin: ") + error);
-                    return;
-                }
-                auto trackTree = safe->project.getMixerTrack (track);
-                if (auto xml = desc.createXml())
-                    trackTree.setProperty (ids::pluginDesc, xml->toString (juce::XmlElement::TextFormat().singleLine()), nullptr);
-                trackTree.setProperty (ids::pluginState, "", nullptr);
-                auto* raw = instance.get();
-                safe->engine.setMixerPlugin (track, std::move (instance));
-                safe->mixerView->rebindAll();
-                PluginWindows::show (raw, desc.name);
-            });
+                showMessage ("Plugin", txt ("No se pudo abrir el plugin: ") + error);
+                return;
+            }
+            auto tree = safe->project.getMixerTrack (track);
+            if (auto xml = desc.createXml())
+                tree.setProperty (fxDescId (slot), xml->toString (juce::XmlElement::TextFormat().singleLine()), nullptr);
+            tree.setProperty (fxStateId (slot), "", nullptr);
+            auto* raw = instance.get();
+            safe->engine.setMixerPlugin (track, std::move (instance), slot);
+            safe->mixerView->rebindAll();
+            PluginWindows::show (raw, desc.name);
+        });
+    };
+
+    menu.showMenuAsync (juce::PopupMenu::Options(), [safe, track, effects, install] (int result)
+    {
+        if (safe == nullptr || result <= 0)
+            return;
+        auto& self = *safe;
+        auto tree = self.project.getMixerTrack (track);
+        if (result >= 10000)
+        {
+            const int slot = (result - 10000) / 1000, index = (result - 10000) % 1000;
+            if (slot < numFxSlots && index < effects.size())
+                install (slot, effects[index]);
+            return;
         }
+        const int slot = (result - 1000) / 10, action = (result - 1000) % 10;
+        if (! juce::isPositiveAndBelow (slot, numFxSlots))
+            return;
+        if (action == 1)
+        {
+            PluginWindows::show (self.engine.getMixerPlugin (track, slot), tree[ids::name].toString());
+        }
+        else if (action == 2)
+        {
+            self.engine.setMixerPlugin (track, nullptr, slot);
+            tree.setProperty (fxDescId (slot), "", nullptr);
+            tree.setProperty (fxStateId (slot), "", nullptr);
+        }
+        else if (action == 3 || action == 4)
+        {
+            // Intercambia dos huecos (los plugins siguen vivos: solo cambian de sitio)
+            const int other = action == 3 ? slot - 1 : slot + 1;
+            self.storePluginStates();
+            // Sacar los dos sin borrarlos: se vuelven a crear desde su descripción y estado guardados
+            const auto descA = tree[fxDescId (slot)].toString(), stateA = tree[fxStateId (slot)].toString();
+            const auto descB = tree[fxDescId (other)].toString(), stateB = tree[fxStateId (other)].toString();
+            self.engine.setMixerPlugin (track, nullptr, slot);
+            self.engine.setMixerPlugin (track, nullptr, other);
+            tree.setProperty (fxDescId (slot), descB, nullptr);
+            tree.setProperty (fxStateId (slot), stateB, nullptr);
+            tree.setProperty (fxDescId (other), descA, nullptr);
+            tree.setProperty (fxStateId (other), stateA, nullptr);
+            for (int k : { slot, other })
+                { self.pendingPlugins.erase (-1000 - track * numFxSlots - k); self.failedPlugins.erase (-1000 - track * numFxSlots - k); }
+            self.restorePlugins();
+        }
+        self.mixerView->rebindAll();
     });
 }
 
@@ -888,6 +943,7 @@ void MainComponent::toggleRecording()
                 ++count;
         auto ch = project.addChannel (ChannelType::audio, txt ("Grabación ") + juce::String (count), 7);
         ch.setProperty (ids::sample, result.file.getFullPathName(), project.um());
+        ch.setProperty (ids::recordBpm, project.getState().getProperty (ids::bpm, 140.0), project.um());
         project.getMixerTrack (7).setProperty (ids::name, "Voz", project.um());
 
         // Buscamos una pista de la playlist libre en ese momento
@@ -1630,6 +1686,8 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     const bool cmd = mods.isCommandDown();
 
     if (key == juce::KeyPress::spaceKey)               { toolbar->togglePlayStop(); return true; }
+    if (currentView == View::pianoRoll && pianoRoll != nullptr && pianoRoll->handleKey (key))
+        return true;
     if (cmd && upper == 'Z' && mods.isShiftDown())     { project.getUndo().redo(); return true; }
     if (cmd && upper == 'Z')                           { project.getUndo().undo(); return true; }
     if (cmd && upper == 'Y')                           { project.getUndo().redo(); return true; }

@@ -1,6 +1,6 @@
 # Studoo · Descargas
 
-**Studoo** es un estudio para hacer música y beats, en español: secuenciador de pasos, piano roll, playlist, mezclador con efectos, kits de batería, 808, sintetizadores y un apartado **Aprende** con 56 lecciones, retos, tests y juegos para entrenar el oído.
+**Studoo** es un estudio para hacer música y beats, en español: secuenciador de pasos, piano roll, playlist, mezclador con efectos, kits de batería, 808, sintetizadores y un apartado **Aprende** con 60 lecciones, retos, tests y juegos para entrenar el oído.
 
 ## 📥 Descargar
 

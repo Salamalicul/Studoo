@@ -65,6 +65,7 @@ namespace studoo
             bool active = false;
             int note = 0;
             double position = 0.0, increment = 1.0;
+            double regionStart = 0.0, regionEnd = 0.0;   // parte del sample que toca (en muestras)
             float gain = 1.0f, env = 1.0f;
             bool releasing = false;
             juce::uint32 age = 0;
@@ -76,6 +77,7 @@ namespace studoo
         double sr = 44100.0;
         int root = 60;
         bool oneShot = true;
+        SamplerParams params;
         juce::uint32 ageCounter = 0;
     };
 
@@ -106,9 +108,12 @@ namespace studoo
         float oscillator (double phase, double inc) const;
         void updateVoiceFrequency (Voice&);
 
+        void renderVoiceRange (float* outL, float* outR, int num);
+
         std::array<Voice, 12> voices;
         SynthParams params;
         double sr = 44100.0;
+        double lfoPhase = 0.0;   // LFO que mueve el filtro ("wobble")
         juce::uint32 ageCounter = 0;
     };
 

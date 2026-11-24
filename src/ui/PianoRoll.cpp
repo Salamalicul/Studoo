@@ -1,5 +1,7 @@
 #include "PianoRoll.h"
 #include "HelpTexts.h"
+#include "model/MidiIO.h"
+#include <map>
 
 namespace studoo
 {
@@ -79,6 +81,16 @@ void PianoRollGrid::paint (juce::Graphics& g)
     {
         const int y = yForNote (note);
         g.setColour (isBlackKey (note) ? juce::Colour (0xff181b20) : juce::Colour (0xff1f2329));
+        if (roll.getScaleType() > 0)
+        {
+            // Con escala: las filas que no son de la escala, más oscuras; la nota base, con color
+            if (! roll.isInScale (note))
+                g.setColour (juce::Colour (0xff0d0f12));
+            else if (((note - roll.getScaleRoot()) % 12 + 12) % 12 == 0)
+                g.setColour (juce::Colour (0xff3b2e1a));
+            else
+                g.setColour (juce::Colour (0xff272c34));
+        }
         g.fillRect (keyboardWidth, y, getWidth() - keyboardWidth, rowHeight);
         g.setColour (juce::Colours::black.withAlpha (0.25f));
         g.drawHorizontalLine (y + rowHeight - 1, (float) keyboardWidth, (float) getWidth());
@@ -139,6 +151,11 @@ void PianoRollGrid::paint (juce::Graphics& g)
         }
         g.setColour ((orange ? Colours::accentDeep : colour).darker (0.7f));
         g.drawRoundedRectangle (r, 3.5f, 1.0f);
+        if (roll.selection.contains (n))
+        {
+            g.setColour (juce::Colours::white);
+            g.drawRoundedRectangle (r.expanded (0.5f), 3.5f, 2.0f);
+        }
         // Asa para alargar
         g.setColour (juce::Colours::black.withAlpha (0.3f));
         g.fillRoundedRectangle (r.withLeft (r.getRight() - 4.0f).reduced (1.0f, 2.5f), 1.0f);
@@ -209,6 +226,15 @@ void PianoRollGrid::paint (juce::Graphics& g)
                               inner.toNearestInt(), juce::Justification::centred, 3, 1.0f);
         }
 
+    // Rectángulo de selección
+    if (dragMode == DragMode::select)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.08f));
+        g.fillRect (selectionBox);
+        g.setColour (juce::Colours::white.withAlpha (0.6f));
+        g.drawRect (selectionBox, 1.0f);
+    }
+
     // Cursor de reproducción
     if (playhead >= 0.0)
     {
@@ -234,10 +260,13 @@ void PianoRollGrid::mouseDown (const juce::MouseEvent& e)
     if (uid == 0)
         return;
 
-    // Teclado: escuchar la nota
+    // Teclado: escuchar la nota (y grabarla si está grabando)
     if (e.x < keyboardWidth)
     {
-        ctx.engine.previewNote (uid, yToNote (e.position.y), 0.8f, 0.5);
+        keyboardNote = yToNote (e.position.y);
+        ctx.engine.previewNote (uid, keyboardNote, 0.8f, 0.5);
+        if (roll.isRecordingNotes())
+            roll.liveNote (keyboardNote, true, 0.8f);
         return;
     }
 
@@ -247,16 +276,61 @@ void PianoRollGrid::mouseDown (const juce::MouseEvent& e)
 
     if (e.mods.isPopupMenu())
     {
-        if (note.isValid())
+        if (note.isValid() && roll.selection.contains (note))
+            roll.deleteSelection();
+        else if (note.isValid())
             roll.getPattern().removeChild (note, ctx.project.um());
         return;
     }
 
     const double steps = xToSteps (e.position.x);
+    const bool selecting = roll.selectMode || e.mods.isCommandDown() || e.mods.isCtrlDown();
+
+    // Ctrl (o modo Seleccionar): clic en una nota la añade/quita de la selección; en un hueco, rectángulo
+    if (selecting && ! edge)
+    {
+        if (note.isValid())
+        {
+            if (roll.selection.contains (note)) roll.selection.removeAllInstancesOf (note);
+            else                                roll.selection.add (note);
+            repaint();
+            if (roll.selection.contains (note))
+            {
+                // y se puede arrastrar enseguida todo el grupo
+                movingGroup.clear();
+                for (auto& n : roll.selection)
+                    movingGroup.push_back ({ n, (double) n[ids::start], (int) n[ids::pitch] });
+                dragNote = note;
+                dragMode = DragMode::move;
+                dragStartSteps = steps;
+                dragStartNote = yToNote (e.position.y);
+            }
+            return;
+        }
+        if (! e.mods.isShiftDown())
+            roll.selection.clear();
+        dragMode = DragMode::select;
+        selectionBox = { e.position, e.position };
+        repaint();
+        return;
+    }
+
+    // Clic en una nota seleccionada: se mueven todas las seleccionadas juntas
+    movingGroup.clear();
+    if (note.isValid() && ! edge && roll.selection.contains (note))
+    {
+        for (auto& n : roll.selection)
+            movingGroup.push_back ({ n, (double) n[ids::start], (int) n[ids::pitch] });
+    }
+    else if (! roll.selection.isEmpty())
+    {
+        roll.clearSelection();
+    }
+
     if (! note.isValid())
     {
         // Añadir nota (o acorde)
-        const int pitch = yToNote (e.position.y);
+        const int pitch = roll.snapToScale (yToNote (e.position.y));
         const double start = snap (steps);
         const int length = Project::getPatternLength (roll.getPattern());
         if (start >= length)
@@ -264,10 +338,11 @@ void PianoRollGrid::mouseDown (const juce::MouseEvent& e)
         const double len = juce::jmin (lastLength, length - start);
         for (int interval : roll.getChordIntervals())
         {
-            auto added = ctx.project.addNote (roll.getPattern(), uid, start, len, pitch + interval);
+            const int p = interval == 0 ? pitch : roll.snapToScale (pitch + interval);
+            auto added = ctx.project.addNote (roll.getPattern(), uid, start, len, p);
             if (interval == 0)
                 note = added;
-            ctx.engine.previewNote (uid, pitch + interval, 0.8f, 0.3);
+            ctx.engine.previewNote (uid, p, 0.8f, 0.3);
         }
         edge = false;
     }
@@ -287,11 +362,37 @@ void PianoRollGrid::mouseDown (const juce::MouseEvent& e)
 
 void PianoRollGrid::mouseDrag (const juce::MouseEvent& e)
 {
+    if (dragMode == DragMode::select)
+    {
+        const auto old = selectionBox;
+        selectionBox = juce::Rectangle<float> (e.mouseDownPosition, e.position);
+        repaint (old.getUnion (selectionBox).expanded (4.0f).toNearestInt());
+        return;
+    }
     if (dragMode == DragMode::none || ! dragNote.isValid())
         return;
 
     const int length = Project::getPatternLength (roll.getPattern());
     const double delta = xToSteps (e.position.x) - dragStartSteps;
+
+    if (dragMode == DragMode::move && movingGroup.size() > 1)
+    {
+        // Mover todo el grupo, sin que ninguna nota se salga del patrón
+        const double s = roll.getSnap();
+        double d = std::round (delta / s) * s;
+        int dp = yToNote (e.position.y) - dragStartNote;
+        for (auto& o : movingGroup)
+        {
+            d = juce::jlimit (-o.start, length - s - o.start, d);
+            dp = juce::jlimit (lowestNote - o.pitch, highestNote - o.pitch, dp);
+        }
+        for (auto& o : movingGroup)
+        {
+            o.note.setProperty (ids::start, o.start + d, ctx.project.um());
+            o.note.setProperty (ids::pitch, o.pitch + dp, ctx.project.um());
+        }
+        return;
+    }
 
     if (dragMode == DragMode::resize)
     {
@@ -304,7 +405,7 @@ void PianoRollGrid::mouseDrag (const juce::MouseEvent& e)
     {
         const double s = roll.getSnap();
         const double newStart = juce::jlimit (0.0, length - s, std::round ((dragNoteStart + delta) / s) * s);
-        const int newPitch = juce::jlimit (lowestNote, highestNote, dragNotePitch + (yToNote (e.position.y) - dragStartNote));
+        const int newPitch = roll.snapToScale (juce::jlimit (lowestNote, highestNote, dragNotePitch + (yToNote (e.position.y) - dragStartNote)));
         if ((int) dragNote[ids::pitch] != newPitch)
             ctx.engine.previewNote (roll.getChannelUid(), newPitch, 0.7f, 0.15);
         dragNote.setProperty (ids::start, newStart, ctx.project.um());
@@ -314,6 +415,30 @@ void PianoRollGrid::mouseDrag (const juce::MouseEvent& e)
 
 void PianoRollGrid::mouseUp (const juce::MouseEvent&)
 {
+    if (keyboardNote >= 0)
+    {
+        if (roll.isRecordingNotes())
+            roll.liveNote (keyboardNote, false, 0.0f);
+        keyboardNote = -1;
+        return;
+    }
+    if (dragMode == DragMode::select)
+    {
+        // Selecciona las notas del canal que tocan el rectángulo
+        const int uid = roll.getChannelUid();
+        for (auto n : roll.getPattern())
+            if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid)
+            {
+                auto r = juce::Rectangle<float> (stepsToX (n[ids::start]), (float) yForNote (n[ids::pitch]),
+                                                 (float) ((double) n[ids::length] * stepWidth()), (float) rowHeight);
+                if (r.intersects (selectionBox) && ! roll.selection.contains (n))
+                    roll.selection.add (n);
+            }
+        dragMode = DragMode::none;
+        repaint();
+        return;
+    }
+    movingGroup.clear();
     if (dragMode == DragMode::move && dragNote.isValid())
         lastLength = dragNote[ids::length];
     dragMode = DragMode::none;
@@ -323,8 +448,79 @@ void PianoRollGrid::mouseUp (const juce::MouseEvent&)
 // ============================================================================
 //  PianoRoll
 // ============================================================================
+//  VelocityLane
+// ============================================================================
+VelocityLane::VelocityLane (AppContext& c, PianoRoll& r) : ctx (c), roll (r)
+{
+    setTooltip (txt ("Velocity: lo fuerte que suena cada nota. Arrastra las barras hacia arriba (más fuerte) "
+                     "o hacia abajo (más suave). Si arrastras de lado, cambias varias notas seguidas."));
+    makeNonFocusing (*this);
+}
+
+void VelocityLane::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colour (0xff15181c));
+    auto area = getLocalBounds().toFloat().reduced (0.0f, 4.0f);
+    g.setColour (Colours::outline.withAlpha (0.4f));
+    for (float f : { 0.25f, 0.5f, 0.75f })
+        g.drawHorizontalLine ((int) (area.getBottom() - f * area.getHeight()), 0.0f, (float) getWidth());
+
+    g.setColour (Colours::textDim);
+    g.setFont (Fonts::bold (11.0f));
+    g.drawFittedText ("VELOCITY", juce::Rectangle<int> (0, 0, PianoRollGrid::keyboardWidth, getHeight()),
+                      juce::Justification::centred, 2);
+
+    const int uid = roll.getChannelUid();
+    const auto colour = Colours::forChannelType (roll.getChannelType());
+    for (auto n : roll.getPattern())
+    {
+        if (! n.hasType (ids::NOTE) || (int) n[ids::channel] != uid)
+            continue;
+        const float x = roll.gridStepsToX (n[ids::start]);
+        const float vel = juce::jlimit (0.0f, 1.0f, (float) n.getProperty (ids::velocity, 0.8f));
+        const float top = area.getBottom() - vel * area.getHeight();
+        g.setColour (colour.withAlpha (0.35f + 0.65f * vel));
+        g.fillRect (juce::Rectangle<float> (x, top, 3.0f, area.getBottom() - top));
+        g.fillEllipse (x - 3.0f, top - 4.5f, 9.0f, 9.0f);
+    }
+}
+
+void VelocityLane::mouseDown (const juce::MouseEvent& e)
+{
+    ctx.project.beginTransaction();
+    setVelocityAt (e.position);
+}
+
+void VelocityLane::mouseDrag (const juce::MouseEvent& e) { setVelocityAt (e.position); }
+
+void VelocityLane::setVelocityAt (juce::Point<float> p)
+{
+    auto area = getLocalBounds().toFloat().reduced (0.0f, 4.0f);
+    const float vel = juce::jlimit (0.05f, 1.0f, (area.getBottom() - p.y) / juce::jmax (1.0f, area.getHeight()));
+    const int uid = roll.getChannelUid();
+
+    // La nota (o acorde) cuyo inicio está más cerca del ratón, a menos de 10 píxeles
+    float best = 10.0f;
+    double bestStart = -1.0;
+    for (auto n : roll.getPattern())
+        if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid)
+        {
+            const float d = std::abs (roll.gridStepsToX (n[ids::start]) - p.x);
+            if (d < best) { best = d; bestStart = n[ids::start]; }
+        }
+    if (bestStart < 0.0)
+        return;
+    for (auto n : roll.getPattern())
+        if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid
+            && juce::approximatelyEqual ((double) n[ids::start], bestStart))
+            n.setProperty (ids::velocity, vel, ctx.project.um());
+    repaint();
+}
+
+// ============================================================================
 PianoRoll::PianoRoll (AppContext& c)
-    : ctx (c), helpButton (txt (help::pianoRollTitle), txt (help::pianoRollText)), grid (c, *this)
+    : ctx (c), helpButton (txt (help::pianoRollTitle), txt (help::pianoRollText)), grid (c, *this),
+      velocityLane (c, *this)
 {
     addAndMakeVisible (helpButton);
 
@@ -375,6 +571,37 @@ PianoRoll::PianoRoll (AppContext& c)
                 p.removeChild (i, ctx.project.um());
     };
     makeNonFocusing (clearButton);
+
+    addAndMakeVisible (recordButton);
+    recordButton.setButtonText (txt ("● Grabar notas"));
+    recordButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0xffd63c3c));
+    recordButton.setTooltip (txt ("Graba lo que tocas en un teclado MIDI (o en las teclas del piano de la izquierda) "
+                                  "dentro de este patrón, mientras suena. Pulsa Espacio o este botón para parar."));
+    recordButton.onClick = [this] { setRecording (! recording); };
+    makeNonFocusing (recordButton);
+
+    addAndMakeVisible (toolsButton);
+    toolsButton.setButtonText (txt ("Herramientas"));
+    toolsButton.setTooltip (txt ("Copiar, pegar, duplicar, transponer, arpegiador y escalas."));
+    toolsButton.onClick = [this] { showToolsMenu(); };
+    makeNonFocusing (toolsButton);
+
+    addAndMakeVisible (selectButton);
+    selectButton.setButtonText (txt ("Seleccionar"));
+    selectButton.setClickingTogglesState (true);
+    selectButton.setTooltip (txt ("Activado: arrastra para seleccionar varias notas (o mantén Ctrl). Luego muévelas todas "
+                                  "juntas, cópialas o bórralas."));
+    selectButton.onClick = [this] { selectMode = selectButton.getToggleState(); };
+    makeNonFocusing (selectButton);
+
+    addAndMakeVisible (quantizeButton);
+    quantizeButton.setButtonText ("Cuantizar");
+    quantizeButton.setTooltip (txt ("Cuantizar: coloca todas las notas de este canal justo en la cuadrícula del \"Ajuste\". "
+                                    "Arregla las notas que grabaste o pusiste un poco fuera de tiempo."));
+    quantizeButton.onClick = [this] { quantize(); };
+    makeNonFocusing (quantizeButton);
+
+    addAndMakeVisible (velocityLane);
 
     addAndMakeVisible (viewport);
     viewport.setViewedComponent (&grid, false);
@@ -436,6 +663,7 @@ void PianoRoll::changeListenerCallback (juce::ChangeBroadcaster*)
 {
     refreshChannels();
     grid.repaint();
+    velocityLane.repaint();
 }
 
 void PianoRoll::refreshChannels()
@@ -481,8 +709,495 @@ void PianoRoll::visibilityChanged()
 
 void PianoRoll::timerCallback()
 {
+    if (recording)
+    {
+        if (! ctx.engine.isPlaying())
+            setRecording (false);   // al parar, se acaba la grabación
+        else
+            for (auto& r : ctx.engine.takeRecordedMidi())
+                handleRecorded (r);
+    }
     const bool show = ctx.engine.isPlaying() && ! ctx.engine.isSongMode();
     grid.setPlayhead (show ? ctx.engine.getPlayPosition() : -1.0);
+}
+
+bool PianoRollGrid::isSelected (const juce::ValueTree& n) const { return roll.selection.contains (n); }
+
+// ----------------------------------------------------------------------------
+//  Selección, copiar y pegar, escalas, arpegiador
+// ----------------------------------------------------------------------------
+namespace
+{
+    struct ClipNote { double start, length; int pitch; float velocity; };
+    std::vector<ClipNote>& clipboard() { static std::vector<ClipNote> c; return c; }
+
+    // Intervalos de cada escala (en semitonos desde la nota base)
+    const std::vector<int>& scaleIntervals (int type)
+    {
+        static const std::vector<std::vector<int>> scales = {
+            {},
+            { 0, 2, 4, 5, 7, 9, 11 },     // Mayor
+            { 0, 2, 3, 5, 7, 8, 10 },     // Menor
+            { 0, 2, 3, 5, 7, 8, 11 },     // Menor armónica
+            { 0, 3, 5, 7, 10 },           // Pentatónica menor
+            { 0, 2, 4, 7, 9 },            // Pentatónica mayor
+            { 0, 3, 5, 6, 7, 10 },        // Blues
+            { 0, 2, 3, 5, 7, 9, 10 },     // Dórica
+            { 0, 1, 3, 5, 7, 8, 10 },     // Frigia (drill, flamenco)
+        };
+        return scales[(size_t) juce::jlimit (0, (int) scales.size() - 1, type)];
+    }
+}
+
+juce::StringArray PianoRoll::scaleNames()
+{
+    return { txt ("Sin escala"), txt ("Mayor (alegre)"), txt ("Menor (triste)"), txt ("Menor armónica (oriental)"),
+             txt ("Pentatónica menor"), txt ("Pentatónica mayor"), "Blues", txt ("Dórica (lo-fi, jazz)"),
+             txt ("Frigia (drill, flamenco)") };
+}
+
+int PianoRoll::getScaleType() const { return juce::jlimit (0, scaleNames().size() - 1, (int) ctx.project.getState().getProperty (ids::scaleType, 0)); }
+int PianoRoll::getScaleRoot() const { return juce::jlimit (0, 11, (int) ctx.project.getState().getProperty (ids::scaleRoot, 0)); }
+
+bool PianoRoll::isInScale (int pitch) const
+{
+    const int type = getScaleType();
+    if (type == 0)
+        return true;
+    const int degree = ((pitch - getScaleRoot()) % 12 + 12) % 12;
+    for (int i : scaleIntervals (type))
+        if (i == degree)
+            return true;
+    return false;
+}
+
+int PianoRoll::snapToScale (int pitch) const
+{
+    if (getScaleType() == 0 || ! (bool) ctx.project.getState().getProperty (ids::scaleLock, true))
+        return pitch;
+    for (int d = 0; d <= 6; ++d)
+    {
+        if (isInScale (pitch - d)) return pitch - d;   // primero hacia abajo: así suena a "la tecla de al lado"
+        if (isInScale (pitch + d)) return pitch + d;
+    }
+    return pitch;
+}
+
+void PianoRoll::pruneSelection()
+{
+    const int uid = getChannelUid();
+    auto pattern = getPattern();
+    for (int i = selection.size(); --i >= 0;)
+        if (selection[i].getParent() != pattern || (int) selection[i][ids::channel] != uid)
+            selection.remove (i);
+}
+
+void PianoRoll::selectAll()
+{
+    selection.clear();
+    const int uid = getChannelUid();
+    for (auto n : getPattern())
+        if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid)
+            selection.add (n);
+    grid.repaint();
+}
+
+void PianoRoll::clearSelection()
+{
+    selection.clear();
+    grid.repaint();
+}
+
+juce::Array<juce::ValueTree> PianoRoll::selectedOrAll()
+{
+    pruneSelection();
+    if (! selection.isEmpty())
+        return selection;
+    juce::Array<juce::ValueTree> all;
+    const int uid = getChannelUid();
+    for (auto n : getPattern())
+        if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid)
+            all.add (n);
+    return all;
+}
+
+void PianoRoll::copySelection()
+{
+    pruneSelection();
+    if (selection.isEmpty())
+        return;
+    clipboard().clear();
+    for (auto& n : selection)
+        clipboard().push_back ({ (double) n[ids::start], (double) n[ids::length], (int) n[ids::pitch],
+                                 (float) n.getProperty (ids::velocity, 0.8f) });
+}
+
+void PianoRoll::cutSelection()
+{
+    copySelection();
+    deleteSelection();
+}
+
+void PianoRoll::paste()
+{
+    if (clipboard().empty() || getChannelUid() == 0)
+        return;
+    ctx.project.beginTransaction();
+    const int length = Project::getPatternLength (getPattern());
+    selection.clear();
+    for (auto& c : clipboard())
+        if (c.start < length)
+            selection.add (ctx.project.addNote (getPattern(), getChannelUid(), c.start, juce::jmin (c.length, length - c.start),
+                                                c.pitch, c.velocity));
+    grid.repaint();
+}
+
+void PianoRoll::duplicateSelection()
+{
+    auto notes = selectedOrAll();
+    if (notes.isEmpty())
+        return;
+    double first = 1.0e9, last = 0.0;
+    for (auto& n : notes)
+    {
+        first = juce::jmin (first, (double) n[ids::start]);
+        last = juce::jmax (last, (double) n[ids::start] + (double) n[ids::length]);
+    }
+    const double span = std::ceil ((last - first) / 4.0 - 1.0e-6) * 4.0;   // en tiempos enteros
+    const int length = Project::getPatternLength (getPattern());
+    ctx.project.beginTransaction();
+    juce::Array<juce::ValueTree> added;
+    for (auto& n : notes)
+    {
+        const double start = (double) n[ids::start] + span;
+        if (start < length)
+            added.add (ctx.project.addNote (getPattern(), getChannelUid(), start,
+                                            juce::jmin ((double) n[ids::length], length - start), n[ids::pitch],
+                                            (float) n.getProperty (ids::velocity, 0.8f)));
+    }
+    selection = added;
+    grid.repaint();
+}
+
+void PianoRoll::deleteSelection()
+{
+    pruneSelection();
+    if (selection.isEmpty())
+        return;
+    ctx.project.beginTransaction();
+    for (auto& n : selection)
+        getPattern().removeChild (n, ctx.project.um());
+    selection.clear();
+    grid.repaint();
+}
+
+void PianoRoll::transpose (int semitones)
+{
+    auto notes = selectedOrAll();
+    if (notes.isEmpty())
+        return;
+    for (auto& n : notes)   // si alguna se sale del teclado, no se mueve ninguna
+    {
+        const int p = (int) n[ids::pitch] + semitones;
+        if (p < PianoRollGrid::lowestNote || p > PianoRollGrid::highestNote)
+            return;
+    }
+    ctx.project.beginTransaction();
+    for (auto& n : notes)
+        n.setProperty (ids::pitch, (int) n[ids::pitch] + semitones, ctx.project.um());
+}
+
+void PianoRoll::arpeggiate (int style)
+{
+    // Cada acorde (notas que empiezan a la vez) se convierte en notas sueltas una detrás de otra
+    auto notes = selectedOrAll();
+    if (notes.isEmpty())
+        return;
+    std::map<double, std::vector<juce::ValueTree>> chords;
+    for (auto& n : notes)
+        chords[(double) n[ids::start]].push_back (n);
+
+    const double s = getSnap();
+    const int length = Project::getPatternLength (getPattern());
+    const int uid = getChannelUid();
+    juce::Random rnd (1234);
+    ctx.project.beginTransaction();
+    selection.clear();
+    for (auto& [start, chord] : chords)
+    {
+        if (chord.size() < 2)
+            continue;
+        std::vector<int> pitches;
+        double chordLength = 0.0;
+        float velocity = 0.8f;
+        for (auto& n : chord)
+        {
+            pitches.push_back (n[ids::pitch]);
+            chordLength = juce::jmax (chordLength, (double) n[ids::length]);
+            velocity = n.getProperty (ids::velocity, 0.8f);
+            getPattern().removeChild (n, ctx.project.um());
+        }
+        std::sort (pitches.begin(), pitches.end());
+        std::vector<int> order;
+        if (style == 1)      order.assign (pitches.rbegin(), pitches.rend());
+        else if (style == 2) { order = pitches; for (int i = (int) pitches.size() - 2; i > 0; --i) order.push_back (pitches[(size_t) i]); }
+        else                 order = pitches;
+
+        int i = 0;
+        for (double t = start; t < start + chordLength - 1.0e-6 && t < length; t += s, ++i)
+        {
+            const int pitch = style == 3 ? pitches[(size_t) rnd.nextInt ((int) pitches.size())]
+                                         : order[(size_t) i % order.size()];
+            selection.add (ctx.project.addNote (getPattern(), uid, t, juce::jmin (s, length - t), pitch, velocity));
+        }
+    }
+    grid.repaint();
+}
+
+bool PianoRoll::handleKey (const juce::KeyPress& key)
+{
+    const auto mods = key.getModifiers();
+    const int code = key.getKeyCode();
+    const auto upper = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code);
+    const bool cmd = mods.isCommandDown();
+    if (cmd && upper == 'A') { selectAll(); return true; }
+    if (cmd && upper == 'C') { copySelection(); return true; }
+    if (cmd && upper == 'X') { cutSelection(); return true; }
+    if (cmd && upper == 'V') { paste(); return true; }
+    if (cmd && upper == 'B') { duplicateSelection(); return true; }
+    if (code == juce::KeyPress::deleteKey || code == juce::KeyPress::backspaceKey)
+    {
+        pruneSelection();
+        if (selection.isEmpty())
+            return false;
+        deleteSelection();
+        return true;
+    }
+    if (code == juce::KeyPress::escapeKey && ! selection.isEmpty()) { clearSelection(); return true; }
+    pruneSelection();
+    if (selection.isEmpty())
+        return false;   // las flechas solo mueven notas seleccionadas
+    if (code == juce::KeyPress::upKey)   { transpose (mods.isShiftDown() ? 12 : 1); return true; }
+    if (code == juce::KeyPress::downKey) { transpose (mods.isShiftDown() ? -12 : -1); return true; }
+    return false;
+}
+
+void PianoRoll::showToolsMenu()
+{
+    pruneSelection();
+    const bool hasSel = ! selection.isEmpty();
+    juce::PopupMenu menu;
+    menu.addSectionHeader (hasSel ? juce::String (selection.size()) + txt (" notas seleccionadas") : txt ("Sin selección: afecta a todas las notas"));
+    menu.addItem (1, txt ("Seleccionar todo (Ctrl+A)"));
+    menu.addItem (2, txt ("Copiar (Ctrl+C)"), hasSel);
+    menu.addItem (3, txt ("Cortar (Ctrl+X)"), hasSel);
+    menu.addItem (4, txt ("Pegar (Ctrl+V)"), ! clipboard().empty());
+    menu.addItem (5, txt ("Duplicar detrás (Ctrl+B)"));
+    menu.addItem (6, txt ("Borrar seleccionadas (Supr)"), hasSel);
+    menu.addItem (7, txt ("Borrar todas las notas de este canal"));
+    menu.addSeparator();
+    menu.addItem (10, txt ("Subir 1 semitono (↑)"));
+    menu.addItem (11, txt ("Bajar 1 semitono (↓)"));
+    menu.addItem (12, txt ("Subir una octava (Mayús+↑)"));
+    menu.addItem (13, txt ("Bajar una octava (Mayús+↓)"));
+    menu.addSeparator();
+    juce::PopupMenu arp;
+    arp.addItem (20, txt ("Subiendo"));
+    arp.addItem (21, txt ("Bajando"));
+    arp.addItem (22, txt ("Sube y baja"));
+    arp.addItem (23, txt ("Al azar"));
+    menu.addSubMenu (txt ("Arpegiador (convierte los acordes en notas sueltas)"), arp);
+
+    juce::PopupMenu scale, root;
+    const auto names = scaleNames();
+    for (int i = 0; i < names.size(); ++i)
+        scale.addItem (100 + i, names[i], true, i == getScaleType());
+    static const char* roots[] = { "Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si" };
+    for (int i = 0; i < 12; ++i)
+        root.addItem (200 + i, roots[i], true, i == getScaleRoot());
+    menu.addSeparator();
+    menu.addItem (30, txt ("Exportar este patrón a MIDI (.mid)"));
+    menu.addItem (31, txt ("Importar MIDI en este canal..."));
+    menu.addSeparator();
+    menu.addSubMenu (txt ("Escala"), scale);
+    menu.addSubMenu (txt ("Nota base de la escala"), root, getScaleType() > 0);
+    menu.addItem (300, txt ("Pegar las notas a la escala"), getScaleType() > 0,
+                  (bool) ctx.project.getState().getProperty (ids::scaleLock, true));
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&toolsButton), [this] (int r)
+    {
+        auto& st = ctx.project.getState();
+        switch (r)
+        {
+            case 1: selectAll(); break;
+            case 2: copySelection(); break;
+            case 3: cutSelection(); break;
+            case 4: paste(); break;
+            case 5: duplicateSelection(); break;
+            case 6: deleteSelection(); break;
+            case 7: clearButton.onClick(); selection.clear(); break;
+            case 10: transpose (1); break;
+            case 11: transpose (-1); break;
+            case 12: transpose (12); break;
+            case 13: transpose (-12); break;
+            case 20: case 21: case 22: case 23: arpeggiate (r - 20); break;
+            case 30: exportMidi(); break;
+            case 31: importMidi(); break;
+            case 300: st.setProperty (ids::scaleLock, ! (bool) st.getProperty (ids::scaleLock, true), ctx.project.um()); break;
+            default:
+                if (r >= 100 && r < 100 + scaleNames().size())
+                {
+                    ctx.project.beginTransaction();
+                    st.setProperty (ids::scaleType, r - 100, ctx.project.um());
+                }
+                else if (r >= 200 && r < 212)
+                {
+                    ctx.project.beginTransaction();
+                    st.setProperty (ids::scaleRoot, r - 200, ctx.project.um());
+                }
+                break;
+        }
+        grid.repaint();
+    });
+}
+
+void PianoRoll::setRecording (bool on)
+{
+    recording = on;
+    recordButton.setToggleState (on, juce::dontSendNotification);
+    openNotes.clear();
+    ctx.engine.takeRecordedMidi();   // descarta lo que hubiera de antes
+    ctx.engine.setMidiRecording (on);
+    if (on)
+    {
+        ctx.project.beginTransaction();   // todo lo grabado se deshace de una vez
+        ctx.project.getState().setProperty (ids::playMode, "pattern", nullptr);
+        if (! ctx.engine.isPlaying())
+            ctx.engine.play();
+    }
+}
+
+void PianoRoll::liveNote (int pitch, bool on, float velocity)
+{
+    if (! recording || ! ctx.engine.isPlaying())
+        return;
+    handleRecorded ({ on, pitch, velocity, ctx.engine.getPlayPosition() });
+}
+
+void PianoRoll::handleRecorded (const AudioEngine::RecordedMidi& r)
+{
+    const int uid = getChannelUid();
+    if (uid == 0)
+        return;
+    const double length = Project::getPatternLength (getPattern());
+    if (r.noteOn)
+    {
+        openNotes[r.note] = { r.position, juce::jlimit (0.05f, 1.0f, r.velocity) };
+        return;
+    }
+    auto it = openNotes.find (r.note);
+    if (it == openNotes.end())
+        return;
+    double start = std::round (it->second.first * 4.0) / 4.0;   // al cuarto de paso más cercano
+    if (start >= length) start = 0.0;
+    double len = r.position - it->second.first;
+    if (len <= 0.0) len += length;                                // la nota cruzó el final del patrón
+    len = juce::jlimit (0.25, length - start, std::round (len * 4.0) / 4.0);
+    const int pitch = juce::jlimit (PianoRollGrid::lowestNote, PianoRollGrid::highestNote, r.note);
+    ctx.project.addNote (getPattern(), uid, start, len, pitch, it->second.second);
+    openNotes.erase (it);
+}
+
+void PianoRoll::exportMidi()
+{
+    auto midi = midiio::patternToMidi (ctx.project, getPattern());
+    auto dir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Studoo").getChildFile ("Exportados");
+    dir.createDirectory();
+    auto name = juce::File::createLegalFileName (ctx.project.getDisplayName() + " - " + getPattern()[ids::name].toString());
+    auto file = dir.getNonexistentChildFile (name, ".mid", false);
+    bool ok = false;
+    {
+        juce::FileOutputStream out (file);
+        ok = out.openedOk() && midi.writeTo (out);
+    }
+    if (! ok)
+    {
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions().withTitle (txt ("No se pudo exportar"))
+                                          .withMessage (txt ("No se pudo escribir el archivo MIDI.")).withButton ("Vale"), nullptr);
+        return;
+    }
+    juce::Component::SafePointer<PianoRoll> safe (this);
+    juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                      .withIconType (juce::MessageBoxIconType::NoIcon)
+                                      .withTitle (txt ("¡MIDI exportado!"))
+                                      .withMessage (txt ("Se ha guardado en:\n") + file.getFullPathName()
+                                                    + txt ("\n\nÁbrelo en cualquier programa de música (cada canal es una pista)."))
+                                     #if JUCE_ANDROID || JUCE_IOS
+                                      .withButton (txt ("Compartir"))
+                                     #else
+                                      .withButton (txt ("Mostrar en la carpeta"))
+                                     #endif
+                                      .withButton (txt ("Cerrar")),
+                                  [safe, file] (int result)
+    {
+        if (safe != nullptr && result == 1 && safe->ctx.shareFile)
+            safe->ctx.shareFile (file);
+    });
+}
+
+void PianoRoll::importMidi()
+{
+    if (getChannelUid() == 0)
+        return;
+    chooser = std::make_unique<juce::FileChooser> (txt ("Elige un archivo MIDI"), juce::File(), "*.mid;*.midi");
+    juce::Component::SafePointer<PianoRoll> safe (this);
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                          [safe] (const juce::FileChooser& fc)
+    {
+        if (safe == nullptr)
+            return;
+        auto files = chosenFiles (fc, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                                          .getChildFile ("Studoo").getChildFile ("Importados"));
+        if (files.isEmpty())
+            return;
+        juce::MidiFile midi;
+        {
+            juce::FileInputStream in (files[0]);
+            // Un .mid normal ocupa pocos KB: más de 4 MB no es un MIDI de verdad
+            if (! in.openedOk() || in.getTotalLength() > 4 * 1024 * 1024 || ! midi.readFrom (in))
+            {
+                juce::AlertWindow::showAsync (juce::MessageBoxOptions().withTitle (txt ("No se pudo importar"))
+                                                  .withMessage (txt ("Ese archivo no parece un MIDI válido.")).withButton ("Vale"), nullptr);
+                return;
+            }
+        }
+        safe->ctx.project.beginTransaction();
+        const int count = midiio::importIntoPattern (safe->ctx.project, safe->getPattern(), safe->getChannelUid(), midi);
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions().withTitle (count > 0 ? txt ("MIDI importado") : txt ("Sin notas"))
+                                          .withMessage (count > 0 ? juce::String (count) + txt (" notas añadidas a este canal (como mucho 4 compases).")
+                                                                  : txt ("El archivo no tiene notas que se puedan usar."))
+                                          .withButton ("Vale"), nullptr);
+        safe->scrollToNotes();
+    });
+}
+
+float PianoRoll::gridStepsToX (double steps) const { return grid.stepsToX (steps); }
+double PianoRoll::gridXToSteps (float x) const { return grid.xToSteps (x); }
+
+void PianoRoll::quantize()
+{
+    const double s = getSnap();
+    const int uid = getChannelUid();
+    const int length = Project::getPatternLength (getPattern());
+    ctx.project.beginTransaction();
+    for (auto n : getPattern())
+        if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid)
+        {
+            const double start = juce::jlimit (0.0, juce::jmax (0.0, length - s), std::round ((double) n[ids::start] / s) * s);
+            const double len = juce::jmax (s, std::round ((double) n[ids::length] / s) * s);
+            n.setProperty (ids::start, start, ctx.project.um());
+            n.setProperty (ids::length, len, ctx.project.um());
+        }
 }
 
 void PianoRoll::paint (juce::Graphics& g)
@@ -496,14 +1211,28 @@ void PianoRoll::resized()
     headerArea = area.removeFromTop (42);
     auto h = headerArea.reduced (8, 7);
     helpButton.setBounds (h.removeFromLeft (26));
-    h.removeFromLeft (110);
-    channelBox.setBounds (h.removeFromLeft (170)); h.removeFromLeft (8);
-    snapBox.setBounds (h.removeFromLeft (170)); h.removeFromLeft (8);
-    chordBox.setBounds (h.removeFromLeft (200)); h.removeFromLeft (8);
-    clearButton.setBounds (h.removeFromRight (110)); h.removeFromRight (8);
+    // Anchos ideales; si no cabe todo (pantallas pequeñas), se encoge todo a la vez
+    constexpr int natural = 110 + 170 + 170 + 200 + 96 + 120 + 104 + 124 + 8 * 8;
+    const bool roomForTitle = h.getWidth() >= natural;
+    const float k = juce::jlimit (0.55f, 1.0f, (float) h.getWidth() / (float) (natural - (roomForTitle ? 0 : 110)));
+    auto w = [k] (int px) { return juce::roundToInt ((float) px * k); };
+    h.removeFromLeft (roomForTitle ? 110 : 8);
+    channelBox.setBounds (h.removeFromLeft (w (170))); h.removeFromLeft (8);
+    snapBox.setBounds (h.removeFromLeft (w (170))); h.removeFromLeft (8);
+    chordBox.setBounds (h.removeFromLeft (w (200))); h.removeFromLeft (8);
+    clearButton.setVisible (false);   // "Borrar notas" está en Herramientas
+    quantizeButton.setBounds (h.removeFromRight (w (96))); h.removeFromRight (8);
+    toolsButton.setBounds (h.removeFromRight (w (120))); h.removeFromRight (8);
+    selectButton.setBounds (h.removeFromRight (w (104))); h.removeFromRight (8);
+    recordButton.setBounds (h.removeFromRight (w (124))); h.removeFromRight (8);
     patternLabel.setBounds (h);
+    patternLabel.setVisible (h.getWidth() > 60);
 
-    viewport.setBounds (area.reduced (6));
+    area.reduce (6, 6);
+    auto lane = area.removeFromBottom (area.getHeight() > 300 ? 64 : 44);
+    area.removeFromBottom (4);
+    viewport.setBounds (area);
+    velocityLane.setBounds (lane.withTrimmedRight (viewport.getScrollBarThickness()));
     const int rows = PianoRollGrid::highestNote - PianoRollGrid::lowestNote + 1;
     grid.setSize (viewport.getWidth() - viewport.getScrollBarThickness(), rows * PianoRollGrid::rowHeight);
 }

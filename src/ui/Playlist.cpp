@@ -10,7 +10,9 @@ PlaylistGrid::PlaylistGrid (AppContext& c, Playlist& p) : ctx (c), playlist (p)
 {
     enableLongPressMenu (*this); // en tablets: mantener pulsado = clic derecho
     setTooltip (txt ("Clic en un hueco: colocar el patrón elegido arriba. Arrastra un bloque: moverlo. Borde derecho: "
-                     "alargarlo. Clic derecho: borrar. Doble clic: editar el patrón. Clic en la regla: mover el cursor."));
+                     "alargarlo. Clic derecho: borrar. Doble clic: editar el patrón. Clic en la regla: mover el cursor.\n"
+                     "Grabaciones: arrastra el borde izquierdo para quitar el principio. Clic derecho (o mantener pulsado): "
+                     "cortar, duplicar, volumen y fundidos."));
     makeNonFocusing (*this);
 }
 
@@ -195,17 +197,44 @@ void PlaylistGrid::paint (juce::Graphics& g)
         }
         else
         {
-            // Forma de onda decorativa
+            // Forma de onda real de la grabación (con su volumen y sus fundidos)
+            double sr = 44100.0;
+            const auto& pk = peaksFor (ctx.project.findChannel (clip[ids::ref])[ids::sample].toString(), sr);
+            const double bpm = juce::jlimit (40.0, 250.0, (double) ctx.project.getState().getProperty (ids::bpm, 140.0));
+            const double secondsPerStep = 60.0 / bpm / stepsPerBeat;
+            const double start = clip[ids::start], length = clip[ids::length], offset = clip[ids::offset];
+            const double fadeIn = clip.getProperty (ids::fadeIn, 0.0), fadeOut = clip.getProperty (ids::fadeOut, 0.0);
+            const float gain = juce::jlimit (0.0f, 2.0f, (float) clip.getProperty (ids::clipGain, 1.0f));
+            const bool stretched = (bool) clip.getProperty (ids::stretch, false);
+            const double timeRatio = stretched ? juce::jlimit (0.25, 4.0, bpm / juce::jlimit (40.0, 250.0, (double) clip.getProperty (ids::recordBpm, bpm))) : 1.0;
+            const int semis = juce::jlimit (-12, 12, (int) clip.getProperty (ids::clipPitch, 0));
             juce::Path wave;
-            const float cy = body.getCentreY(), amp = body.getHeight() * 0.45f;
-            juce::Random rnd ((juce::int64) (int) clip[ids::uid]);
-            for (float x = body.getX(); x < body.getRight(); x += 2.0f)
+            const float cy = body.getCentreY(), amp = body.getHeight() * 0.5f;
+            const float x0 = juce::jmax (body.getX(), clipArea.getX() - 2.0f), x1 = juce::jmin (body.getRight(), clipArea.getRight() + 2.0f);
+            for (float x = x0; x < x1 && ! pk.empty(); x += 2.0f)
             {
-                const float a = amp * (0.25f + 0.75f * rnd.nextFloat()) * (0.6f + 0.4f * std::sin (x * 0.05f));
+                const double inClip = xToSteps (x) - start;
+                const double idx = (inClip + offset) * secondsPerStep * timeRatio * sr / samplesPerPeak;
+                if (idx < 0.0 || idx >= (double) pk.size())
+                    continue;
+                double env = gain;
+                if (fadeIn > 0.0)  env *= juce::jmin (1.0, inClip / fadeIn);
+                if (fadeOut > 0.0) env *= juce::jmin (1.0, (length - inClip) / fadeOut);
+                const float a = juce::jmax (0.5f, amp * (float) juce::jlimit (0.0, 1.0, pk[(size_t) idx] * env));
                 wave.addRectangle (x, cy - a, 1.2f, a * 2.0f);
             }
             g.setColour (colour.brighter (0.4f).withAlpha (0.85f));
             g.fillPath (wave);
+            juce::StringArray tags;
+            if (stretched)  tags.add (txt ("al tempo"));
+            if (semis != 0) tags.add ((semis > 0 ? "+" : "") + juce::String (semis) + " st");
+            if (! juce::approximatelyEqual (gain, 1.0f)) tags.add (juce::String ((int) std::round (gain * 100.0f)) + "%");
+            if (! tags.isEmpty())
+            {
+                g.setColour (juce::Colour (0xff140c02));
+                g.setFont (Fonts::bold (9.5f));
+                g.drawText (tags.joinIntoString (" · "), head.reduced (6.0f, 0.0f), juce::Justification::centredRight, false);
+            }
         }
     }
 
@@ -237,8 +266,132 @@ void PlaylistGrid::mouseMove (const juce::MouseEvent& e)
 {
     bool edge = false;
     auto c = clipAt (e.position, edge);
+    if (c.isValid() && ! edge && c[ids::kind].toString() == "audio")
+    {
+        const auto b = clipBounds (c);
+        edge = e.position.x < b.getX() + juce::jmin (8.0f, b.getWidth() * 0.3f);
+    }
     setMouseCursor (c.isValid() ? (edge ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor)
                                 : juce::MouseCursor::NormalCursor);
+}
+
+const std::vector<float>& PlaylistGrid::peaksFor (const juce::String& path, double& sampleRate)
+{
+    auto it = peakCache.find (path);
+    if (it == peakCache.end())
+    {
+        std::vector<float> peaks;
+        double rate = 44100.0;
+        if (auto sample = path.isNotEmpty() ? ctx.samples.get (path) : nullptr)
+        {
+            const auto& b = sample->buffer;
+            rate = sample->sampleRate;
+            const int len = b.getNumSamples();
+            peaks.reserve ((size_t) (len / samplesPerPeak + 1));
+            float maxPeak = 0.0001f;
+            for (int from = 0; from < len; from += samplesPerPeak)
+            {
+                const int num = juce::jmin (samplesPerPeak, len - from);
+                float m = 0.0f;
+                for (int ch = 0; ch < b.getNumChannels(); ++ch)
+                    m = juce::jmax (m, b.getMagnitude (ch, from, num));
+                peaks.push_back (m);
+                maxPeak = juce::jmax (maxPeak, m);
+            }
+            for (auto& p : peaks)
+                p = juce::jmin (1.0f, p / maxPeak);
+        }
+        it = peakCache.emplace (path, std::make_pair (rate, std::move (peaks))).first;
+    }
+    sampleRate = it->second.first;
+    return it->second.second;
+}
+
+void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
+{
+    const double s = playlist.getSnap();
+    const double start = clip[ids::start], length = clip[ids::length];
+    const double cut = std::round (atSteps / s) * s;
+    const bool canCut = cut > start + 0.01 && cut < start + length - 0.01;
+
+    juce::PopupMenu menu;
+    menu.addItem (1, txt ("Cortar aquí (en dos trozos)"), canCut);
+    menu.addItem (2, txt ("Duplicar (pone una copia detrás)"));
+    juce::PopupMenu volume, fadeIn, fadeOut;
+    const float gain = clip.getProperty (ids::clipGain, 1.0f);
+    for (int pc : { 25, 50, 75, 100, 125, 150, 200 })
+        volume.addItem (100 + pc, juce::String (pc) + "%", true, juce::approximatelyEqual (gain * 100.0f, (float) pc));
+    const double fi = clip.getProperty (ids::fadeIn, 0.0), fo = clip.getProperty (ids::fadeOut, 0.0);
+    const std::pair<int, const char*> fades[] = { { 0, "Sin fundido" }, { 1, "Corto (1 paso)" }, { 4, "Medio (1 tiempo)" }, { 16, "Largo (1 compás)" } };
+    for (auto& f : fades)
+    {
+        fadeIn.addItem (400 + f.first, txt (f.second), true, juce::approximatelyEqual (fi, (double) f.first));
+        fadeOut.addItem (500 + f.first, txt (f.second), true, juce::approximatelyEqual (fo, (double) f.first));
+    }
+    menu.addSubMenu ("Volumen", volume);
+    menu.addItem (600, txt ("Seguir el tempo de la canción (estirar sin cambiar el tono)"), true,
+                  (bool) clip.getProperty (ids::stretch, false));
+    juce::PopupMenu pitch;
+    const int currentPitch = clip.getProperty (ids::clipPitch, 0);
+    for (int st : { 12, 7, 5, 3, 2, 1, 0, -1, -2, -3, -5, -7, -12 })
+        pitch.addItem (700 + st + 12, st == 0 ? txt ("Original") : (st > 0 ? "+" : "") + juce::String (st) + txt (" semitonos"),
+                       true, st == currentPitch);
+    menu.addSubMenu (txt ("Tono (sin cambiar la velocidad)"), pitch);
+    menu.addSubMenu (txt ("Fundido de entrada (sube poco a poco)"), fadeIn);
+    menu.addSubMenu (txt ("Fundido de salida (baja poco a poco)"), fadeOut);
+    menu.addSeparator();
+    menu.addItem (3, "Borrar");
+
+    juce::Component::SafePointer<PlaylistGrid> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition(), [safe, clip, cut] (int result) mutable
+    {
+        if (safe == nullptr || result == 0 || ! clip.getParent().isValid())
+            return;
+        auto& project = safe->ctx.project;
+        auto* um = project.um();
+        project.beginTransaction();
+        const double start = clip[ids::start], length = clip[ids::length], offset = clip[ids::offset];
+        if (result == 1)
+        {
+            auto second = clip.createCopy();
+            second.setProperty (ids::uid, project.newUid(), nullptr);
+            second.setProperty (ids::start, cut, nullptr);
+            second.setProperty (ids::length, start + length - cut, nullptr);
+            second.setProperty (ids::offset, offset + (cut - start), nullptr);
+            second.setProperty (ids::fadeIn, 0.0, nullptr);
+            clip.setProperty (ids::length, cut - start, um);
+            clip.setProperty (ids::fadeOut, 0.0, um);
+            project.playlist().appendChild (second, um);
+        }
+        else if (result == 2)
+        {
+            auto copy = clip.createCopy();
+            copy.setProperty (ids::uid, project.newUid(), nullptr);
+            copy.setProperty (ids::start, start + length, nullptr);
+            project.playlist().appendChild (copy, um);
+        }
+        else if (result == 3)
+            project.playlist().removeChild (clip, um);
+        else if (result >= 100 && result <= 300)
+            clip.setProperty (ids::clipGain, (result - 100) / 100.0f, um);
+        else if (result >= 400 && result < 500)
+            clip.setProperty (ids::fadeIn, (double) (result - 400), um);
+        else if (result >= 500 && result < 600)
+            clip.setProperty (ids::fadeOut, (double) (result - 500), um);
+        else if (result == 600)
+        {
+            const bool on = ! (bool) clip.getProperty (ids::stretch, false);
+            if (on && ! clip.hasProperty (ids::recordBpm))
+            {
+                // El tempo "original" de la grabación: el que se guardó al grabar o, si no, el de ahora
+                auto channel = project.findChannel (clip[ids::ref]);
+                clip.setProperty (ids::recordBpm, channel.getProperty (ids::recordBpm, project.getState().getProperty (ids::bpm, 140.0)), um);
+            }
+            clip.setProperty (ids::stretch, on, um);
+        }
+        else if (result >= 700 && result <= 724)
+            clip.setProperty (ids::clipPitch, result - 700 - 12, um);
+    });
 }
 
 void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
@@ -263,7 +416,9 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
 
     if (e.mods.isPopupMenu())
     {
-        if (clip.isValid())
+        if (clip.isValid() && clip[ids::kind].toString() == "audio")
+            showAudioClipMenu (clip, steps);
+        else if (clip.isValid())
             ctx.project.playlist().removeChild (clip, ctx.project.um());
         return;
     }
@@ -280,7 +435,11 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
     }
 
     dragClip = clip;
-    dragMode = edge ? DragMode::resize : DragMode::move;
+    const bool audio = clip[ids::kind].toString() == "audio";
+    const auto bounds = clipBounds (clip);
+    const bool leftEdge = audio && ! edge && e.position.x < bounds.getX() + juce::jmin (8.0f, bounds.getWidth() * 0.3f);
+    dragMode = leftEdge ? DragMode::trimStart : edge ? DragMode::resize : DragMode::move;
+    clipOffset = clip[ids::offset];
     dragStartSteps = steps;
     dragStartTrack = yToTrack (e.position.y);
     clipStart = clip[ids::start];
@@ -304,6 +463,16 @@ void PlaylistGrid::mouseDrag (const juce::MouseEvent& e)
 
     const double s = playlist.getSnap();
     const double delta = steps - dragStartSteps;
+    if (dragMode == DragMode::trimStart)
+    {
+        // Recortar el principio de una grabación: el clip empieza más tarde y salta esa parte del audio
+        double d = std::round (delta / s) * s;
+        d = juce::jlimit (-juce::jmin (clipOffset, clipStart), clipLength - s, d);
+        dragClip.setProperty (ids::start, clipStart + d, ctx.project.um());
+        dragClip.setProperty (ids::length, clipLength - d, ctx.project.um());
+        dragClip.setProperty (ids::offset, clipOffset + d, ctx.project.um());
+        return;
+    }
     if (dragMode == DragMode::resize)
     {
         const double newLength = juce::jmax (s, std::round ((clipLength + delta) / s) * s);

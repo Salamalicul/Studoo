@@ -24,7 +24,12 @@ namespace studoo
     juce::String channelTypeToString (ChannelType);
     ChannelType  channelTypeFromString (const juce::String&);
 
-    constexpr int numMixerTracks    = 9;  // 0 = Master, 1..8 = pistas
+    constexpr int numMixerTracks    = 17; // 0 = Master, 1..16 = pistas
+    constexpr int numFxSlots        = 4;  // huecos de plugins de efecto en cada pista
+
+    // Dónde se guarda el plugin de cada hueco (el hueco 0 usa los nombres de siempre)
+    inline juce::Identifier fxDescId (int slot)  { return slot == 0 ? juce::Identifier ("pluginDesc")  : juce::Identifier ("pluginDesc" + juce::String (slot)); }
+    inline juce::Identifier fxStateId (int slot) { return slot == 0 ? juce::Identifier ("pluginState") : juce::Identifier ("pluginState" + juce::String (slot)); }
     constexpr int numPlaylistTracks = 16;
     constexpr int stepsPerBar       = 16; // 16 semicorcheas = 1 compás
     constexpr int stepsPerBeat      = 4;
@@ -35,7 +40,16 @@ namespace studoo
     struct AutomationTarget
     {
         enum class Kind { mixer, channel, invalid };
-        enum class Param { volume, pan, reverbMix, delayMix, cutoff, eqLow, eqHigh, invalid };
+        enum class Param { volume, pan, reverbMix, delayMix, cutoff, eqLow, eqHigh,
+                           eqMid, trackFilter, distortion, chorusMix,
+                           resonance, lfoRate, lfoAmount, drive, sampleTune, sendLevel, invalid };
+
+        // ¿Es un control del instrumento (sinte, 808, sampler) y no del volumen/pan del canal?
+        static bool isInstrumentParam (Param p)
+        {
+            return p == Param::cutoff || p == Param::resonance || p == Param::lfoRate || p == Param::lfoAmount
+                || p == Param::drive || p == Param::sampleTune;
+        }
 
         Kind kind = Kind::invalid;
         int index = 0;  // número de pista del mezclador o uid del canal

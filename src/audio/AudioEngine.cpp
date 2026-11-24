@@ -19,7 +19,8 @@ AudioEngine::~AudioEngine()
     const juce::ScopedLock sl (lock);
     runtimes.clear();
     for (auto& t : mixer)
-        t.setPlugin (nullptr);
+        for (int slot = 0; slot < numFxSlots; ++slot)
+            t.setPlugin (nullptr, slot);
     channelPlugins.clear();
     for (auto& p : mixerPlugins)
         p.reset();
@@ -309,10 +310,11 @@ juce::AudioPluginInstance* AudioEngine::getChannelPlugin (int channelUid)
     return it != channelPlugins.end() ? it->second.get() : nullptr;
 }
 
-void AudioEngine::setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginInstance> plugin)
+void AudioEngine::setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginInstance> plugin, int slot)
 {
-    if (! juce::isPositiveAndBelow (track, numMixerTracks))
+    if (! juce::isPositiveAndBelow (track, numMixerTracks) || ! juce::isPositiveAndBelow (slot, numFxSlots))
         return;
+    const auto index = (size_t) (track * numFxSlots + slot);
 
     if (plugin != nullptr)
     {
@@ -324,9 +326,9 @@ void AudioEngine::setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginIn
     std::unique_ptr<juce::AudioPluginInstance> old;
     {
         const juce::ScopedLock sl (lock);
-        old = std::move (mixerPlugins[(size_t) track]);
-        mixerPlugins[(size_t) track] = std::move (plugin);
-        mixer[(size_t) track].setPlugin (mixerPlugins[(size_t) track].get());
+        old = std::move (mixerPlugins[index]);
+        mixerPlugins[index] = std::move (plugin);
+        mixer[(size_t) track].setPlugin (mixerPlugins[index].get(), slot);
     }
 
     if (old != nullptr && onPluginWillBeDeleted)
@@ -345,20 +347,23 @@ void AudioEngine::clearAllPlugins()
             if (auto* pi = dynamic_cast<PluginInstrument*> (rt->instrument.get()))
                 pi->setPlugin (nullptr);
         for (int t = 0; t < numMixerTracks; ++t)
-        {
-            mixer[(size_t) t].setPlugin (nullptr);
-            if (mixerPlugins[(size_t) t] != nullptr)
-                old.push_back (std::move (mixerPlugins[(size_t) t]));
-        }
+            for (int slot = 0; slot < numFxSlots; ++slot)
+            {
+                mixer[(size_t) t].setPlugin (nullptr, slot);
+                auto& p = mixerPlugins[(size_t) (t * numFxSlots + slot)];
+                if (p != nullptr)
+                    old.push_back (std::move (p));
+            }
     }
     for (auto& p : old)
         if (onPluginWillBeDeleted)
             onPluginWillBeDeleted (p.get());
 }
 
-juce::AudioPluginInstance* AudioEngine::getMixerPlugin (int track)
+juce::AudioPluginInstance* AudioEngine::getMixerPlugin (int track, int slot)
 {
-    return juce::isPositiveAndBelow (track, numMixerTracks) ? mixerPlugins[(size_t) track].get() : nullptr;
+    return juce::isPositiveAndBelow (track, numMixerTracks) && juce::isPositiveAndBelow (slot, numFxSlots)
+               ? mixerPlugins[(size_t) (track * numFxSlots + slot)].get() : nullptr;
 }
 
 juce::Optional<juce::AudioPlayHead::PositionInfo> AudioEngine::getPosition() const
@@ -586,7 +591,15 @@ void AudioEngine::collectPatternEvents (const Snapshot& snap, const PatternSnap&
             const double base = rep * len;
             for (const auto& note : pattern.notesPerChannel[ci])
             {
-                const double t = base + note.start;
+                // Swing: las semicorcheas "pares" (2, 4, 6...) se retrasan un poco
+                double start = note.start;
+                if (snap.swing > 0.001f)
+                {
+                    const double inPair = std::fmod (start, 2.0);
+                    if (std::abs (inPair - 1.0) < 0.01)
+                        start += snap.swing * 0.5;
+                }
+                const double t = base + start;
                 if (t < localFrom || t >= localTo || t >= localEnd)
                     continue;
 
@@ -665,16 +678,62 @@ void AudioEngine::renderAudioClips (const Snapshot& snap, double from, double to
         const int first = juce::jmax (0, sampleOffset + (int) ((a - from) * samplesPerStep));
         const int last = juce::jmin (currentChunkSize, sampleOffset + (int) ((b - from) * samplesPerStep));
 
+        const double srcRate = rt.audioSample->sampleRate;
+        const bool granular = ! juce::approximatelyEqual (clip.timeRatio, 1.0) || ! juce::approximatelyEqual (clip.pitchRatio, 1.0);
+
+        // Lee el sample en una posición (en muestras), con interpolación
+        auto readAt = [&] (double pos, float& l, float& r)
+        {
+            if (! (pos >= 0.0) || pos >= (double) (srcLength - 1)) { l = r = 0.0f; return false; }
+            const int idx = (int) pos;
+            const float fr = (float) (pos - idx);
+            l = srcL[idx] + (srcL[idx + 1] - srcL[idx]) * fr;
+            r = srcR[idx] + (srcR[idx + 1] - srcR[idx]) * fr;
+            return true;
+        };
+
         for (int i = first; i < last; ++i)
         {
             const double songTime = from + (i - sampleOffset) / samplesPerStep;
-            const double srcPos = ((songTime - clip.start) + clip.offset) * secondsPerStep * rt.audioSample->sampleRate;
-            if (! (srcPos >= 0.0)) continue;               // también descarta NaN
-            if (srcPos >= (double) (srcLength - 1)) break;  // antes de convertir a int (sin desbordes)
-            const int idx = (int) srcPos;
-            const float frac = (float) (srcPos - idx);
-            outL[i] += srcL[idx] + (srcL[idx + 1] - srcL[idx]) * frac;
-            outR[i] += srcR[idx] + (srcR[idx + 1] - srcR[idx]) * frac;
+            const double u = ((songTime - clip.start) + clip.offset) * secondsPerStep;   // segundos desde el principio del audio
+            float sl = 0.0f, sr = 0.0f;
+            if (granular)
+            {
+                // Estirar sin cambiar el tono (y cambiar el tono sin cambiar la velocidad):
+                // granos de 60 ms que se solapan a la mitad, con ventana Hann (suman 1).
+                // Cada grano empieza en u·timeRatio y dentro de él se lee a pitchRatio.
+                constexpr double grain = 0.06, hop = grain * 0.5;
+                if (! (u >= 0.0) || u * clip.timeRatio >= (double) srcLength / srcRate) break;
+                const auto k0 = (juce::int64) std::floor (u / hop);
+                for (auto k = k0 - 1; k <= k0; ++k)
+                {
+                    const double local = u - (double) k * hop;
+                    if (k < 0 || local < 0.0 || local >= grain)
+                        continue;
+                    const float w = 0.5f - 0.5f * (float) std::cos (juce::MathConstants<double>::twoPi * local / grain);
+                    float gl, gr;
+                    if (readAt (((double) k * hop * clip.timeRatio + local * clip.pitchRatio) * srcRate, gl, gr))
+                    {
+                        sl += gl * w;
+                        sr += gr * w;
+                    }
+                }
+            }
+            else
+            {
+                const double srcPos = u * srcRate;
+                if (! (srcPos >= 0.0)) continue;               // también descarta NaN
+                if (srcPos >= (double) (srcLength - 1)) break;  // antes de convertir a int (sin desbordes)
+                readAt (srcPos, sl, sr);
+            }
+            // Volumen del clip y fundidos (siempre un fundido mínimo para que los cortes no hagan "clic")
+            const double inClip = songTime - clip.start;
+            constexpr double minFade = 0.03;
+            const double fin = juce::jmax (minFade, clip.fadeIn), fout = juce::jmax (minFade, clip.fadeOut);
+            const float env = clip.gain * (float) juce::jmin (1.0, inClip / fin, (clip.length - inClip) / fout);
+            if (env <= 0.0f) continue;
+            outL[i] += sl * env;
+            outR[i] += sr * env;
         }
     }
 }
@@ -735,6 +794,25 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     const double samplesPerStep = sampleRate * 60.0 / snap->bpm / stepsPerBeat;
     const bool song = snap->songMode || exportingSong.load();
     double chunkStartPos = position.load();
+
+    // Grabar lo que se toca en el teclado MIDI (solo en modo patrón y sonando)
+    if (isPlaying && ! song && midiRecording.load() && ! liveMidi.isEmpty())
+    {
+        double patternLength = 16.0;
+        if (juce::isPositiveAndBelow (snap->currentPatternIndex, (int) snap->patterns.size()))
+            patternLength = juce::jmax (1.0, snap->patterns[(size_t) snap->currentPatternIndex].length);
+        for (const auto meta : liveMidi)
+        {
+            const auto m = meta.getMessage();
+            if (! m.isNoteOnOrOff())
+                continue;
+            const double p = std::fmod (chunkStartPos + meta.samplePosition / samplesPerStep, patternLength);
+            const RecordedMidi r { m.isNoteOn(), m.getNoteNumber(), m.getFloatVelocity(), p };
+            const auto scope = recordFifo.write (1);   // si se llena (no debería), se pierde la nota
+            if (scope.blockSize1 > 0)      recordBuffer[(size_t) scope.startIndex1] = r;
+            else if (scope.blockSize2 > 0) recordBuffer[(size_t) scope.startIndex2] = r;
+        }
+    }
 
     if (isPlaying)
     {
@@ -797,6 +875,11 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
                 case AutomationTarget::Param::delayMix:  tp.delayMix = v; break;
                 case AutomationTarget::Param::eqLow:     tp.eqLow = v; break;
                 case AutomationTarget::Param::eqHigh:    tp.eqHigh = v; break;
+                case AutomationTarget::Param::eqMid:     tp.eqMid = v; break;
+                case AutomationTarget::Param::trackFilter: tp.filter = v; break;
+                case AutomationTarget::Param::distortion:  tp.distortion = v; break;
+                case AutomationTarget::Param::chorusMix:   tp.chorusMix = v; break;
+                case AutomationTarget::Param::sendLevel:   tp.sendLevel = v; break;
                 default: break;
             }
         }
@@ -811,12 +894,31 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
 
         if (rt.instrument != nullptr)
         {
-            if (automate && ch.type == ChannelType::synth)
+            bool instrumentAutomated = false;
+            if (automate)
+                for (const auto& lane : snap->lanes)
+                    instrumentAutomated = instrumentAutomated
+                        || (lane.channelIndex == (int) i && AutomationTarget::isInstrumentParam (lane.target.param));
+            if (instrumentAutomated)
             {
+                using P = AutomationTarget::Param;
                 ChannelSnap tmp = ch;
                 for (const auto& lane : snap->lanes)
-                    if (lane.channelIndex == (int) i && lane.target.param == AutomationTarget::Param::cutoff)
-                        tmp.synth.cutoff = AutomationTarget::fromNormalised (lane.target.param, lane.valueAt (chunkStartPos));
+                {
+                    if (lane.channelIndex != (int) i)
+                        continue;
+                    const float v = AutomationTarget::fromNormalised (lane.target.param, lane.valueAt (chunkStartPos));
+                    switch (lane.target.param)
+                    {
+                        case P::cutoff:     tmp.synth.cutoff = v; break;
+                        case P::resonance:  tmp.synth.resonance = v; break;
+                        case P::lfoRate:    tmp.synth.lfoRate = v; break;
+                        case P::lfoAmount:  tmp.synth.lfoAmount = v; break;
+                        case P::drive:      tmp.bass.drive = v; break;
+                        case P::sampleTune: tmp.sampler.tune = v; break;
+                        default: break;
+                    }
+                }
                 rt.instrument->setParameters (tmp);
             }
             else
@@ -852,19 +954,62 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         dest.addFrom (1, 0, rt.buffer, 1, 0, n, gr);
     }
 
+    // --- Sidechain: cada pista puede "agacharse" cuando suena otra (normalmente el bombo) -------
+    for (int t = 1; t < numMixerTracks; ++t)
+    {
+        const auto& tp = trackParams[(size_t) t];
+        if (tp.sidechain < 0.01f || tp.sidechainSource == t)
+            continue;
+        const auto& src = mixer[(size_t) tp.sidechainSource].getBuffer();
+        auto& dst = mixer[(size_t) t].getBuffer();
+        float& env = sidechainEnv[(size_t) t];
+        const float release = (float) std::exp (-1.0 / (0.16 * sampleRate));   // vuelve a subir en ~160 ms
+        const float* sl = src.getReadPointer (0);
+        const float* sr_ = src.getReadPointer (1);
+        float* dl = dst.getWritePointer (0);
+        float* dr = dst.getWritePointer (1);
+        for (int i = 0; i < n; ++i)
+        {
+            const float level = juce::jmin (1.0f, juce::jmax (std::abs (sl[i]), std::abs (sr_[i])) * 2.0f);
+            env = level > env ? level : env * release;
+            const float gain = 1.0f - tp.sidechain * 0.9f * env;
+            dl[i] *= gain;
+            dr[i] *= gain;
+        }
+    }
+
     // --- Mezclador -----------------------------------------------------------------------------
+    // Solo: una pista que recibe el envío de una pista en solo también se oye
+    std::array<bool, numMixerTracks> soloed {};
     bool anySolo = false;
     for (int t = 1; t < numMixerTracks; ++t)
-        anySolo = anySolo || trackParams[(size_t) t].solo;
+    {
+        const auto& tp = trackParams[(size_t) t];
+        soloed[(size_t) t] = soloed[(size_t) t] || tp.solo;
+        anySolo = anySolo || tp.solo;
+        if (soloed[(size_t) t] && tp.sendTo > t && tp.sendLevel > 0.0f)
+            soloed[(size_t) tp.sendTo] = true;
+    }
 
     auto& master = mixer[0].getBuffer();
     for (int t = 1; t < numMixerTracks; ++t)
     {
         const auto& tp = trackParams[(size_t) t];
-        const bool silenced = tp.mute || (anySolo && ! tp.solo);
+        const bool silenced = tp.mute || (anySolo && ! soloed[(size_t) t]);
+        auto& out = mixer[(size_t) t].getBuffer();
         mixer[(size_t) t].process (n, tp, snap->bpm, silenced);
-        master.addFrom (0, 0, mixer[(size_t) t].getBuffer(), 0, 0, n);
-        master.addFrom (1, 0, mixer[(size_t) t].getBuffer(), 1, 0, n);
+
+        // Envío: una copia (después del volumen) va a otra pista, que aún no se ha procesado
+        if (tp.sendTo > t && tp.sendTo < numMixerTracks && tp.sendLevel > 0.0f)
+        {
+            auto& dest = mixer[(size_t) tp.sendTo].getBuffer();
+            dest.addFrom (0, 0, out, 0, 0, n, tp.sendLevel);
+            dest.addFrom (1, 0, out, 1, 0, n, tp.sendLevel);
+        }
+        if (tp.sendOnly && tp.sendTo > t)
+            continue;
+        master.addFrom (0, 0, out, 0, 0, n);
+        master.addFrom (1, 0, out, 1, 0, n);
     }
     mixer[0].process (n, trackParams[0], snap->bpm, trackParams[0].mute);
     metronome.render (master, n);
@@ -929,5 +1074,13 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     }
 
     sampleClock += n;
+}
+
+std::vector<AudioEngine::RecordedMidi> AudioEngine::takeRecordedMidi()
+{
+    std::vector<RecordedMidi> out;
+    const auto scope = recordFifo.read (recordFifo.getNumReady());
+    scope.forEach ([&] (int i) { out.push_back (recordBuffer[(size_t) i]); });
+    return out;
 }
 }

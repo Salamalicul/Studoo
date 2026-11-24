@@ -61,6 +61,13 @@ namespace studoo
         // --- Sonar notas desde la interfaz o un teclado MIDI ------------------------
         void previewNote (int channelUid, int note, float velocity, double seconds);
         void setLiveChannel (int channelUid) { liveChannelUid.store (channelUid); }
+
+        // --- Grabar notas del teclado MIDI en el patrón ----------------------------
+        struct RecordedMidi { bool noteOn; int note; float velocity; double position; };   // posición en pasos
+        void setMidiRecording (bool on) { midiRecording.store (on); }
+        bool isMidiRecording() const { return midiRecording.load(); }
+        // Hilo principal: recoge lo que se ha tocado desde la última vez
+        std::vector<RecordedMidi> takeRecordedMidi();
         juce::MidiMessageCollector& getMidiCollector() { return midiCollector; }
 
         // --- Escuchar un sonido ya preparado (juegos de oído de Aprende) ----------------
@@ -78,8 +85,8 @@ namespace studoo
         // --- Plugins VST3 --------------------------------------------------------------
         void setChannelPlugin (int channelUid, std::unique_ptr<juce::AudioPluginInstance>);
         juce::AudioPluginInstance* getChannelPlugin (int channelUid);
-        void setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginInstance>);
-        juce::AudioPluginInstance* getMixerPlugin (int track);
+        void setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginInstance>, int slot = 0);
+        juce::AudioPluginInstance* getMixerPlugin (int track, int slot = 0);
         void clearAllPlugins();
         std::function<void (juce::AudioPluginInstance*)> onPluginWillBeDeleted;
 
@@ -138,7 +145,7 @@ namespace studoo
         MetronomeInstrument metronome;
 
         std::map<int, std::unique_ptr<juce::AudioPluginInstance>> channelPlugins;
-        std::array<std::unique_ptr<juce::AudioPluginInstance>, numMixerTracks> mixerPlugins;
+        std::array<std::unique_ptr<juce::AudioPluginInstance>, numMixerTracks * numFxSlots> mixerPlugins;   // [pista * huecos + hueco]
 
         double sampleRate = 44100.0;
         int blockSize = 512;
@@ -150,7 +157,12 @@ namespace studoo
         std::atomic<double> requestedPosition { -1.0 };
         std::atomic<double> currentBpm { 140.0 };
         std::atomic<int> liveChannelUid { 0 };
+        std::atomic<bool> midiRecording { false };
+        static constexpr int recordFifoSize = 1024;
+        juce::AbstractFifo recordFifo { recordFifoSize };
+        std::array<RecordedMidi, recordFifoSize> recordBuffer {};
         std::array<std::atomic<float>, 256> channelActivity {};
+        std::array<float, numMixerTracks> sidechainEnv {};   // seguidor del sidechain de cada pista
 
         SharedBuffer audition;            // sonido de los juegos de oído
         double auditionPos = 0.0, auditionStep = 1.0;

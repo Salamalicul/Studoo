@@ -37,7 +37,8 @@ namespace studoo::help
         "- Rueda VOL: volumen. Rueda PAN: izquierda/derecha.\n"
         "- Número: a qué pista del mezclador va su sonido.\n\n"
         "Arriba puedes cambiar de patrón, crear patrones nuevos, elegir la duración (16, 32 o 64 pasos) "
-        "y añadir canales: samples, kits de batería, sintetizador, 808 o plugins VST3.\n\n"
+        "y añadir canales: samples, kits de batería, sintetizador, 808 o plugins VST3.\n"
+        "\"Swing\": retrasa un poco los pasos pares para que el ritmo baile (20-40% en boom bap y lo-fi).\n\n"
         "SONIDOS INCLUIDOS: en \"+ Añadir\" tienes 18 kits de batería (Trap, Drill, Reggaetón, Phonk, Afrobeat, House, Lo-fi...), "
         "efectos FX, 14 sonidos de sintetizador ya preparados y 6 tipos de 808. "
         "\"Usar este kit\" cambia los sonidos de tu batería por los del kit SIN perder el ritmo que ya has escrito.\n\n"
@@ -67,7 +68,14 @@ namespace studoo::help
         "- Arrastra una nota: muévela. Arrastra su borde derecho: cámbiale la duración.\n"
         "- Clic derecho en una nota: bórrala.\n"
         "- \"Ajuste\": a qué cuadrícula se pegan las notas.\n"
-        "- \"Acorde\": añade un acorde completo con un solo clic (mayor = alegre, menor = triste).\n\n"
+        "- \"Acorde\": añade un acorde completo con un solo clic (mayor = alegre, menor = triste).\n"
+        "- \"Cuantizar\": coloca todas las notas del canal justo en la cuadrícula del Ajuste.\n"
+        "- \"Seleccionar\" (o Ctrl + arrastrar): elige varias notas para moverlas juntas. Ctrl+C copia, Ctrl+V pega, "
+        "Ctrl+B duplica, Supr borra y las flechas suben o bajan el tono.\n"
+        "- \"Herramientas\": escalas (las notas que no son de la escala se ven más oscuras), arpegiador, "
+        "transponer y exportar o importar MIDI.\n"
+        "- \"Grabar notas\": toca un teclado MIDI (o las teclas del piano de la izquierda) mientras suena y se escribe solo.\n"
+        "- Carril VELOCITY (abajo): una barra por nota. Arrástrala para que la nota suene más fuerte o más suave.\n\n"
         "Arriba eliges qué canal (instrumento) estás editando. Las notas son del patrón actual.\n"
         "Para el 808: haz notas largas, y si solapas dos notas el tono se \"desliza\" (glide).";
 
@@ -80,7 +88,10 @@ namespace studoo::help
         "- Clic derecho en un bloque: borrarlo. Doble clic: abrir ese patrón en el secuenciador.\n"
         "- Clic en la regla de arriba: mueve el cursor de reproducción.\n\n"
         "IMPORTANTE: para escuchar la playlist pulsa CANCIÓN en la barra superior (o la tecla L).\n\n"
-        "Las grabaciones de voz aparecen aquí como bloques verdes.\n\n"
+        "Las grabaciones de voz aparecen aquí como bloques verdes, con su forma de onda. Para editarlas:\n"
+        "- Arrastra su borde izquierdo para quitar el principio (o el derecho para quitar el final).\n"
+        "- Clic derecho (o mantener pulsado): cortar en dos, duplicar, volumen, fundidos, seguir el tempo "
+        "(estirar sin cambiar el tono) y cambiar el tono.\n\n"
         "Idea de estructura: Intro (4 compases) - Estribillo (8) - Estrofa (16) - Estribillo (8) - Final (4).";
 
     inline constexpr const char* mixerTitle = "Mezclador";
@@ -93,6 +104,12 @@ namespace studoo::help
         "Ratio = cuánto comprime.\n"
         "- Delay: eco sincronizado con el BPM. Tiempo en tiempos de compás (0,75 = corchea con puntillo).\n"
         "- Reverb: sensación de sala o espacio.\n"
+        "- Filtro: a la izquierda quita agudos, a la derecha quita graves. Sucio (Distor.): satura el sonido. "
+        "Chorus: lo hace más ancho.\n"
+        "- Sidechain: elige la pista del bombo y sube la Bajada; esta pista se agachará con cada golpe (el \"bombeo\").\n"
+        "- Limitador: no deja que el sonido pase del máximo. El Master lo trae encendido.\n"
+        "- Envío: manda una copia del sonido a otra pista (por ejemplo, una pista solo con reverb). "
+        "Con \"Solo envío\" la pista suena únicamente a través de la otra: así agrupas, por ejemplo, toda la batería.\n"
         "- Plugin: añade un efecto VST3.\n"
         "- PAN: izquierda/derecha. M = silenciar. S = escuchar solo esa pista.\n"
         "- Fader: el volumen. La barra de color muestra el nivel. Si llega arriba del todo, baja el volumen.";
@@ -110,7 +127,7 @@ namespace studoo::help
     inline constexpr const char* learnTitle = "Aprende";
     inline constexpr const char* learnText =
         "Todo para aprender a producir, de cero a terminar canciones. Tiene cuatro pestañas:\n\n"
-        "- Ruta: 56 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
+        "- Ruta: 60 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
         "un test al final y bases de 11 géneros para cargar y cambiar.\n"
         "- Juegos: entrena el oído (instrumentos, notas, acordes y géneros).\n"
         "- Logros: tu racha de días practicando, tus estadísticas y tus medallas.\n"

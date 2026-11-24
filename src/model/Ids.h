@@ -97,5 +97,33 @@ namespace studoo::ids
     STUDOO_ID (time)
     STUDOO_ID (value)
 
+    // Studoo 2.0
+    STUDOO_ID (swing)             // proyecto: 0..1
+    STUDOO_ID (sampleTune)        // sampler: semitonos -24..24
+    STUDOO_ID (sampleStart)       // sampler: 0..1
+    STUDOO_ID (sampleEnd)         // sampler: 0..1
+    STUDOO_ID (reverse)           // sampler: al revés
+    STUDOO_ID (slices)            // sampler: 1..16 trozos (chops)
+    STUDOO_ID (lfoRate)           // sinte: Hz
+    STUDOO_ID (lfoAmount)         // sinte: 0..1 (mueve el filtro)
+    STUDOO_ID (trackFilter)       // pista: -1 (paso bajo) .. 0 .. 1 (paso alto)
+    STUDOO_ID (distortion)        // pista: 0..1
+    STUDOO_ID (chorusMix)         // pista: 0..1
+    STUDOO_ID (sidechain)         // pista: 0..1 (cuánto se agacha)
+    STUDOO_ID (sidechainSource)   // pista: de qué pista escucha (1..)
+    STUDOO_ID (sendTo)            // pista: a qué pista manda una copia (0 = a ninguna; solo a pistas de número mayor)
+    STUDOO_ID (sendLevel)         // pista: 0..1, cuánto manda
+    STUDOO_ID (scaleRoot)         // proyecto: nota base de la escala (0 = Do ... 11 = Si)
+    STUDOO_ID (scaleType)         // proyecto: 0 = sin escala, 1 mayor, 2 menor...
+    STUDOO_ID (scaleLock)         // proyecto: las notas nuevas se pegan a la escala
+    STUDOO_ID (recordBpm)         // grabación/clip: el BPM con el que se grabó (para seguir el tempo)
+    STUDOO_ID (stretch)           // clip de audio: sigue el tempo de la canción sin cambiar el tono
+    STUDOO_ID (clipPitch)         // clip de audio: tono en semitonos (-12..12) sin cambiar la velocidad
+    STUDOO_ID (clipGain)          // clip de audio: volumen 0..2
+    STUDOO_ID (fadeIn)            // clip de audio: fundido de entrada (en pasos)
+    STUDOO_ID (fadeOut)           // clip de audio: fundido de salida (en pasos)
+    STUDOO_ID (sendOnly)          // pista: true = solo suena a través del envío (no va directa al Master)
+    STUDOO_ID (limiter)           // pista: limitador encendido
+
 #undef STUDOO_ID
 }

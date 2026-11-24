@@ -302,6 +302,95 @@ const std::vector<Challenge>& challenges()
                   if (pattern[ids::name].toString().startsWith ("Base "))
                       return true;
               return false; } },
+
+        { "swing", "Ponle swing",
+          "Elige un Swing de 20% o más en el Secuenciador.",
+          "Es el desplegable \"Swing 0%\" de arriba, al lado de la duración del patrón.",
+          View::channelRack,
+          [] (Project& p) { return (double) p.getState().getProperty (ids::swing, 0.0) >= 0.19; } },
+
+        { "velocity", "Notas suaves",
+          "En el carril VELOCITY del Piano roll, baja al menos una nota por debajo de la mitad.",
+          "Debajo de las notas hay una barra por nota: arrástrala hacia abajo.",
+          View::pianoRoll,
+          [] (Project& p) {
+              for (auto pattern : p.patterns())
+                  for (auto item : pattern)
+                      if (item.hasType (ids::NOTE) && (float) item.getProperty (ids::velocity, 0.8f) < 0.5f)
+                          return true;
+              return false; } },
+
+        { "sidechain", "Sidechain de verdad",
+          "En el Mezclador, sube la Bajada del SIDECHAIN de una pista al 30% o más.",
+          "Elige en el desplegable la pista del bombo y gira la rueda \"Bajada\".",
+          View::mixer,
+          [] (Project& p) {
+              for (int t = 1; t < numMixerTracks; ++t)
+                  if ((float) p.getMixerTrack (t).getProperty (ids::sidechain, 0.0f) >= 0.3f)
+                      return true;
+              return false; } },
+
+        { "chops", "Trocea un sample",
+          "Pon un sampler en 4 trozos o más y toca al menos 3 trozos distintos en el Piano roll.",
+          "Sube \"Trozos\" en el panel del sonido y pon notas de distintas alturas.",
+          View::pianoRoll,
+          [] (Project& p) {
+              return anyOfType (p, "sampler", [&p] (const juce::ValueTree& ch) {
+                  if ((int) ch.getProperty (ids::slices, 1) < 4)
+                      return false;
+                  std::set<int> pitches;
+                  for (auto& n : notesOf (p, ch)) pitches.insert ((int) n[ids::pitch]);
+                  return pitches.size() >= 3; }); } },
+
+        { "escala", "Elige una escala",
+          "En el Piano roll, pulsa Herramientas → Escala y elige una (por ejemplo, Menor).",
+          "Las filas que no son de la escala se verán más oscuras.",
+          View::pianoRoll,
+          [] (Project& p) { return (int) p.getState().getProperty (ids::scaleType, 0) > 0; } },
+
+        { "envio", "Una pista de efectos",
+          "En el Mezclador, manda (ENVÍO) una pista a otra con la rueda Envío al 20% o más.",
+          "En la sección ENVÍO elige la pista de destino en el desplegable y gira la rueda.",
+          View::mixer,
+          [] (Project& p) {
+              for (int t = 1; t < numMixerTracks; ++t)
+              {
+                  auto tr = p.getMixerTrack (t);
+                  const int to = tr.getProperty (ids::sendTo, 0);
+                  if (to > t && to < numMixerTracks && (float) tr.getProperty (ids::sendLevel, 0.0f) >= 0.2f)
+                      return true;
+              }
+              return false; } },
+
+        { "editar_grabacion", "Edita tu grabación",
+          "En la Playlist, corta una grabación en dos o quítale el principio arrastrando su borde izquierdo.",
+          "Clic derecho (o mantener pulsado) sobre la grabación → Cortar aquí.",
+          View::playlist,
+          [] (Project& p) {
+              int audioClips = 0;
+              for (auto clip : p.playlist())
+                  if (clip[ids::kind].toString() == "audio")
+                  {
+                      ++audioClips;
+                      if ((double) clip[ids::offset] > 0.0)
+                          return true;
+                  }
+              return audioClips >= 2; } },
+
+        { "efectos_creativos", "Efectos creativos",
+          "En el Mezclador, usa el Filtro, el Sucio (Distor.) o el Chorus de una pista (al 20% o más).",
+          "Son las tres ruedas de la sección \"FILTRO · SUCIO · CHORUS\".",
+          View::mixer,
+          [] (Project& p) {
+              for (int t = 0; t < numMixerTracks; ++t)
+              {
+                  auto tr = p.getMixerTrack (t);
+                  if (std::abs ((float) tr.getProperty (ids::trackFilter, 0.0f)) >= 0.2f
+                      || (float) tr.getProperty (ids::distortion, 0.0f) >= 0.2f
+                      || (float) tr.getProperty (ids::chorusMix, 0.0f) >= 0.2f)
+                      return true;
+              }
+              return false; } },
     };
     return list;
 }

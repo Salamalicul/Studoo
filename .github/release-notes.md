@@ -1,6 +1,24 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 1.9
+### 🆕 Novedades de la versión 2.0: más cerca de un estudio profesional
+- 🎚️ **Velocity de cada nota**: debajo del Piano roll hay un carril con una barra por nota. Arrástrala para que suene más fuerte o más suave.
+- 🧲 **Cuantizar**: un botón coloca todas las notas justo en la cuadrícula.
+- 🖱️ **Piano roll de profesional**: selecciona varias notas y muévelas juntas, copia y pega (Ctrl+C / Ctrl+V), duplica (Ctrl+B), sube o baja el tono con las flechas, **arpegiador** y **escalas** (las notas que no son de la escala se oscurecen y las nuevas se pegan a ella).
+- 🎹 **Grabar notas tocando**: con un teclado MIDI (o las teclas del piano de la pantalla) todo lo que tocas se escribe solo en el patrón.
+- 📄 **Exportar e importar MIDI** para llevar tus melodías a otros programas o traerlas a Studoo.
+- 💃 **Swing**: el ritmo "baila" (arriba en el Secuenciador). Las bases de lo-fi y boom bap ya lo traen.
+- 🔊 **Sidechain de verdad**: el famoso "bombeo". En el Mezclador eliges la pista del bombo y cuánto se agacha cada pista. Las bases de house y techno ya lo traen puesto.
+- 🎛️ **Efectos nuevos en cada pista**: filtro (quita agudos o graves), distorsión, chorus y limitador (el Master lo trae encendido para que nada se rompa).
+- 🎚️ **16 pistas en el mezclador** (antes 8) y **envíos**: manda varias pistas a una misma reverb o agrúpalas en un bus (por ejemplo, toda la batería con un solo fader). Tus proyectos antiguos se abren sin problema.
+- ✂️ **Editar samples**: tono, inicio, final, **al revés** y **trozos (chops)** para tocar cada parte del sample con una nota distinta. Con su **forma de onda**: arrastra las marcas para recortar.
+- 🎙️ **Editar tus grabaciones** en la Playlist: forma de onda real, quitar el principio o el final, cortar en dos, duplicar, volumen y fundidos. Y **estirarlas al tempo** (cambias el BPM y la voz sigue a tiempo sin cambiar de tono) o **cambiarles el tono** sin cambiar la velocidad.
+- 🔌 **4 huecos de efectos VST3 por pista** (antes 1), en el orden que quieras.
+- 🌊 **LFO en el sintetizador**: el filtro se mueve solo (el "wobble").
+- 📈 **Automatiza más cosas**: medios de la EQ, filtro, distorsión, chorus y envíos del mezclador; filtro, resonancia y LFO del sinte; distorsión del 808 y tono del sampler.
+- 🎓 **Aprende**: 4 lecciones nuevas (Chops, Efectos creativos, Envíos y buses y Trucos del piano roll), lecciones actualizadas, 8 retos nuevos, 12 preguntas y 12 palabras nuevas en el diccionario.
+- ⚡ Las pistas del mezclador que no suenan no gastan procesador (va más fluido en móviles).
+
+### Novedades de la versión 1.9
 - 🏪 **Studoo se prepara para Google Play**: nueva versión para la tienda (archivo `.aab`) con **Studoo Pro** (pago único) y **donaciones** para apoyar al creador. En el ordenador y en el APK de GitHub todo sigue gratis y desbloqueado.
 - 📱 Preparado para **Android 16**.
 - 📥 Las descargas y actualizaciones pasan a un repositorio propio, **Studoo-descargas**. Tu Studoo lo encuentra solo, no tienes que hacer nada.

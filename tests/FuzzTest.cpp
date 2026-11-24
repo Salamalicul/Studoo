@@ -10,6 +10,7 @@
 #include "audio/AudioEngine.h"
 #include "model/GenreBeats.h"
 #include "model/Project.h"
+#include "model/MidiIO.h"
 
 #include <iostream>
 
@@ -96,7 +97,12 @@ namespace
             ids::drive, ids::pluginDesc, ids::pluginState, ids::length, ids::channel, ids::data, ids::start,
             ids::pitch, ids::velocity, ids::kind, ids::ref, ids::track, ids::offset, ids::index, ids::solo, ids::eqLow,
             ids::eqMid, ids::eqHigh, ids::compOn, ids::compThreshold, ids::compRatio, ids::delayMix, ids::delayTime,
-            ids::delayFeedback, ids::reverbMix, ids::reverbSize, ids::target, ids::time, ids::value, ids::colour };
+            ids::delayFeedback, ids::reverbMix, ids::reverbSize, ids::target, ids::time, ids::value, ids::colour,
+            ids::swing, ids::sampleTune, ids::sampleStart, ids::sampleEnd, ids::reverse, ids::slices, ids::lfoRate,
+            ids::lfoAmount, ids::trackFilter, ids::distortion, ids::chorusMix, ids::sidechain, ids::sidechainSource,
+            ids::limiter, ids::sendTo, ids::sendLevel, ids::sendOnly, ids::clipGain, ids::fadeIn, ids::fadeOut,
+            ids::stretch, ids::clipPitch, ids::recordBpm, ids::scaleRoot, ids::scaleType, ids::scaleLock,
+            juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3") };
 
         // Recorre todo el árbol y cambia, borra o duplica cosas al azar
         std::function<void (juce::ValueTree)> mutate = [&] (juce::ValueTree t)
@@ -215,6 +221,42 @@ int main (int argc, char* argv[])
 
         if (i % 500 == 0)
             std::cout << "  " << i << " proyectos probados...\n" << std::flush;
+    }
+
+    // Archivos MIDI rotos o con trampa: no deben romper nada al importarlos
+    {
+        int midiOk = 0;
+        Project p;
+        const int uid = p.findChannelByType (ChannelType::synth)[ids::uid];
+        auto good = midiio::patternToMidi (p, p.getCurrentPattern());
+        juce::MemoryOutputStream base;
+        p.addNote (p.getCurrentPattern(), uid, 0.0, 4.0, 60);
+        midiio::patternToMidi (p, p.getCurrentPattern()).writeTo (base);
+        juce::ignoreUnused (good);
+        for (int i = 0; i < 3000; ++i)
+        {
+            juce::MemoryBlock bytes (base.getData(), base.getDataSize());
+            const int flips = 1 + rng.nextInt (12);
+            for (int f = 0; f < flips; ++f)
+                static_cast<juce::uint8*> (bytes.getData())[rng.nextInt ((int) bytes.getSize())] = (juce::uint8) rng.nextInt (256);
+            if (rng.nextInt (4) == 0)
+                bytes.setSize ((size_t) rng.nextInt ((int) bytes.getSize()) + 1);
+            juce::MemoryInputStream in (bytes, false);
+            juce::MidiFile midi;
+            if (midi.readFrom (in))
+            {
+                Project q;
+                auto pattern = q.getCurrentPattern();
+                midiio::importIntoPattern (q, pattern, q.findChannelByType (ChannelType::synth)[ids::uid], midi);
+                for (auto n : pattern)
+                    if (n.hasType (ids::NOTE)
+                        && (! std::isfinite ((double) n[ids::start]) || (double) n[ids::start] < 0.0
+                            || (double) n[ids::start] + (double) n[ids::length] > 64.0 + 1.0e-6))
+                        ++failures;
+                ++midiOk;
+            }
+        }
+        std::cout << "Archivos MIDI estropeados probados: 3000 (" << midiOk << " se pudieron leer)\n";
     }
 
     std::cout << "Proyectos probados: " << count << "\n"

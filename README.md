@@ -52,7 +52,7 @@
 | ↩️ | Deshacer y rehacer (**Ctrl+Z / Ctrl+Y**) | Barra superior |
 | 💿 | Exportar a **WAV** y **MP3** | Menú ☰ |
 | ⏱️ | BPM, metrónomo, modos PATRÓN/CANCIÓN y atajos de teclado | Barra superior |
-| 🎓 | **Aprende**: 56 lecciones en 9 niveles con retos que se comprueban solos, tests, juegos de oído, logros con racha diaria, diccionario y bases de 11 géneros con ilustraciones animadas, pasos, ejercicios, vídeos y progreso. Además, tutorial guiado, botón **?** en cada sección y mensajes de ayuda | **Aprende** (F1) |
+| 🎓 | **Aprende**: 60 lecciones en 9 niveles con retos que se comprueban solos, tests, juegos de oído, logros con racha diaria, diccionario y bases de 11 géneros con ilustraciones animadas, pasos, ejercicios, vídeos y progreso. Además, tutorial guiado, botón **?** en cada sección y mensajes de ayuda | **Aprende** (F1) |
 
 ## ⌨️ Atajos principales
 

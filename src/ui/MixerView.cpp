@@ -25,6 +25,54 @@ MixerStrip::MixerStrip (AppContext& c, int trackIndex) : ctx (c), index (trackIn
     reverbMix = makeKnob ("Mezcla", txt ("Reverb: cuánta reverberación se oye."));
     reverbSize = makeKnob (txt ("Tamaño"), txt ("Reverb: tamaño de la sala."));
     pan = makeKnob ("PAN", txt ("Panorama: coloca el sonido a la izquierda o a la derecha."));
+    filter = makeKnob ("Filtro", txt ("Filtro de pista: a la izquierda quita agudos (sonido apagado), a la derecha quita graves (sonido fino). En el centro no hace nada."));
+    distortion = makeKnob ("Distor.", txt ("Ensucia y satura el sonido: más fuerte y agresivo."));
+    chorus = makeKnob ("Chorus", txt ("Chorus: el sonido se hace más ancho, como si sonaran varios a la vez."));
+    sidechain = makeKnob ("Bajada", txt ("Sidechain: cuánto baja esta pista cuando suena la pista de origen (normalmente el bombo). Es el famoso \"bombeo\"."));
+    filter->setDisplayFunction ([] (double v)
+    {
+        if (std::abs (v) < 0.02) return txt ("Sin filtro");
+        return v < 0 ? txt ("Quita agudos ") + juce::String ((int) (-v * 100.0)) + "%" : txt ("Quita graves ") + juce::String ((int) (v * 100.0)) + "%";
+    });
+    for (auto* k : { distortion, chorus, sidechain })
+        k->setDisplayFunction ([] (double v) { return juce::String ((int) (v * 100.0)) + "%"; });
+
+    addAndMakeVisible (sidechainSource);
+    sidechainSource.setTooltip (txt ("Pista que manda (normalmente el bombo): cuando suena, esta pista baja su volumen."));
+    for (int t = 1; t < numMixerTracks; ++t)
+        if (t != index)
+            sidechainSource.addItem ("Pista " + juce::String (t), t);
+    makeNonFocusing (sidechainSource);
+
+    send = makeKnob (txt ("Envío"), txt ("Envío: cuánto sonido de esta pista se manda (copia) a otra pista. "
+                                       "Ideal para una pista de efectos, por ejemplo una reverb compartida por varias pistas."));
+    send->setDisplayFunction ([] (double v) { return juce::String ((int) std::round (v * 100.0)) + "%"; });
+
+    addAndMakeVisible (sendTarget);
+    sendTarget.setTooltip (txt ("A qué pista se manda la copia. Solo se puede mandar a pistas de número mayor "
+                                "(pon tus pistas de efectos o \"buses\" al final)."));
+    sendTarget.onChange = [this]
+    {
+        ctx.project.beginTransaction();
+        const int target = juce::jmax (0, sendTarget.getSelectedId() - 1);
+        auto track = ctx.project.getMixerTrack (index);
+        track.setProperty (ids::sendTo, target, ctx.project.um());
+        if (target > 0 && (float) track.getProperty (ids::sendLevel, 0.0f) < 0.01f)
+            track.setProperty (ids::sendLevel, 0.8f, ctx.project.um());   // para que se oiga al elegirla
+        updateSendControls();
+    };
+    makeNonFocusing (sendTarget);
+
+    addAndMakeVisible (sendOnly);
+    sendOnly.setButtonText (txt ("Solo envío"));
+    sendOnly.setTooltip (txt ("Activado: esta pista ya no va directa al Master, solo suena a través de la pista de destino. "
+                              "Sirve para agrupar (por ejemplo, toda la batería en una pista \"Batería\")."));
+    makeNonFocusing (sendOnly);
+
+    addAndMakeVisible (limiterOn);
+    limiterOn.setButtonText (txt ("Limitador"));
+    limiterOn.setTooltip (txt ("Limitador: nada pasa del máximo. Evita que el sonido se rompa (distorsione) cuando todo suena muy fuerte."));
+    makeNonFocusing (limiterOn);
 
     auto db = [] (double v) { return (v > 0 ? "+" : "") + juce::String (v, 1) + " dB"; };
     for (auto* k : { eqLow, eqMid, eqHigh })
@@ -93,6 +141,21 @@ void MixerStrip::bind()
     reverbMix->bind (track, ids::reverbMix, um, 0.0, 1.0, 0.0);
     reverbSize->bind (track, ids::reverbSize, um, 0.0, 1.0, 0.6);
     pan->bind (track, ids::pan, um, -1.0, 1.0, 0.0);
+    filter->bind (track, ids::trackFilter, um, -1.0, 1.0, 0.0);
+    distortion->bind (track, ids::distortion, um, 0.0, 1.0, 0.0);
+    chorus->bind (track, ids::chorusMix, um, 0.0, 1.0, 0.0);
+    sidechain->bind (track, ids::sidechain, um, 0.0, 1.0, 0.0);
+    sidechainSource.getSelectedIdAsValue().referTo (track.getPropertyAsValue (ids::sidechainSource, um));
+    if (sidechainSource.getSelectedId() == 0)
+        sidechainSource.setSelectedId (index == 1 ? 2 : 1, juce::dontSendNotification);
+    if (! track.hasProperty (ids::limiter))
+        track.setProperty (ids::limiter, index == 0, nullptr);   // el Master lo trae encendido
+    limiterOn.getToggleStateValue().referTo (track.getPropertyAsValue (ids::limiter, um));
+    sidechain->setVisible (index != 0);
+    sidechainSource.setVisible (index != 0);
+    send->bind (track, ids::sendLevel, um, 0.0, 1.0, 0.0);
+    sendOnly.getToggleStateValue().referTo (track.getPropertyAsValue (ids::sendOnly, um));
+    updateSendControls();
 
     compOn.getToggleStateValue().referTo (track.getPropertyAsValue (ids::compOn, um));
     muteButton.getToggleStateValue().referTo (track.getPropertyAsValue (ids::muted, um));
@@ -103,9 +166,15 @@ void MixerStrip::bind()
     fader.getValueObject().referTo (track.getPropertyAsValue (ids::volume, um));
 
     soloButton.setVisible (index != 0);
-    pluginButton.setButtonText (ctx.engine.getMixerPlugin (index) != nullptr
-                                    ? ctx.engine.getMixerPlugin (index)->getName().substring (0, 14)
-                                    : txt ("+ Plugin"));
+    juce::StringArray names;
+    for (int slot = 0; slot < numFxSlots; ++slot)
+        if (auto* p = ctx.engine.getMixerPlugin (index, slot))
+            names.add (p->getName());
+    pluginButton.setButtonText (names.isEmpty() ? txt ("+ Plugin")
+                                : names.size() == 1 ? names[0].substring (0, 14)
+                                                    : juce::String (names.size()) + " plugins");
+    pluginButton.setTooltip (names.isEmpty() ? txt ("Añade hasta 4 efectos VST3 a esta pista.")
+                                             : txt ("Efectos (en orden): ") + names.joinIntoString (", "));
     repaint();
 }
 
@@ -189,6 +258,10 @@ void MixerStrip::paint (juce::Graphics& g)
     label (compThreshold, "COMPRESOR");
     label (delayMix, "DELAY");
     label (reverbMix, "REVERB");
+    label (filter, "FILTRO · SUCIO · CHORUS");
+    label (index == 0 ? (juce::Component*) &limiterOn : (juce::Component*) sidechain, index == 0 ? "MASTER" : "SIDECHAIN · LIMITADOR");
+    if (index != 0)
+        label (send, "ENVÍO");
 
     // Medidor de nivel con LEDs
     auto drawBar = [&] (juce::Rectangle<int> r, float level)
@@ -214,6 +287,35 @@ void MixerStrip::paint (juce::Graphics& g)
     drawBar (m.removeFromLeft (m.getWidth() / 2 - 1), meterL);
     m.removeFromLeft (2);
     drawBar (m, meterR);
+}
+
+void MixerStrip::updateSendControls()
+{
+    const int target = ctx.project.getMixerTrack (index).getProperty (ids::sendTo, 0);
+    const bool valid = target > index && target < numMixerTracks;
+
+    // Los nombres de las pistas pueden cambiar: rehace la lista solo si cambió algo
+    juce::StringArray names { txt ("Sin envío") };
+    for (int t = index + 1; t < numMixerTracks && index > 0; ++t)
+        names.add (txt ("→ ") + juce::String (t) + ". " + ctx.project.getMixerTrack (t)[ids::name].toString());
+    bool same = sendTarget.getNumItems() == names.size();
+    for (int i = 0; same && i < names.size(); ++i)
+        same = sendTarget.getItemText (i) == names[i];
+    if (! same)
+    {
+        sendTarget.clear (juce::dontSendNotification);
+        sendTarget.addItem (names[0], 1);
+        for (int i = 1; i < names.size(); ++i)
+            sendTarget.addItem (names[i], index + i + 1);
+    }
+    sendTarget.setSelectedId (valid ? target + 1 : 1, juce::dontSendNotification);
+    const bool canSend = index > 0 && index < numMixerTracks - 1;
+    send->setVisible (index > 0);
+    sendTarget.setVisible (index > 0);
+    sendOnly.setVisible (index > 0);
+    sendTarget.setEnabled (canSend);
+    send->setEnabled (valid);
+    sendOnly.setEnabled (valid);
 }
 
 void MixerStrip::resized()
@@ -242,6 +344,37 @@ void MixerStrip::resized()
     }
     row ({ delayMix, delayTime, delayFeedback });
     row ({ reverbMix, reverbSize });
+    row ({ filter, distortion, chorus });
+    {
+        auto r = area.removeFromTop (knobHeight);
+        const int w = r.getWidth() / 3;
+        if (index != 0)
+        {
+            sidechain->setBounds (r.removeFromLeft (w));
+            auto right = r.reduced (2, 0);
+            sidechainSource.setBounds (right.removeFromTop (22));
+            limiterOn.setBounds (right.withTrimmedTop (2));
+        }
+        else
+        {
+            limiterOn.setBounds (r.withSizeKeepingCentre (r.getWidth(), 26));
+        }
+        area.removeFromTop (12);
+    }
+    if (index != 0)
+    {
+        auto r = area.removeFromTop (knobHeight);
+        const int w = r.getWidth() / 3;
+        send->setBounds (r.removeFromLeft (w));
+        auto right = r.reduced (2, 0);
+        sendTarget.setBounds (right.removeFromTop (22));
+        sendOnly.setBounds (right.withTrimmedTop (2));
+        area.removeFromTop (12);
+    }
+    else
+    {
+        area.removeFromTop (knobHeight + 12);   // el Master no envía: deja el hueco para que todo quede alineado
+    }
     area.removeFromTop (-8);
     pluginButton.setBounds (area.removeFromTop (24));
     area.removeFromTop (6);
@@ -272,7 +405,7 @@ MixerView::MixerView (AppContext& c) : ctx (c), helpButton (txt (help::mixerTitl
 
     addAndMakeVisible (viewport);
     viewport.setViewedComponent (&stripHolder, false);
-    viewport.setScrollBarsShown (false, true);
+    viewport.setScrollBarsShown (true, true);
 
     for (int i = 0; i < numMixerTracks; ++i)
         stripHolder.addAndMakeVisible (strips.add (new MixerStrip (ctx, i)));
@@ -296,7 +429,10 @@ void MixerView::changeListenerCallback (juce::ChangeBroadcaster*)
             s->bind();
     }
     for (auto* s : strips)
+    {
+        s->updateSendControls();
         s->repaint();
+    }
 }
 
 void MixerView::timerCallback()
@@ -322,7 +458,7 @@ void MixerView::resized()
     infoLabel.setBounds (h);
 
     viewport.setBounds (area.reduced (6));
-    const int height = juce::jmax (560, viewport.getHeight() - viewport.getScrollBarThickness());
+    const int height = juce::jmax (750, viewport.getHeight() - viewport.getScrollBarThickness());
     stripHolder.setSize (stripWidth * numMixerTracks, height);
     for (int i = 0; i < strips.size(); ++i)
         strips[i]->setBounds (i * stripWidth, 0, stripWidth, height);

@@ -26,6 +26,15 @@ namespace studoo
         int wave = 0; // 0 sierra, 1 cuadrada, 2 seno, 3 triángulo
         float attack = 0.005f, decay = 0.3f, sustain = 0.6f, release = 0.3f;
         float cutoff = 5000.0f, resonance = 0.2f, detune = 8.0f;
+        float lfoRate = 4.0f, lfoAmount = 0.0f;   // LFO que mueve el filtro
+    };
+
+    struct SamplerParams
+    {
+        float tune = 0.0f;              // semitonos
+        float start = 0.0f, end = 1.0f; // parte del sample que suena (0..1)
+        bool reverse = false;
+        int slices = 1;                 // trocear en N partes (cada nota toca un trozo)
     };
 
     struct Bass808Params
@@ -45,6 +54,7 @@ namespace studoo
         juce::String samplePath;
         SynthParams synth;
         Bass808Params bass;
+        SamplerParams sampler;
     };
 
     struct PatternSnap
@@ -60,6 +70,10 @@ namespace studoo
         int patternIndex = -1; // si es un clip de patrón
         int channelIndex = -1; // si es un clip de audio
         double start = 0.0, length = 16.0, offset = 0.0;
+        float gain = 1.0f;                     // clips de audio: volumen
+        double timeRatio = 1.0;                // > 1: el audio avanza más deprisa (sigue un tempo más rápido)
+        double pitchRatio = 1.0;               // > 1: más agudo (sin cambiar la velocidad)
+        double fadeIn = 0.0, fadeOut = 0.0;    // clips de audio: fundidos (en pasos)
     };
 
     struct TrackParams
@@ -71,6 +85,14 @@ namespace studoo
         float compThreshold = -18.0f, compRatio = 4.0f;
         float delayMix = 0.0f, delayTime = 0.75f, delayFeedback = 0.35f;
         float reverbMix = 0.0f, reverbSize = 0.6f;
+        float filter = 0.0f;        // -1 paso bajo .. 0 nada .. 1 paso alto
+        float distortion = 0.0f, chorusMix = 0.0f;
+        float sidechain = 0.0f;     // 0..1: cuánto se agacha cuando suena la pista de origen
+        int sidechainSource = 1;
+        int sendTo = 0;             // 0 = sin envío; si no, una pista de número MAYOR (así no hay bucles)
+        float sendLevel = 0.0f;
+        bool sendOnly = false;      // solo suena por el envío (agrupar pistas en un "bus")
+        bool limiter = false;
     };
 
     struct LaneSnap
@@ -100,6 +122,7 @@ namespace studoo
     struct Snapshot
     {
         double bpm = 140.0;
+        float swing = 0.0f;          // 0..1: retrasa las semicorcheas pares
         bool metronome = false;
         bool songMode = false;
         int currentPatternIndex = 0;
