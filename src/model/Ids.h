@@ -116,6 +116,9 @@ namespace studoo::ids
     STUDOO_ID (scaleRoot)         // proyecto: nota base de la escala (0 = Do ... 11 = Si)
     STUDOO_ID (scaleType)         // proyecto: 0 = sin escala, 1 mayor, 2 menor...
     STUDOO_ID (scaleLock)         // proyecto: las notas nuevas se pegan a la escala
+    STUDOO_ID (stepVel)           // pasos: fuerza de cada paso, "85,40,100..." (0..100)
+    STUDOO_ID (stepPitch)         // pasos: tono de cada paso en semitonos, "0,0,12..." (-24..24)
+    STUDOO_ID (mono)              // sinte: una sola nota a la vez (con glide si se solapan)
     STUDOO_ID (recordBpm)         // grabación/clip: el BPM con el que se grabó (para seguir el tempo)
     STUDOO_ID (stretch)           // clip de audio: sigue el tempo de la canción sin cambiar el tono
     STUDOO_ID (clipPitch)         // clip de audio: tono en semitonos (-12..12) sin cambiar la velocidad

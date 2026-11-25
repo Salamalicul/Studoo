@@ -167,6 +167,9 @@ void PianoRollGrid::paint (juce::Graphics& g)
         }
     }
 
+    // Teclado (fijo a la izquierda de lo que se ve)
+    juce::Graphics::ScopedSaveState keyboardState (g);
+    g.addTransform (juce::AffineTransform::translation (keyboardLeft(), 0.0f));
     // Teclado: teclas blancas
     auto keys = juce::Rectangle<float> (0.0f, 0.0f, (float) keyboardWidth, (float) getHeight());
     g.setGradientFill (juce::ColourGradient (juce::Colour (0xffc9cdd3), 0.0f, 0.0f, juce::Colour (0xfff4f5f7), (float) keyboardWidth * 0.8f, 0.0f, false));
@@ -203,6 +206,7 @@ void PianoRollGrid::paint (juce::Graphics& g)
     g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.5f), (float) keyboardWidth, 0.0f,
                                              juce::Colours::transparentBlack, (float) keyboardWidth + 8.0f, 0.0f, false));
     g.fillRect ((float) keyboardWidth, 0.0f, 8.0f, (float) getHeight());
+    g.addTransform (juce::AffineTransform::translation (-keyboardLeft(), 0.0f));
 
     // Sin notas: un pequeño cartel que explica qué hacer
     if (ownNotes == 0)
@@ -245,6 +249,24 @@ void PianoRollGrid::paint (juce::Graphics& g)
     }
 }
 
+float PianoRollGrid::keyboardLeft() const
+{
+    if (auto* vp = findParentComponentOfClass<juce::Viewport>())
+        return (float) vp->getViewPositionX();
+    return 0.0f;
+}
+
+void PianoRollGrid::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+{
+    // Ctrl + rueda: zoom horizontal (como en los programas de música)
+    if (e.mods.isCommandDown() || e.mods.isCtrlDown())
+    {
+        roll.setZoom (roll.getZoom() * (wheel.deltaY > 0 ? 1.25f : 0.8f), e.position.x);
+        return;
+    }
+    Component::mouseWheelMove (e, wheel);
+}
+
 void PianoRollGrid::mouseMove (const juce::MouseEvent& e)
 {
     bool edge = false;
@@ -261,7 +283,7 @@ void PianoRollGrid::mouseDown (const juce::MouseEvent& e)
         return;
 
     // Teclado: escuchar la nota (y grabarla si está grabando)
-    if (e.x < keyboardWidth)
+    if (e.position.x < keyboardLeft() + keyboardWidth)
     {
         keyboardNote = yToNote (e.position.y);
         ctx.engine.previewNote (uid, keyboardNote, 0.8f, 0.5);
@@ -467,7 +489,7 @@ void VelocityLane::paint (juce::Graphics& g)
 
     g.setColour (Colours::textDim);
     g.setFont (Fonts::bold (11.0f));
-    g.drawFittedText ("VELOCITY", juce::Rectangle<int> (0, 0, PianoRollGrid::keyboardWidth, getHeight()),
+    g.drawFittedText ("VELOCITY", juce::Rectangle<int> (0, 0, PianoRollGrid::keyboardWidth, getHeight() - 22),
                       juce::Justification::centred, 2);
 
     const int uid = roll.getChannelUid();
@@ -476,7 +498,9 @@ void VelocityLane::paint (juce::Graphics& g)
     {
         if (! n.hasType (ids::NOTE) || (int) n[ids::channel] != uid)
             continue;
-        const float x = roll.gridStepsToX (n[ids::start]);
+        const float x = roll.gridStepsToX (n[ids::start]) - (float) roll.viewX();
+        if (x < (float) PianoRollGrid::keyboardWidth - 2.0f || x > (float) getWidth())
+            continue;
         const float vel = juce::jlimit (0.0f, 1.0f, (float) n.getProperty (ids::velocity, 0.8f));
         const float top = area.getBottom() - vel * area.getHeight();
         g.setColour (colour.withAlpha (0.35f + 0.65f * vel));
@@ -505,7 +529,7 @@ void VelocityLane::setVelocityAt (juce::Point<float> p)
     for (auto n : roll.getPattern())
         if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid)
         {
-            const float d = std::abs (roll.gridStepsToX (n[ids::start]) - p.x);
+            const float d = std::abs (roll.gridStepsToX (n[ids::start]) - (float) roll.viewX() - p.x);
             if (d < best) { best = d; bestStart = n[ids::start]; }
         }
     if (bestStart < 0.0)
@@ -605,7 +629,20 @@ PianoRoll::PianoRoll (AppContext& c)
 
     addAndMakeVisible (viewport);
     viewport.setViewedComponent (&grid, false);
-    viewport.setScrollBarsShown (true, false);
+    viewport.setScrollBarsShown (true, true);
+    viewport.onScroll = [this] { grid.repaint(); velocityLane.repaint(); };
+
+    for (auto* b : { &zoomOutButton, &zoomInButton })
+    {
+        addAndMakeVisible (*b);
+        makeNonFocusing (*b);
+    }
+    zoomOutButton.setButtonText (txt ("−"));
+    zoomInButton.setButtonText ("+");
+    zoomOutButton.setTooltip (txt ("Alejar: ver más compases (también Ctrl + rueda del ratón)."));
+    zoomInButton.setTooltip (txt ("Acercar: ver las notas más grandes (también Ctrl + rueda del ratón)."));
+    zoomOutButton.onClick = [this] { setZoom (zoom / 1.5f); };
+    zoomInButton.onClick = [this] { setZoom (zoom * 1.5f); };
 
     ctx.project.addChangeListener (this);
     refreshChannels();
@@ -659,8 +696,36 @@ juce::Array<int> PianoRoll::getChordIntervals() const
     }
 }
 
+void PianoRoll::updateGridSize()
+{
+    const int rows = PianoRollGrid::highestNote - PianoRollGrid::lowestNote + 1;
+    const int visibleW = viewport.getWidth() - viewport.getScrollBarThickness();
+    const float bars4 = juce::jmax (1.0f, Project::getPatternLength (getPattern()) / 64.0f);
+    const int notesW = juce::roundToInt ((float) (visibleW - PianoRollGrid::keyboardWidth) * zoom * bars4);
+    const int w = PianoRollGrid::keyboardWidth + juce::jmax (visibleW - PianoRollGrid::keyboardWidth, notesW);
+    if (grid.getWidth() != w || grid.getHeight() != rows * PianoRollGrid::rowHeight)
+        grid.setSize (w, rows * PianoRollGrid::rowHeight);
+}
+
+void PianoRoll::setZoom (float newZoom, float anchorX)
+{
+    newZoom = juce::jlimit (0.25f, 16.0f, newZoom);
+    if (juce::approximatelyEqual (newZoom, zoom))
+        return;
+    // Mantiene en su sitio el punto de la canción que hay debajo del ratón (o el centro)
+    const float anchor = anchorX >= 0.0f ? anchorX : (float) viewport.getViewPositionX() + viewport.getViewWidth() * 0.5f;
+    const double stepAtAnchor = grid.xToSteps (anchor);
+    const float offsetInView = anchor - (float) viewport.getViewPositionX();
+    zoom = newZoom;
+    updateGridSize();
+    viewport.setViewPosition (juce::jmax (0, juce::roundToInt (grid.stepsToX (stepAtAnchor) - offsetInView)), viewport.getViewPositionY());
+    grid.repaint();
+    velocityLane.repaint();
+}
+
 void PianoRoll::changeListenerCallback (juce::ChangeBroadcaster*)
 {
+    updateGridSize();
     refreshChannels();
     grid.repaint();
     velocityLane.repaint();
@@ -698,7 +763,7 @@ void PianoRoll::scrollToNotes()
             break;
         }
     const int y = grid.yForNote (centre) - viewport.getHeight() / 2;
-    viewport.setViewPosition (0, juce::jmax (0, y));
+    viewport.setViewPosition (viewport.getViewPositionX(), juce::jmax (0, y));
 }
 
 void PianoRoll::visibilityChanged()
@@ -1174,7 +1239,7 @@ void PianoRoll::importMidi()
         safe->ctx.project.beginTransaction();
         const int count = midiio::importIntoPattern (safe->ctx.project, safe->getPattern(), safe->getChannelUid(), midi);
         juce::AlertWindow::showAsync (juce::MessageBoxOptions().withTitle (count > 0 ? txt ("MIDI importado") : txt ("Sin notas"))
-                                          .withMessage (count > 0 ? juce::String (count) + txt (" notas añadidas a este canal (como mucho 4 compases).")
+                                          .withMessage (count > 0 ? juce::String (count) + txt (" notas añadidas a este canal (como mucho 16 compases).")
                                                                   : txt ("El archivo no tiene notas que se puedan usar."))
                                           .withButton ("Vale"), nullptr);
         safe->scrollToNotes();
@@ -1233,7 +1298,11 @@ void PianoRoll::resized()
     area.removeFromBottom (4);
     viewport.setBounds (area);
     velocityLane.setBounds (lane.withTrimmedRight (viewport.getScrollBarThickness()));
-    const int rows = PianoRollGrid::highestNote - PianoRollGrid::lowestNote + 1;
-    grid.setSize (viewport.getWidth() - viewport.getScrollBarThickness(), rows * PianoRollGrid::rowHeight);
+    // Zoom: dos botones pequeños en la esquina del carril de velocity
+    auto zoomArea = lane.withWidth (PianoRollGrid::keyboardWidth).removeFromBottom (22).reduced (3, 1);
+    zoomOutButton.setBounds (zoomArea.removeFromLeft (zoomArea.getWidth() / 2 - 1));
+    zoomArea.removeFromLeft (2);
+    zoomInButton.setBounds (zoomArea);
+    updateGridSize();
 }
 }

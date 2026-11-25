@@ -136,6 +136,11 @@ namespace studoo
         static int getPatternLength (const juce::ValueTree& pattern);
         bool getStep (const juce::ValueTree& pattern, int channelUid, int step);
         void setStep (juce::ValueTree pattern, int channelUid, int step, bool on);
+        // Editor de pasos: un valor por paso (fuerza 0..100 o tono -24..24)
+        int getStepValue (const juce::ValueTree& pattern, int channelUid, int step, const juce::Identifier& which);
+        void setStepValue (juce::ValueTree pattern, int channelUid, int step, const juce::Identifier& which, int value);
+        static int stepValueDefault (const juce::Identifier& which) { return which == ids::stepVel ? 85 : 0; }
+        static int parseStepValue (const juce::String& list, int step, const juce::Identifier& which);
         void clearPattern (juce::ValueTree pattern);
         void loadExampleBeat (juce::ValueTree pattern);
 

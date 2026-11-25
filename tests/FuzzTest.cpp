@@ -102,7 +102,7 @@ namespace
             ids::lfoAmount, ids::trackFilter, ids::distortion, ids::chorusMix, ids::sidechain, ids::sidechainSource,
             ids::limiter, ids::sendTo, ids::sendLevel, ids::sendOnly, ids::clipGain, ids::fadeIn, ids::fadeOut,
             ids::stretch, ids::clipPitch, ids::recordBpm, ids::scaleRoot, ids::scaleType, ids::scaleLock,
-            juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3") };
+            juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3"), ids::stepVel, ids::stepPitch, ids::mono };
 
         // Recorre todo el árbol y cambia, borra o duplica cosas al azar
         std::function<void (juce::ValueTree)> mutate = [&] (juce::ValueTree t)
@@ -251,7 +251,7 @@ int main (int argc, char* argv[])
                 for (auto n : pattern)
                     if (n.hasType (ids::NOTE)
                         && (! std::isfinite ((double) n[ids::start]) || (double) n[ids::start] < 0.0
-                            || (double) n[ids::start] + (double) n[ids::length] > 64.0 + 1.0e-6))
+                            || (double) n[ids::start] + (double) n[ids::length] > 256.0 + 1.0e-6))
                         ++failures;
                 ++midiOk;
             }

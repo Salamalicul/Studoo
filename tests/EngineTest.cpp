@@ -543,6 +543,107 @@ int main (int argc, char* argv[])
             wav.deleteFile();
         }
 
+        // Tanda A: patrones largos, editor de pasos, stems y glide del sinte
+        {
+            auto firstAbove = [] (const juce::AudioBuffer<float>& b, float th)
+            {
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    if (std::abs (b.getSample (0, i)) > th) return i;
+                return -1;
+            };
+            // Un patrón de 8 compases: el paso 100 suena a su hora
+            auto longPattern = renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                p.getCurrentPattern().setProperty (ids::length, 128, nullptr);
+                p.getState().setProperty (ids::bpm, 240.0, nullptr);
+                stepAt (p, k, 100);
+            }, 6.6);
+            check (std::abs (firstAbove (longPattern, 0.01f) - sampleRate * 60.0 / 240.0 / 4.0 * 100) < 300,
+                   "Patrón de 8 compases: el paso 100 suena a su hora");
+
+            // Editor de pasos: fuerza 30 suena más flojo; fuerza 0 no suena
+            auto loudStep = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); }, 0.5);
+            auto softStep = renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                stepAt (p, k, 0);
+                p.setStepValue (p.getCurrentPattern(), k[ids::uid], 0, ids::stepVel, 30);
+            }, 0.5);
+            auto mutedStep = renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                stepAt (p, k, 0);
+                p.setStepValue (p.getCurrentPattern(), k[ids::uid], 0, ids::stepVel, 0);
+            }, 0.5);
+            check (rms (softStep) < rms (loudStep) * 0.6f && rms (mutedStep) < 1.0e-5f, "Editor de pasos: la fuerza de cada golpe cambia el volumen");
+            auto upStep = renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                stepAt (p, k, 0);
+                p.setStepValue (p.getCurrentPattern(), k[ids::uid], 0, ids::stepPitch, 12);
+            }, 1.0);
+            auto baseStep = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); }, 1.0);
+            check (lastSound (upStep) < lastSound (baseStep) * 0.7, "Editor de pasos: +12 semitonos suena más agudo");
+            {
+                Project p;
+                const int uid = p.channels().getChild (0)[ids::uid];
+                p.setStepValue (p.getCurrentPattern(), uid, 5, ids::stepVel, 500);
+                p.setStepValue (p.getCurrentPattern(), uid, 6, ids::stepPitch, -99);
+                check (p.getStepValue (p.getCurrentPattern(), uid, 5, ids::stepVel) == 100
+                       && p.getStepValue (p.getCurrentPattern(), uid, 6, ids::stepPitch) == -24
+                       && p.getStepValue (p.getCurrentPattern(), uid, 7, ids::stepVel) == 85, "Editor de pasos: los valores se limitan y tienen valor por defecto");
+            }
+
+            // Exportar por pistas: con el bombo en su pista, la pista de la caja queda en silencio
+            {
+                Project p;
+                auto kick = p.findChannelByBuiltin ("builtin:kick");
+                auto snare = p.findChannelByBuiltin ("builtin:snare");
+                p.setStep (p.getCurrentPattern(), kick[ids::uid], 0, true);
+                p.setStep (p.getCurrentPattern(), snare[ids::uid], 4, true);
+                AudioEngine e;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (p.getState(), cache);
+                e.setStemTrack ((int) snare[ids::mixer]);
+                e.play();
+                auto onlySnare = renderSeconds (e, 0.5);
+                const int snareStart = (int) (samplesPerStep * 4);
+                check (onlySnare.getMagnitude (0, 0, snareStart - 200) < 1.0e-4f && onlySnare.getMagnitude (0, snareStart, 4000) > 0.01f,
+                       "Exportar por pistas: solo suena la pista elegida");
+            }
+
+            // Sinte mono con glide: la segunda nota empieza con el tono de la primera
+            {
+                auto glideRender = [&] (float glide)
+                {
+                    Project p;
+                    auto synth = p.findChannelByType (ChannelType::synth);
+                    synth.setProperty (ids::mono, true, nullptr);
+                    synth.setProperty (ids::glide, glide, nullptr);
+                    synth.setProperty (ids::wave, 2, nullptr);
+                    synth.setProperty (ids::sustain, 1.0f, nullptr);
+                    synth.setProperty (ids::cutoff, 18000.0f, nullptr);
+                    p.addNote (p.getCurrentPattern(), synth[ids::uid], 0.0, 5.0, 57);   // La3 (220 Hz)
+                    p.addNote (p.getCurrentPattern(), synth[ids::uid], 4.0, 8.0, 69);   // La4 (440 Hz), solapada
+                    for (auto ch : p.channels()) if (ch != synth) ch.setProperty (ids::muted, true, nullptr);
+                    AudioEngine e;
+                    e.prepare (sampleRate, blockSize);
+                    e.updateFromProject (p.getState(), cache);
+                    e.play();
+                    return renderSeconds (e, 1.2);
+                };
+                auto crossings = [] (const juce::AudioBuffer<float>& b, int from, int len)
+                {
+                    int c = 0;
+                    for (int i = from + 1; i < from + len; ++i)
+                        c += (b.getSample (0, i - 1) < 0.0f) != (b.getSample (0, i) < 0.0f) ? 1 : 0;
+                    return c / 2.0 / (len / sampleRate);
+                };
+                const int second = (int) (samplesPerStep * 4);
+                auto noGlide = glideRender (0.0f), withGlide = glideRender (0.5f);
+                const double fNo = crossings (noGlide, second + 600, 2205), fGlide = crossings (withGlide, second + 600, 2205);
+                check (fNo > 380.0 && fGlide < fNo * 0.8, "Sinte mono: con glide la nota se desliza (empieza más grave)");
+                check (crossings (withGlide, (int) (sampleRate * 1.0), 4410) > 400.0, "Sinte mono: al final llega a la nota nueva");
+            }
+        }
+
         // MIDI: exportar un patrón y volver a importarlo
         {
             Project p;

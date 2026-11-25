@@ -118,6 +118,125 @@ namespace
     };
 }
 
+namespace
+{
+    // Exportar por pistas: un WAV por cada pista del mezclador que suena
+    class StemJob : public juce::ThreadWithProgressWindow
+    {
+    public:
+        StemJob (AudioEngine& e, juce::AudioDeviceManager& dm, juce::File folder, std::vector<std::pair<int, juce::String>> stemTracks,
+                 std::function<void (bool, const juce::String&)> onDone)
+            : ThreadWithProgressWindow (txt ("Exportando por pistas..."), true, true),
+              engine (e), deviceManager (dm), target (std::move (folder)), tracks (std::move (stemTracks)), done (std::move (onDone))
+        {
+            deviceManager.removeAudioCallback (&engine);
+        }
+
+        void run() override
+        {
+            ok = true;
+            for (size_t i = 0; i < tracks.size() && ok && ! threadShouldExit(); ++i)
+            {
+                const auto& [track, name] = tracks[i];
+                setStatusMessage (txt ("Pista ") + juce::String (track) + ": " + name);
+                engine.setStemTrack (track);
+                auto file = target.getChildFile (juce::String (track).paddedLeft ('0', 2) + " - "
+                                                 + juce::File::createLegalFileName (name) + ".wav");
+                ok = engine.renderSongToFile (file, 44100.0, [this, i] (float p)
+                {
+                    setProgress (((double) i + p) / (double) tracks.size());
+                    return ! threadShouldExit();
+                }, error);
+            }
+            engine.setStemTrack (-1);
+        }
+
+        void threadComplete (bool userPressedCancel) override
+        {
+            engine.setStemTrack (-1);
+            deviceManager.addAudioCallback (&engine);
+            done (ok && ! userPressedCancel, userPressedCancel ? txt ("Exportación cancelada.") : error);
+            delete this;
+        }
+
+    private:
+        AudioEngine& engine;
+        juce::AudioDeviceManager& deviceManager;
+        juce::File target;
+        std::vector<std::pair<int, juce::String>> tracks;
+        std::function<void (bool, const juce::String&)> done;
+        bool ok = false;
+        juce::String error;
+    };
+}
+
+void MainComponent::exportStems()
+{
+    if (project.playlist().getNumChildren() == 0)
+    {
+        showMessage (txt ("La playlist está vacía"),
+                     txt ("Se exporta la canción de la PLAYLIST. Coloca primero tus patrones en la playlist (F5)."));
+        return;
+    }
+    if (! pro::isUnlocked())
+    {
+        proScreen.show (txt ("Exportar por pistas (stems) es de Studoo Pro"));
+        return;
+    }
+
+    // Las pistas que suenan: las que tienen canales o reciben envíos
+    std::vector<std::pair<int, juce::String>> tracks;
+    for (int t = 1; t < numMixerTracks; ++t)
+    {
+        bool used = false;
+        for (auto ch : project.channels())
+            used = used || (int) ch[ids::mixer] == t;
+        for (int s = 1; s < t && ! used; ++s)
+            used = (int) project.getMixerTrack (s).getProperty (ids::sendTo, 0) == t;
+        if (used && ! (bool) project.getMixerTrack (t)[ids::muted])
+            tracks.push_back ({ t, project.getMixerTrack (t)[ids::name].toString() });
+    }
+    if (tracks.empty())
+    {
+        showMessage (txt ("No hay pistas que exportar"), txt ("Ninguna pista del mezclador tiene sonidos."));
+        return;
+    }
+
+    auto folder = getStudooFolder ("Exportados").getNonexistentChildFile (
+        juce::File::createLegalFileName (project.getDisplayName() + " - pistas"), {}, false);
+    folder.createDirectory();
+    engine.stop();
+    juce::Component::SafePointer<MainComponent> safe (this);
+    auto* job = new StemJob (engine, deviceManager, folder, tracks, [safe, folder, count = tracks.size()] (bool ok, const juce::String& error)
+    {
+        if (! ok)
+        {
+            showMessage (txt ("No se pudo exportar"), error);
+            return;
+        }
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                          .withIconType (juce::MessageBoxIconType::NoIcon)
+                                          .withTitle (txt ("¡Pistas exportadas!"))
+                                          .withMessage (juce::String ((int) count) + txt (" archivos WAV (uno por pista del mezclador) en:\n")
+                                                        + folder.getFullPathName()
+                                                        + txt ("\n\nTodos empiezan en el mismo momento: ponlos juntos en cualquier programa y sonarán como la canción."))
+                                         #if ! (JUCE_ANDROID || JUCE_IOS)
+                                          .withButton (txt ("Abrir la carpeta"))
+                                         #endif
+                                          .withButton (txt ("Cerrar")),
+                                      [folder] (int r)
+        {
+           #if ! (JUCE_ANDROID || JUCE_IOS)
+            if (r == 1) folder.startAsProcess();
+           #else
+            juce::ignoreUnused (r);
+           #endif
+        });
+        if (safe != nullptr) safe->setStatus (txt ("Pistas exportadas en: ") + folder.getFileName());
+    });
+    job->launchThread();
+}
+
 // ============================================================================
 //  Construcción
 // ============================================================================
@@ -548,6 +667,7 @@ void MainComponent::showFileMenu()
     menu.addSeparator();
    #if JUCE_ANDROID
     menu.addItem (5, txt ("Exportar canción (WAV) y compartir..."));
+    menu.addItem (16, txt ("Exportar por pistas (stems)...") + (pro::isUnlocked() ? juce::String() : juce::String (" · Pro")));
     menu.addItem (13, txt ("Compartir este proyecto..."));
     menu.addItem (14, txt ("Importar un proyecto..."));
     menu.addSeparator();
@@ -555,9 +675,11 @@ void MainComponent::showFileMenu()
    #else
     menu.addItem (5, txt ("Exportar a WAV..."));
     menu.addItem (6, txt ("Exportar a MP3..."));
+    menu.addItem (16, txt ("Exportar por pistas (stems)...") + (pro::isUnlocked() ? juce::String() : juce::String (" · Pro")));
     menu.addSeparator();
     menu.addItem (7, txt ("Tutorial: tu primer beat"));
     menu.addItem (8, txt ("Atajos de teclado"));
+    menu.addItem (15, txt ("Tocar con el teclado del ordenador (como un piano)"), true, typingPiano);
     menu.addItem (9, txt ("Abrir la carpeta de proyectos"));
    #endif
     menu.addSeparator();
@@ -613,6 +735,15 @@ void MainComponent::showFileMenu()
                 saveProject ([this] { shareFile (project.getFile()); });
                 break;
             case 14: importProject(); break;
+            case 16: exportStems(); break;
+            case 15:
+                typingPiano = ! typingPiano;
+                releaseTypingNotes();
+                setStatus (typingPiano ? txt ("Teclado como piano: Z X C V B N M = Do Re Mi Fa Sol La Si (fila de abajo), "
+                                              "Q W E R T Y U = una octava más arriba. Las teclas de arriba (S D G H J, 2 3 5 6 7) son las negras. "
+                                              "Flechas izquierda/derecha: cambiar de octava.")
+                                       : txt ("Teclado como piano desactivado."));
+                break;
             case 30: proScreen.show ({}); break;
             case 12:
                 settings->setValue ("autoUpdate", ! settings->getBoolValue ("autoUpdate", true));
@@ -1678,10 +1809,81 @@ void MainComponent::resized()
     proScreen.setBounds (getLocalBounds());
 }
 
+int MainComponent::typingNoteForKey (int keyCode) const
+{
+    // Distribución como en los programas de música: dos filas de teclas = dos octavas
+    static const std::pair<char, int> keys[] = {
+        { 'Z', 0 }, { 'S', 1 }, { 'X', 2 }, { 'D', 3 }, { 'C', 4 }, { 'V', 5 }, { 'G', 6 }, { 'B', 7 },
+        { 'H', 8 }, { 'N', 9 }, { 'J', 10 }, { 'M', 11 }, { ',', 12 },
+        { 'Q', 12 }, { '2', 13 }, { 'W', 14 }, { '3', 15 }, { 'E', 16 }, { 'R', 17 }, { '5', 18 }, { 'T', 19 },
+        { '6', 20 }, { 'Y', 21 }, { '7', 22 }, { 'U', 23 }, { 'I', 24 }, { '9', 25 }, { 'O', 26 }, { '0', 27 }, { 'P', 28 } };
+    const auto upper = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) keyCode);
+    for (auto& [c, offset] : keys)
+        if (upper == (juce::juce_wchar) c)
+            return juce::jlimit (0, 127, (typingOctave - 1) * 12 + offset);   // Z = Do de la octava elegida
+    return -1;
+}
+
+void MainComponent::releaseTypingNotes()
+{
+    for (auto& [key, note] : typingHeld)
+        engine.getMidiCollector().addMessageToQueue (juce::MidiMessage::noteOff (1, note)
+                                                         .withTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001));
+    typingHeld.clear();
+}
+
+bool MainComponent::keyStateChanged (bool)
+{
+    if (! typingPiano)
+        return false;
+    bool handled = false;
+    // Notas que se sueltan
+    for (auto it = typingHeld.begin(); it != typingHeld.end();)
+    {
+        if (! juce::KeyPress::isKeyCurrentlyDown (it->first))
+        {
+            engine.getMidiCollector().addMessageToQueue (juce::MidiMessage::noteOff (1, it->second)
+                                                             .withTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001));
+            it = typingHeld.erase (it);
+            handled = true;
+        }
+        else
+            ++it;
+    }
+    // Notas que se pulsan (sin Ctrl ni Alt, para no estorbar a los atajos)
+    const auto mods = juce::ModifierKeys::getCurrentModifiers();
+    if (! mods.isCommandDown() && ! mods.isAltDown())
+        for (const char* k = "ZSXDCVGBHNJM,Q2W3ER5T6Y7UI9O0P"; *k != 0; ++k)
+        {
+            const int code = juce::CharacterFunctions::toLowerCase ((juce::juce_wchar) *k);
+            for (int c : { (int) *k, code })
+                if (juce::KeyPress::isKeyCurrentlyDown (c) && typingHeld.count ((int) *k) == 0)
+                {
+                    const int note = typingNoteForKey (*k);
+                    if (note >= 0)
+                    {
+                        typingHeld[(int) *k] = note;
+                        engine.getMidiCollector().addMessageToQueue (juce::MidiMessage::noteOn (1, note, 0.8f)
+                                                                         .withTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001));
+                        handled = true;
+                    }
+                    break;
+                }
+        }
+    return handled;
+}
+
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     const auto mods = key.getModifiers();
     const int code = key.getKeyCode();
+    if (typingPiano && ! mods.isCommandDown() && ! mods.isAltDown())
+    {
+        if (code == juce::KeyPress::leftKey)  { typingOctave = juce::jmax (1, typingOctave - 1); setStatus (txt ("Octava ") + juce::String (typingOctave)); return true; }
+        if (code == juce::KeyPress::rightKey) { typingOctave = juce::jmin (7, typingOctave + 1); setStatus (txt ("Octava ") + juce::String (typingOctave)); return true; }
+        if (typingNoteForKey (code) >= 0)
+            return true;   // la nota ya suena (keyStateChanged); que no haga su atajo (R, L...)
+    }
     const auto upper = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code);
     const bool cmd = mods.isCommandDown();
 

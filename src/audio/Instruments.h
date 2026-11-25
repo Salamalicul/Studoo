@@ -100,6 +100,7 @@ namespace studoo
             int note = -1;
             double phase1 = 0.0, phase2 = 0.0, inc1 = 0.0, inc2 = 0.0;
             float velocity = 0.0f;
+            double glideRatio = 1.0;   // al deslizarse, empieza en la frecuencia de la nota anterior y llega a 1
             juce::ADSR adsr;
             juce::dsp::StateVariableTPTFilter<float> filter;
             juce::uint32 age = 0;

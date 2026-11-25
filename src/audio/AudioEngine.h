@@ -100,6 +100,8 @@ namespace studoo
         // --- Exportación (sin tarjeta de sonido) ---------------------------------------
         // Debe llamarse con el motor desconectado de la tarjeta de sonido
         // maxSeconds > 0: solo se exporta ese tiempo (versión gratis)
+        // Exportar por pistas: solo suena esta pista del mezclador (sin los efectos del Master). -1 = normal
+        void setStemTrack (int track) { stemTrack.store (track); }
         bool renderSongToFile (const juce::File& wavFile, double sampleRate,
                                std::function<bool (float progress)> keepGoing, juce::String& error,
                                double maxSeconds = 0.0);
@@ -158,6 +160,7 @@ namespace studoo
         std::atomic<double> currentBpm { 140.0 };
         std::atomic<int> liveChannelUid { 0 };
         std::atomic<bool> midiRecording { false };
+        std::atomic<int> stemTrack { -1 };
         static constexpr int recordFifoSize = 1024;
         juce::AbstractFifo recordFifo { recordFifoSize };
         std::array<RecordedMidi, recordFifoSize> recordBuffer {};

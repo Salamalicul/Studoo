@@ -982,7 +982,13 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     // Solo: una pista que recibe el envío de una pista en solo también se oye
     std::array<bool, numMixerTracks> soloed {};
     bool anySolo = false;
-    for (int t = 1; t < numMixerTracks; ++t)
+    const int stem = stemTrack.load();
+    if (stem > 0 && stem < numMixerTracks)
+    {
+        anySolo = true;   // exportar por pistas: solo esta pista
+        soloed[(size_t) stem] = true;
+    }
+    else for (int t = 1; t < numMixerTracks; ++t)
     {
         const auto& tp = trackParams[(size_t) t];
         soloed[(size_t) t] = soloed[(size_t) t] || tp.solo;
@@ -1006,12 +1012,13 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
             dest.addFrom (0, 0, out, 0, 0, n, tp.sendLevel);
             dest.addFrom (1, 0, out, 1, 0, n, tp.sendLevel);
         }
-        if (tp.sendOnly && tp.sendTo > t)
+        if (tp.sendOnly && tp.sendTo > t && t != stem)
             continue;
         master.addFrom (0, 0, out, 0, 0, n);
         master.addFrom (1, 0, out, 1, 0, n);
     }
-    mixer[0].process (n, trackParams[0], snap->bpm, trackParams[0].mute);
+    if (! (stem > 0 && stem < numMixerTracks))
+        mixer[0].process (n, trackParams[0], snap->bpm, trackParams[0].mute);
     metronome.render (master, n);
 
     // --- Sonido de los juegos de oído (no pasa por el mezclador) ---------------------------

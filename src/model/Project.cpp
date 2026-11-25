@@ -787,6 +787,51 @@ bool Project::getStep (const juce::ValueTree& pattern, int channelUid, int step)
     return false;
 }
 
+int Project::parseStepValue (const juce::String& list, int step, const juce::Identifier& which)
+{
+    const int def = stepValueDefault (which);
+    if (list.isEmpty() || step < 0)
+        return def;
+    // Busca el valor número 'step' sin crear listas enteras (puede llamarse mucho)
+    int index = 0, start = 0;
+    for (int i = 0; i <= list.length(); ++i)
+        if (i == list.length() || list[i] == ',')
+        {
+            if (index == step)
+            {
+                const auto token = list.substring (start, i).trim();
+                if (token.isEmpty()) return def;
+                return which == ids::stepVel ? juce::jlimit (0, 100, token.getIntValue()) : juce::jlimit (-24, 24, token.getIntValue());
+            }
+            ++index;
+            start = i + 1;
+        }
+    return def;
+}
+
+int Project::getStepValue (const juce::ValueTree& pattern, int channelUid, int step, const juce::Identifier& which)
+{
+    for (auto c : pattern)
+        if (c.hasType (ids::STEPSET) && (int) c[ids::channel] == channelUid)
+            return parseStepValue (c[which].toString(), step, which);
+    return stepValueDefault (which);
+}
+
+void Project::setStepValue (juce::ValueTree pattern, int channelUid, int step, const juce::Identifier& which, int value)
+{
+    if (! pattern.isValid() || step < 0 || step >= 256)
+        return;
+    auto set = getStepSet (pattern, channelUid, true);
+    auto values = juce::StringArray::fromTokens (set[which].toString(), ",", "");
+    while (values.size() <= step)
+        values.add (juce::String (stepValueDefault (which)));
+    value = which == ids::stepVel ? juce::jlimit (0, 100, value) : juce::jlimit (-24, 24, value);
+    if (values[step].getIntValue() == value && values[step].isNotEmpty())
+        return;
+    values.set (step, juce::String (value));
+    set.setProperty (which, values.joinIntoString (","), &undoManager);
+}
+
 void Project::setStep (juce::ValueTree pattern, int channelUid, int step, bool on)
 {
     if (! pattern.isValid() || step < 0 || step >= 256)

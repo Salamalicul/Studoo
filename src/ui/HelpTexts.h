@@ -38,7 +38,9 @@ namespace studoo::help
         "- Número: a qué pista del mezclador va su sonido.\n\n"
         "Arriba puedes cambiar de patrón, crear patrones nuevos, elegir la duración (16, 32 o 64 pasos) "
         "y añadir canales: samples, kits de batería, sintetizador, 808 o plugins VST3.\n"
-        "\"Swing\": retrasa un poco los pasos pares para que el ritmo baile (20-40% en boom bap y lo-fi).\n\n"
+        "\"Swing\": retrasa un poco los pasos pares para que el ritmo baile (20-40% en boom bap y lo-fi).\n"
+        "Los patrones pueden durar hasta 16 compases: si son largos, elige arriba qué 4 compases ves.\n"
+        "\"Editor de pasos\" (debajo de los canales): cambia la fuerza o el tono de cada golpe del canal elegido.\n\n"
         "SONIDOS INCLUIDOS: en \"+ Añadir\" tienes 18 kits de batería (Trap, Drill, Reggaetón, Phonk, Afrobeat, House, Lo-fi...), "
         "efectos FX, 14 sonidos de sintetizador ya preparados y 6 tipos de 808. "
         "\"Usar este kit\" cambia los sonidos de tu batería por los del kit SIN perder el ritmo que ya has escrito.\n\n"
@@ -75,6 +77,8 @@ namespace studoo::help
         "- \"Herramientas\": escalas (las notas que no son de la escala se ven más oscuras), arpegiador, "
         "transponer y exportar o importar MIDI.\n"
         "- \"Grabar notas\": toca un teclado MIDI (o las teclas del piano de la izquierda) mientras suena y se escribe solo.\n"
+        "- Zoom: botones − y + abajo a la izquierda, o Ctrl + rueda del ratón.\n"
+        "- Sin teclado MIDI: menú ☰ > \"Tocar con el teclado del ordenador\" (Z X C V... y Q W E R...).\n"
         "- Carril VELOCITY (abajo): una barra por nota. Arrástrala para que la nota suene más fuerte o más suave.\n\n"
         "Arriba eliges qué canal (instrumento) estás editando. Las notas son del patrón actual.\n"
         "Para el 808: haz notas largas, y si solapas dos notas el tono se \"desliza\" (glide).";
@@ -153,5 +157,8 @@ namespace studoo::help
         "F7: piano roll\n"
         "F8: automatización\n"
         "F9: mezclador\n"
+        "\nPiano roll: Ctrl+A seleccionar todo, Ctrl+C copiar, Ctrl+X cortar, Ctrl+V pegar, Ctrl+B duplicar, "
+        "Supr borrar, flechas arriba/abajo transponer, Ctrl + rueda zoom.\n"
+        "Teclado como piano (menú ☰): Z X C V B N M y Q W E R T Y U son notas; flechas izquierda/derecha cambian la octava.\n"
         "F1: aprende";
 }

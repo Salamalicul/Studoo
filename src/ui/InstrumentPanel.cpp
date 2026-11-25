@@ -277,6 +277,15 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
             addKnob ("Resonancia", txt ("Realza la zona del filtro (sonido más \"chillón\")."), ids::resonance, 0.0, 1.0, 0.2);
             addKnob ("Desafinar", txt ("Separa los dos osciladores: sonido más ancho."), ids::detune, 0.0, 50.0, 8.0)
                 ->setValueSuffix (" cents", 0);
+            auto* mono = new juce::ToggleButton ("Mono");
+            mono->setTooltip (txt ("Mono: solo suena una nota a la vez. Si dos notas se solapan en el piano roll, "
+                                   "el sonido se desliza de una a otra (con la rueda Glide)."));
+            mono->getToggleStateValue().referTo (channel.getPropertyAsValue (ids::mono, ctx.project.um()));
+            makeNonFocusing (*mono);
+            controls.add (mono);
+            addAndMakeVisible (mono);
+            addKnob ("Glide", txt ("Cuánto tarda en deslizarse de una nota a otra (en modo Mono, con notas solapadas)."),
+                     ids::glide, 0.0, 1.0, 0.0, 0.2)->setDisplayFunction ([] (double v) { return juce::String ((int) (v * 1000.0)) + " ms"; });
             addKnob ("LFO vel.", txt ("Velocidad del LFO: lo rápido que el filtro sube y baja solo (el \"wobble\" del dubstep)."),
                      ids::lfoRate, 0.1, 20.0, 4.0, 3.0)
                 ->setDisplayFunction ([] (double v) { return juce::String (v, 1) + " Hz"; });

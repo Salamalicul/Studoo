@@ -37,6 +37,26 @@ namespace studoo
         int paintRow = -1;
     };
 
+    // Editor de pasos: una barra por paso del canal elegido (fuerza o tono de cada golpe)
+    class StepGraph : public juce::Component, public juce::SettableTooltipClient
+    {
+    public:
+        StepGraph (AppContext&, ChannelRack&, StepGrid&);
+        void paint (juce::Graphics&) override;
+        void mouseDown (const juce::MouseEvent&) override;
+        void mouseDrag (const juce::MouseEvent&) override;
+        void resized() override;
+        static constexpr int labelWidth = 300;   // igual que la columna de controles del secuenciador
+
+    private:
+        void setAt (juce::Point<float>);
+        bool pitchMode() const { return modeBox.getSelectedId() == 2; }
+        AppContext& ctx;
+        ChannelRack& rack;
+        StepGrid& grid;
+        juce::ComboBox modeBox;
+    };
+
     class ChannelRack : public juce::Component,
                         public juce::FileDragAndDropTarget,
                         private juce::ChangeListener,
@@ -53,6 +73,12 @@ namespace studoo
         int getRowUid (int row) const;
         juce::ValueTree getPattern();
         int getPatternLength();
+        // Los pasos se ven en páginas de 4 compases (64 pasos) cuando el patrón es más largo
+        static constexpr int stepsPerPage = 64;
+        int getPageStart();
+        int getVisibleSteps();
+        int page = 0;
+        
 
         void paint (juce::Graphics&) override;
         void resized() override;
@@ -85,8 +111,9 @@ namespace studoo
 
         AppContext& ctx;
         HelpButton helpButton;
-        juce::ComboBox patternBox, lengthBox, swingBox;
-        juce::TextButton patternMenuButton, addButton, exampleButton, clearButton, soundButton;
+        juce::ComboBox patternBox, lengthBox, swingBox, pageBox;
+        juce::TextButton patternMenuButton, addButton, exampleButton, clearButton, soundButton, graphButton;
+        std::unique_ptr<StepGraph> stepGraph;
         bool panelOpen = false; // modo móvil: panel del sonido abierto
 
         juce::Viewport viewport;

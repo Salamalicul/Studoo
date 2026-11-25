@@ -59,6 +59,8 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         c.synth.detune = num (ch, ids::detune, 0.0f, 50.0f, 8.0f);
         c.synth.lfoRate = num (ch, ids::lfoRate, 0.1f, 20.0f, 4.0f);
         c.synth.lfoAmount = num (ch, ids::lfoAmount, 0.0f, 1.0f, 0.0f);
+        c.synth.mono = (bool) ch.getProperty (ids::mono, false);
+        c.synth.glide = num (ch, ids::glide, 0.0f, 1.0f, 0.0f);
 
         c.sampler.tune = num (ch, ids::sampleTune, -24.0f, 24.0f, 0.0f);
         c.sampler.start = num (ch, ids::sampleStart, 0.0f, 0.99f, 0.0f);
@@ -101,10 +103,18 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
                     continue;
                 // Cada paso encendido se convierte en una nota
                 const auto data = item[ids::data].toString();
+                const auto vels = juce::StringArray::fromTokens (item[ids::stepVel].toString(), ",", "");
+                const auto pitches = juce::StringArray::fromTokens (item[ids::stepPitch].toString(), ",", "");
                 const double stepLength = ch.type == ChannelType::bass808 ? 4.0 : 1.0;
                 for (int s = 0; s < juce::jmin (data.length(), (int) ps.length); ++s)
                     if (data[s] == '1')
-                        notes.push_back ({ (double) s, stepLength, ch.root, 0.85f });
+                    {
+                        // Editor de pasos: fuerza y tono de cada golpe (con valores seguros)
+                        const float vel = s < vels.size() && vels[s].isNotEmpty() ? juce::jlimit (0, 100, vels[s].getIntValue()) / 100.0f : 0.85f;
+                        const int pitch = juce::jlimit (0, 127, ch.root + (s < pitches.size() ? juce::jlimit (-24, 24, pitches[s].getIntValue()) : 0));
+                        if (vel > 0.0f)
+                            notes.push_back ({ (double) s, stepLength, pitch, vel });
+                    }
             }
             else if (item.hasType (ids::NOTE))
             {

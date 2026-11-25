@@ -173,6 +173,103 @@ StepGrid::StepGrid (AppContext& c, ChannelRack& r) : ctx (c), rack (r)
     makeNonFocusing (*this);
 }
 
+// ============================================================================
+//  StepGraph: el editor de pasos
+// ============================================================================
+StepGraph::StepGraph (AppContext& c, ChannelRack& r, StepGrid& g) : ctx (c), rack (r), grid (g)
+{
+    addAndMakeVisible (modeBox);
+    modeBox.addItem (txt ("Fuerza (velocity)"), 1);
+    modeBox.addItem (txt ("Tono (semitonos)"), 2);
+    modeBox.setSelectedId (1, juce::dontSendNotification);
+    modeBox.onChange = [this] { repaint(); };
+    makeNonFocusing (modeBox);
+    setTooltip (txt ("Arrastra sobre las barras para cambiar cada paso del canal elegido. En Fuerza, más alto = más fuerte "
+                     "(abajo del todo = no suena). En Tono, el centro es la nota normal; arriba más agudo y abajo más grave."));
+}
+
+void StepGraph::resized()
+{
+    modeBox.setBounds (8, 26, labelWidth - 24, 26);
+}
+
+void StepGraph::paint (juce::Graphics& g)
+{
+    g.setColour (juce::Colour (0xff15181c));
+    g.fillRoundedRectangle (getLocalBounds().toFloat(), 8.0f);
+    const int uid = ctx.project.getSelectedChannel();
+    auto channel = ctx.project.findChannel (uid);
+    g.setColour (Colours::textDim);
+    g.setFont (Fonts::bold (11.0f));
+    g.drawText (txt ("EDITOR DE PASOS · ") + channel[ids::name].toString(), juce::Rectangle<int> (10, 4, labelWidth - 20, 18),
+                juce::Justification::centredLeft);
+
+    auto area = getLocalBounds().toFloat().withTrimmedLeft ((float) labelWidth).reduced (0.0f, 8.0f);
+    const bool pitch = pitchMode();
+    if (pitch)
+    {
+        g.setColour (Colours::outline);
+        g.drawHorizontalLine ((int) area.getCentreY(), area.getX(), area.getRight());
+    }
+    const auto colour = Colours::forChannelType (channel[ids::type].toString());
+    auto pattern = rack.getPattern();
+    const auto which = pitch ? ids::stepPitch : ids::stepVel;
+    for (int s = rack.getPageStart(); s < rack.getPageStart() + rack.getVisibleSteps(); ++s)
+    {
+        auto cell = grid.getCellBounds (0, s);
+        const float x = area.getX() + cell.getX(), w = cell.getWidth();
+        const bool on = ctx.project.getStep (pattern, uid, s);
+        const int v = ctx.project.getStepValue (pattern, uid, s, which);
+        g.setColour (on ? colour.withAlpha (0.9f) : Colours::textDim.withAlpha (0.25f));
+        if (pitch)
+        {
+            const float y = area.getCentreY() - (float) v / 24.0f * area.getHeight() * 0.5f;
+            g.fillRect (juce::Rectangle<float> (x + 2.0f, juce::jmin (y, area.getCentreY()), w - 4.0f, juce::jmax (2.0f, std::abs (y - area.getCentreY()))));
+            if (on && v != 0 && w > 18.0f)
+            {
+                g.setFont (Fonts::regular (9.0f));
+                g.drawText ((v > 0 ? "+" : "") + juce::String (v), juce::Rectangle<float> (x, area.getY(), w, 10.0f), juce::Justification::centred);
+            }
+        }
+        else
+        {
+            const float h = area.getHeight() * (float) v / 100.0f;
+            g.fillRect (juce::Rectangle<float> (x + 2.0f, area.getBottom() - h, w - 4.0f, juce::jmax (1.0f, h)));
+        }
+    }
+}
+
+void StepGraph::mouseDown (const juce::MouseEvent& e)
+{
+    ctx.project.beginTransaction();
+    setAt (e.position);
+}
+
+void StepGraph::mouseDrag (const juce::MouseEvent& e) { setAt (e.position); }
+
+void StepGraph::setAt (juce::Point<float> p)
+{
+    auto area = getLocalBounds().toFloat().withTrimmedLeft ((float) labelWidth).reduced (0.0f, 8.0f);
+    if (p.x < area.getX())
+        return;
+    for (int s = rack.getPageStart(); s < rack.getPageStart() + rack.getVisibleSteps(); ++s)
+    {
+        auto cell = grid.getCellBounds (0, s);
+        if (p.x >= area.getX() + cell.getX() - 2.0f && p.x < area.getX() + cell.getRight() + 2.0f)
+        {
+            const int uid = ctx.project.getSelectedChannel();
+            int value;
+            if (pitchMode())
+                value = juce::roundToInt ((area.getCentreY() - p.y) / (area.getHeight() * 0.5f) * 24.0f);
+            else
+                value = juce::roundToInt ((area.getBottom() - p.y) / area.getHeight() * 100.0f);
+            ctx.project.setStepValue (rack.getPattern(), uid, s, pitchMode() ? ids::stepPitch : ids::stepVel, value);
+            repaint();
+            return;
+        }
+    }
+}
+
 void StepGrid::setPlayingStep (int step)
 {
     if (step != playingStep)
@@ -181,7 +278,7 @@ void StepGrid::setPlayingStep (int step)
         // que se enciende), no toda la cuadrícula: así va mucho más fluido.
         auto column = [this] (int s)
         {
-            if (s < 0 || s >= rack.getPatternLength())
+            if (s < rack.getPageStart() || s >= rack.getPageStart() + rack.getVisibleSteps())
                 return juce::Rectangle<int>();
             return getCellBounds (0, s).withY (0.0f).withBottom ((float) getHeight())
                                        .expanded (12.0f, 0.0f).getSmallestIntegerContainer();
@@ -195,7 +292,8 @@ void StepGrid::setPlayingStep (int step)
 
 juce::Rectangle<float> StepGrid::getCellBounds (int row, int step) const
 {
-    const int length = rack.getPatternLength();
+    const int length = rack.getVisibleSteps();
+    step -= rack.getPageStart();
     const int groups = (length + 3) / 4;
     const float cellWidth = ((float) getWidth() - groupGap * (float) (groups - 1)) / (float) length;
     const float x = (float) step * cellWidth + (float) (step / 4) * groupGap;
@@ -209,8 +307,8 @@ bool StepGrid::cellAt (juce::Point<float> pos, int& row, int& step) const
     if (! juce::isPositiveAndBelow (row, rack.getNumRows()))
         return false;
 
-    const int length = rack.getPatternLength();
-    for (int s = 0; s < length; ++s)
+    const int first = rack.getPageStart(), last = first + rack.getVisibleSteps();
+    for (int s = first; s < last; ++s)
         if (getCellBounds (row, s).expanded (cellGap * 0.5f + groupGap * 0.5f, 6.0f).contains (pos))
         {
             step = s;
@@ -222,10 +320,10 @@ bool StepGrid::cellAt (juce::Point<float> pos, int& row, int& step) const
 void StepGrid::paint (juce::Graphics& g)
 {
     auto pattern = rack.getPattern();
-    const int length = rack.getPatternLength();
+    const int first = rack.getPageStart(), length = rack.getVisibleSteps(), last = first + length;
 
     // Columna de luz del paso que está sonando
-    if (playingStep >= 0 && playingStep < length && rack.getNumRows() > 0)
+    if (playingStep >= first && playingStep < last && rack.getNumRows() > 0)
     {
         auto col = getCellBounds (0, playingStep).withBottom ((float) getHeight()).withY (0.0f).expanded (2.0f, 0.0f);
         g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.16f), col.getCentreX(), 0.0f,
@@ -254,7 +352,7 @@ void StepGrid::paint (juce::Graphics& g)
             if (item.hasType (ids::STEPSET) && (int) item[ids::channel] == uid)
                 data = item[ids::data].toString();
 
-        for (int s = 0; s < length; ++s)
+        for (int s = first; s < last; ++s)
         {
             auto cell = getCellBounds (row, s);
             if (! cell.expanded (10.0f).intersects (clip))
@@ -310,11 +408,14 @@ void StepGrid::paint (juce::Graphics& g)
             const auto rowArea = juce::Rectangle<float> (0.0f, (float) (row * ChannelRack::rowHeight) + 8.0f,
                                                          (float) getWidth(), (float) ChannelRack::rowHeight - 16.0f);
             const float range = (float) juce::jmax (1, hi - lo);
-            const float pxPerStep = (getCellBounds (0, length - 1).getRight() + cellGap) / (float) length;
+            const float pxPerStep = (getCellBounds (0, last - 1).getRight() + cellGap) / (float) length;
             g.setColour (colour.brighter (0.3f).withAlpha (0.95f));
             for (auto& n : notes)
             {
-                const float x = (float) (double) n[ids::start] * pxPerStep;
+                const double start = n[ids::start];
+                if (start + (double) n[ids::length] < first || start >= last)
+                    continue;
+                const float x = (float) (start - first) * pxPerStep;
                 const float w = juce::jmax (2.0f, (float) (double) n[ids::length] * pxPerStep - 1.0f);
                 const float y = rowArea.getBottom() - ((float) ((int) n[ids::pitch] - lo) / range) * (rowArea.getHeight() - 3.0f) - 3.0f;
                 g.fillRoundedRectangle (x, y, w, 3.0f, 1.0f);
@@ -399,6 +500,19 @@ ChannelRack::ChannelRack (AppContext& c)
     lengthBox.addItem (txt ("16 pasos (1 compás)"), 16);
     lengthBox.addItem (txt ("32 pasos (2 compases)"), 32);
     lengthBox.addItem (txt ("64 pasos (4 compases)"), 64);
+    lengthBox.addItem (txt ("128 pasos (8 compases)"), 128);
+    lengthBox.addItem (txt ("256 pasos (16 compases)"), 256);
+
+    addChildComponent (pageBox);
+    pageBox.setTooltip (txt ("El patrón es largo: elige qué 4 compases ves en los pasos."));
+    pageBox.onChange = [this]
+    {
+        page = juce::jmax (0, pageBox.getSelectedId() - 1);
+        grid.repaint();
+        if (stepGraph != nullptr) stepGraph->repaint();
+        repaint();
+    };
+    makeNonFocusing (pageBox);
     lengthBox.setTooltip (txt ("Duración del patrón."));
     lengthBox.onChange = [this]
     {
@@ -488,6 +602,16 @@ ChannelRack::ChannelRack (AppContext& c)
     addRow = std::make_unique<AddRow>();
     addRow->onClick = [this] { showAddMenu(); };
     content.addAndMakeVisible (*addRow);
+
+    content.addAndMakeVisible (graphButton);
+    graphButton.setButtonText (txt ("Editor de pasos"));
+    graphButton.setClickingTogglesState (true);
+    graphButton.setTooltip (txt ("Muestra debajo una barra por paso del canal elegido: cambia la fuerza (velocity) "
+                                 "o el tono de cada golpe. Ideal para hi-hats con ritmo y bombos que cambian de nota."));
+    graphButton.onClick = [this] { stepGraph->setVisible (graphButton.getToggleState()); resized(); };
+    makeNonFocusing (graphButton);
+    stepGraph = std::make_unique<StepGraph> (ctx, *this, grid);
+    addChildComponent (*stepGraph);
     content.onPaint = [this] (juce::Graphics& g)
     {
         const int selected = ctx.project.getSelectedChannel();
@@ -542,6 +666,17 @@ juce::ValueTree ChannelRack::getPattern()
     return ctx.project.getCurrentPattern();
 }
 
+int ChannelRack::getPageStart()
+{
+    const int pages = (getPatternLength() + stepsPerPage - 1) / stepsPerPage;
+    return juce::jlimit (0, juce::jmax (0, pages - 1), page) * stepsPerPage;
+}
+
+int ChannelRack::getVisibleSteps()
+{
+    return juce::jmin (stepsPerPage, getPatternLength() - getPageStart());
+}
+
 int ChannelRack::getPatternLength()
 {
     return Project::getPatternLength (getPattern());
@@ -555,6 +690,8 @@ void ChannelRack::changeListenerCallback (juce::ChangeBroadcaster*)
 
     if (key != structureKey || ctx.project.getGeneration() != lastGeneration)
         rebuildRows();
+    if (stepGraph != nullptr && stepGraph->isVisible())
+        stepGraph->repaint();
 
     // Actualizamos nombres, mute y pista del mezclador
     for (auto* row : rows)
@@ -590,6 +727,17 @@ void ChannelRack::refreshHeader()
         patternBox.addItem (p[ids::name].toString(), i++);
     patternBox.setSelectedId (ctx.project.patterns().indexOf (getPattern()) + 1, juce::dontSendNotification);
     lengthBox.setSelectedId (getPatternLength(), juce::dontSendNotification);
+    const int pages = (getPatternLength() + stepsPerPage - 1) / stepsPerPage;
+    pageBox.clear (juce::dontSendNotification);
+    for (int p = 0; p < pages; ++p)
+        pageBox.addItem (txt ("Compases ") + juce::String (p * 4 + 1) + "-" + juce::String (p * 4 + 4), p + 1);
+    page = juce::jlimit (0, juce::jmax (0, pages - 1), page);
+    pageBox.setSelectedId (page + 1, juce::dontSendNotification);
+    if (pageBox.isVisible() != (pages > 1))
+    {
+        pageBox.setVisible (pages > 1);
+        resized();
+    }
     const int swingPc = juce::jlimit (0, 70, (int) std::round ((double) ctx.project.getState().getProperty (ids::swing, 0.0) * 10.0) * 10);
     swingBox.setSelectedId (swingPc + 1, juce::dontSendNotification);
 }
@@ -683,10 +831,10 @@ void ChannelRack::paint (juce::Graphics& g)
     drawPanel (g, area, headerArea, Layout::compact() ? juce::String() : txt ("Secuenciador de patrones"));
 
     // Números de los pasos encima de la cuadrícula
-    const int length = getPatternLength();
+    const int length = getVisibleSteps(), firstStep = getPageStart();
     g.setFont (juce::FontOptions (11.0f));
     const auto gridInRack = getLocalArea (&grid, grid.getLocalBounds());
-    for (int s = 0; s < length; ++s)
+    for (int s = firstStep; s < firstStep + length; ++s)
     {
         if (length > 32 && s % 2 == 1)
             continue;
@@ -731,6 +879,11 @@ void ChannelRack::resized()
         patternBox.setBounds (h.removeFromLeft (150)); h.removeFromLeft (4);
         patternMenuButton.setBounds (h.removeFromLeft (84)); h.removeFromLeft (8);
         lengthBox.setBounds (h.removeFromLeft (170));
+        if (pageBox.isVisible())
+        {
+            h.removeFromLeft (8);
+            pageBox.setBounds (h.removeFromLeft (compact ? 120 : 140));
+        }
         const bool swingFits = h.getWidth() > (compact ? 528 : 448);
         if (swingFits) h.removeFromLeft (8);
         swingBox.setBounds (swingFits ? h.removeFromLeft (120) : juce::Rectangle<int>());
@@ -748,11 +901,17 @@ void ChannelRack::resized()
     area.removeFromTop (numbersHeight + 2);
     area.reduce (8, 0);
     area.removeFromBottom (6);
+    if (stepGraph != nullptr && stepGraph->isVisible())
+    {
+        stepGraph->setBounds (area.removeFromBottom (juce::jmin (110, area.getHeight() / 2)));
+        area.removeFromBottom (4);
+    }
     viewport.setBounds (area);
 
     const int width = viewport.getWidth() - viewport.getScrollBarThickness();
     content.setSize (width, rows.size() * rowHeight + rowHeight + 4);
     addRow->setBounds (0, rows.size() * rowHeight + 2, controlsWidth - 4, rowHeight);
+    graphButton.setBounds (controlsWidth, rows.size() * rowHeight + 8, 150, rowHeight - 12);
     grid.setBounds (controlsWidth, 0, width - controlsWidth - 4, rows.size() * rowHeight);
 
     for (int r = 0; r < rows.size(); ++r)

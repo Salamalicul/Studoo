@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 // ============================================================================
 //  MainComponent: todo lo que hay dentro de la ventana principal.
 //  Une el proyecto, el motor de audio, la tarjeta de sonido y las pantallas.
@@ -40,6 +41,15 @@ namespace studoo
         void paint (juce::Graphics&) override;
         void resized() override;
         bool keyPressed (const juce::KeyPress&) override;
+        bool keyStateChanged (bool isKeyDown) override;
+        void exportStems();
+
+        // Tocar con el teclado del ordenador (Z S X D C... y Q 2 W 3 E...)
+        bool typingPiano = false;
+        int typingOctave = 4;
+        std::map<int, int> typingHeld;   // tecla -> nota que suena
+        int typingNoteForKey (int keyCode) const;
+        void releaseTypingNotes();
         void parentHierarchyChanged() override;
 
         // Tamaño de pantalla (ordenador/tablet o móvil)

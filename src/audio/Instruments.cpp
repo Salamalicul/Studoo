@@ -241,6 +241,31 @@ void SynthInstrument::updateVoiceFrequency (Voice& v)
 
 void SynthInstrument::noteOn (int note, float velocity)
 {
+    // Modo mono: si ya suena una nota, la misma voz se desliza a la nueva (sin volver a empezar)
+    if (params.mono)
+    {
+        Voice* playing = nullptr;
+        for (auto& v : voices)
+            if (v.note >= 0 && v.adsr.isActive() && (playing == nullptr || v.age > playing->age))
+                playing = &v;
+        if (playing != nullptr)
+        {
+            const double oldFreq = noteToFrequency (playing->note) * playing->glideRatio;
+            for (auto& v : voices)
+                if (&v != playing && v.note >= 0)
+                    v.adsr.noteOff();
+            playing->note = note;
+            playing->velocity = velocity;
+            playing->age = ++ageCounter;
+            updateVoiceFrequency (*playing);
+            playing->glideRatio = params.glide > 0.001f ? oldFreq / noteToFrequency (note) : 1.0;
+            if (playing->adsr.isActive() && ! juce::approximatelyEqual (params.sustain, 0.0f))
+                return;
+            playing->adsr.noteOn();
+            return;
+        }
+    }
+
     Voice* voice = nullptr;
     for (auto& v : voices)
         if (v.note < 0 || ! v.adsr.isActive()) { voice = &v; break; }
@@ -257,6 +282,7 @@ void SynthInstrument::noteOn (int note, float velocity)
     voice->velocity = velocity;
     voice->phase1 = 0.0;
     voice->phase2 = 0.37;
+    voice->glideRatio = 1.0;
     voice->age = ++ageCounter;
     updateVoiceFrequency (*voice);
     voice->filter.reset();
@@ -333,11 +359,15 @@ void SynthInstrument::renderVoiceRange (float* outL, float* outR, int num)
             continue;
         }
 
+        const double glideCoef = params.glide > 0.001f ? std::exp (-1.0 / (params.glide * 0.25 * sr)) : 0.0;
         for (int i = 0; i < num; ++i)
         {
-            const float osc = 0.5f * (oscillator (v.phase1, v.inc1) + oscillator (v.phase2, v.inc2));
-            v.phase1 += v.inc1; if (v.phase1 >= 1.0) v.phase1 -= 1.0;
-            v.phase2 += v.inc2; if (v.phase2 >= 1.0) v.phase2 -= 1.0;
+            if (! juce::approximatelyEqual (v.glideRatio, 1.0))
+                v.glideRatio = std::abs (v.glideRatio - 1.0) < 1.0e-5 ? 1.0 : 1.0 + (v.glideRatio - 1.0) * glideCoef;
+            const double inc1 = v.inc1 * v.glideRatio, inc2 = v.inc2 * v.glideRatio;
+            const float osc = 0.5f * (oscillator (v.phase1, inc1) + oscillator (v.phase2, inc2));
+            v.phase1 += inc1; if (v.phase1 >= 1.0) v.phase1 -= 1.0;
+            v.phase2 += inc2; if (v.phase2 >= 1.0) v.phase2 -= 1.0;
 
             const float filtered = v.filter.processSample (0, osc);
             const float s = filtered * v.adsr.getNextSample() * v.velocity * 0.3f;

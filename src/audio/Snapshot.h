@@ -27,6 +27,8 @@ namespace studoo
         float attack = 0.005f, decay = 0.3f, sustain = 0.6f, release = 0.3f;
         float cutoff = 5000.0f, resonance = 0.2f, detune = 8.0f;
         float lfoRate = 4.0f, lfoAmount = 0.0f;   // LFO que mueve el filtro
+        bool mono = false;                        // una nota a la vez: las notas solapadas se deslizan
+        float glide = 0.0f;                       // segundos que tarda en deslizarse (modo mono)
     };
 
     struct SamplerParams
