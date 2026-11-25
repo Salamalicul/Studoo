@@ -47,10 +47,10 @@ namespace studoo
     // ------------------------------------------------------------------------
     struct AutomationTarget
     {
-        enum class Kind { mixer, channel, invalid };
+        enum class Kind { mixer, channel, project, invalid };
         enum class Param { volume, pan, reverbMix, delayMix, cutoff, eqLow, eqHigh,
                            eqMid, trackFilter, distortion, chorusMix,
-                           resonance, lfoRate, lfoAmount, drive, sampleTune, sendLevel, invalid };
+                           resonance, lfoRate, lfoAmount, drive, sampleTune, sendLevel, bpm, invalid };
 
         // ¿Es un control del instrumento (sinte, 808, sampler) y no del volumen/pan del canal?
         static bool isInstrumentParam (Param p)
@@ -83,6 +83,10 @@ namespace studoo
         ~Project() override;
 
         juce::ValueTree& getState()        { return state; }
+
+        // Compás de la canción (4/4, 3/4, 6/8...): cuántos pasos (semicorcheas) tiene un compás
+        static int stepsPerBarOf (const juce::ValueTree& projectState);
+        int getStepsPerBar() const         { return stepsPerBarOf (state); }
         juce::UndoManager& getUndo()       { return undoManager; }
         juce::UndoManager* um()            { return &undoManager; }
         void beginTransaction()            { undoManager.beginNewTransaction(); }

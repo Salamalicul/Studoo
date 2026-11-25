@@ -169,6 +169,7 @@ namespace studoo
         std::atomic<double> position { 0.0 };
         std::atomic<double> requestedPosition { -1.0 };
         std::atomic<double> currentBpm { 140.0 };
+        std::atomic<int> currentStepsPerBar { 16 };
         std::atomic<int> liveChannelUid { 0 };
         std::atomic<bool> midiRecording { false };
         std::atomic<int> stemTrack { -1 };

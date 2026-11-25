@@ -173,7 +173,8 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         songEnd = juce::jmax (songEnd, cs.start + cs.length);
         snap->clips.push_back (cs);
     }
-    snap->songLength = juce::jmax ((double) stepsPerBar, std::ceil (songEnd / stepsPerBar) * stepsPerBar);
+    snap->stepsPerBar = Project::stepsPerBarOf (state);
+    snap->songLength = juce::jmax ((double) snap->stepsPerBar, std::ceil (songEnd / snap->stepsPerBar) * snap->stepsPerBar);
 
     // --- Mezclador ----------------------------------------------------------------
     for (auto t : state.getChildWithName (ids::MIXER))
@@ -240,7 +241,12 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         if (! ls.target.isValid())
             continue;
 
-        if (ls.target.kind == AutomationTarget::Kind::channel)
+        if (ls.target.kind == AutomationTarget::Kind::project)
+        {
+            if (snap->tempoLane >= 0)
+                continue;   // solo una línea de tempo
+        }
+        else if (ls.target.kind == AutomationTarget::Kind::channel)
         {
             auto it = channelIndexByUid.find (ls.target.index);
             if (it == channelIndexByUid.end()) continue;
@@ -255,7 +261,11 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
             ls.points.emplace_back (pos (p[ids::time]), num (p, ids::value, 0.0f, 1.0f, 0.5f));
         std::sort (ls.points.begin(), ls.points.end());
         if (! ls.points.empty())
+        {
+            if (ls.target.kind == AutomationTarget::Kind::project)
+                snap->tempoLane = (int) snap->lanes.size();
             snap->lanes.push_back (std::move (ls));
+        }
     }
 
     return snap;

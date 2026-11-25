@@ -14,7 +14,7 @@ AutomationEditor::AutomationEditor (AppContext& c, AutomationView& v) : ctx (c),
     makeNonFocusing (*this);
 }
 
-double AutomationEditor::totalSteps()  { return ctx.project.getSongLengthSteps() + 4.0 * stepsPerBar; }
+double AutomationEditor::totalSteps()  { return ctx.project.getSongLengthSteps() + 4.0 * ctx.project.getStepsPerBar(); }
 float AutomationEditor::timeToX (double t) { return (float) (t / totalSteps() * getWidth()); }
 double AutomationEditor::xToTime (float x) { return juce::jmax (0.0, x / (double) getWidth() * totalSteps()); }
 float AutomationEditor::valueToY (float v) const { return ruler + 8.0f + (1.0f - v) * (float) (getHeight() - ruler - 16); }
@@ -33,11 +33,12 @@ void AutomationEditor::paint (juce::Graphics& g)
     g.fillAll (juce::Colour (0xff22272c));
 
     const double total = totalSteps();
-    const int bars = (int) (total / stepsPerBar);
+    const int barSteps = ctx.project.getStepsPerBar();
+    const int bars = (int) (total / barSteps);
     g.setFont (juce::FontOptions (11.0f));
     for (int b = 0; b <= bars; ++b)
     {
-        const float x = timeToX (b * stepsPerBar);
+        const float x = timeToX (b * barSteps);
         g.setColour (Colours::outline);
         g.drawVerticalLine ((int) x, (float) ruler, (float) getHeight());
         if (bars < 60 || b % 2 == 0)
@@ -117,6 +118,7 @@ void AutomationEditor::paint (juce::Graphics& g)
         {
             case AutomationTarget::Param::cutoff: return juce::String ((int) v) + " Hz";
             case AutomationTarget::Param::lfoRate: return juce::String (v, 1) + " Hz";
+            case AutomationTarget::Param::bpm:     return juce::String ((int) std::round (v)) + " BPM";
             case AutomationTarget::Param::sampleTune: return (v > 0 ? "+" : "") + juce::String ((int) v) + " st";
             case AutomationTarget::Param::pan:    return std::abs (v) < 0.01f ? juce::String ("Centro") : (v < 0 ? juce::String ("Izquierda") : juce::String ("Derecha"));
             case AutomationTarget::Param::eqLow:
@@ -325,6 +327,8 @@ void AutomationView::showNewLaneMenu()
         m.addItem ((int) targets.size(), AutomationTarget::paramName (param));
     };
 
+    menu.addSectionHeader (txt ("Canción"));
+    add (menu, AutomationTarget::Kind::project, 0, P::bpm);
     menu.addSectionHeader (txt ("Mezclador"));
     for (int track = 0; track < numMixerTracks; ++track)
     {

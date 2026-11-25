@@ -105,7 +105,7 @@ namespace
             juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3"), ids::stepVel, ids::stepPitch, ids::mono,
             ids::gateThreshold, ids::tuneAmount, ids::tuneRoot, ids::tuneScale, ids::rhythmMode, ids::rhythmMix, ids::maximize,
             juce::Identifier ("sendTo2"), juce::Identifier ("sendLevel3"), juce::Identifier ("peqFreq2"),
-            juce::Identifier ("peqGain1"), juce::Identifier ("peqQ4") };
+            juce::Identifier ("peqGain1"), juce::Identifier ("peqQ4"), ids::timeSigNum, ids::timeSigDen };
 
         // Recorre todo el árbol y cambia, borra o duplica cosas al azar
         std::function<void (juce::ValueTree)> mutate = [&] (juce::ValueTree t)

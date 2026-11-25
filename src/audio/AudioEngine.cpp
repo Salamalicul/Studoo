@@ -219,6 +219,7 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
         }
 
         currentBpm.store (newSnap->bpm);
+        currentStepsPerBar.store (newSnap->stepsPerBar);
         songModeFlag.store (newSnap->songMode);
         std::swap (snapshot, newSnap);
     }
@@ -385,10 +386,11 @@ juce::Optional<juce::AudioPlayHead::PositionInfo> AudioEngine::getPosition() con
     const double bpm = currentBpm.load();
     const double steps = position.load();
     info.setBpm (bpm);
-    info.setTimeSignature (juce::AudioPlayHead::TimeSignature { 4, 4 });
+    const int barSteps = juce::jmax (4, currentStepsPerBar.load());
+    info.setTimeSignature (juce::AudioPlayHead::TimeSignature { barSteps % 4 == 0 ? barSteps / 4 : barSteps / 2, barSteps % 4 == 0 ? 4 : 8 });
     info.setIsPlaying (playing.load());
     info.setPpqPosition (steps / stepsPerBeat);
-    info.setPpqPositionOfLastBarStart (std::floor (steps / stepsPerBar) * 4.0);
+    info.setPpqPositionOfLastBarStart (std::floor (steps / barSteps) * barSteps / stepsPerBeat);
     info.setTimeInSeconds (steps * 60.0 / bpm / stepsPerBeat);
     info.setTimeInSamples ((juce::int64) (steps * 60.0 / bpm / stepsPerBeat * sampleRate));
     return info;
@@ -498,8 +500,17 @@ bool AudioEngine::renderSongToFile (const juce::File& wavFile, double exportRate
         requestedPosition.store (0.0);
         playing.store (true);
 
-        const double samplesPerStep = exportRate * 60.0 / bpm / stepsPerBeat;
-        auto songSamples = (juce::int64) (songLength * samplesPerStep);
+        // Duración de la canción (sumando trocitos: el tempo puede cambiar a lo largo de ella)
+        double songSecondsTotal = 0.0;
+        {
+            const auto snapForTempo = snapshot.get();
+            for (double st = 0.0; st < songLength; st += 0.25)
+            {
+                const double b = snapForTempo != nullptr ? snapForTempo->bpmAt (st) : bpm;
+                songSecondsTotal += 0.25 * 60.0 / juce::jlimit (40.0, 250.0, b) / stepsPerBeat;
+            }
+        }
+        auto songSamples = (juce::int64) (songSecondsTotal * exportRate);
         if (maxSeconds > 0.0)
             songSamples = juce::jmin (songSamples, (juce::int64) (maxSeconds * exportRate));
         const auto totalSamples = songSamples + (juce::int64) (exportRate * 2.0); // 2 s de cola (reverb, delay...)
@@ -631,7 +642,7 @@ void AudioEngine::collectEvents (const Snapshot& snap, double from, double to, i
     {
         for (double beat = std::ceil (from / stepsPerBeat) * stepsPerBeat; beat < to; beat += stepsPerBeat)
         {
-            const bool accent = std::fmod (beat, (double) stepsPerBar) < 0.5;
+            const bool accent = std::fmod (beat, (double) snap.stepsPerBar) < 0.5;
             metronome.trigger (accent, sampleOffset + (int) ((beat - from) * samplesPerStep));
         }
     }
@@ -665,7 +676,7 @@ void AudioEngine::collectEvents (const Snapshot& snap, double from, double to, i
 
 void AudioEngine::renderAudioClips (const Snapshot& snap, double from, double to, int sampleOffset, double samplesPerStep)
 {
-    const double secondsPerStep = 60.0 / snap.bpm / stepsPerBeat;
+    const double secondsPerStep = samplesPerStep / sampleRate;   // sigue los cambios de tempo
 
     for (const auto& clip : snap.clips)
     {
@@ -804,9 +815,12 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     }
 
     // --- Secuenciador: qué notas suenan en este trocito ----------------------------------
-    const double samplesPerStep = sampleRate * 60.0 / snap->bpm / stepsPerBeat;
     const bool song = snap->songMode || exportingSong.load();
     double chunkStartPos = position.load();
+    // Tempo de este trocito (en modo canción puede cambiar con la automatización de tempo)
+    const double chunkBpm = song ? snap->bpmAt (chunkStartPos) : snap->bpm;
+    currentBpm.store (chunkBpm);
+    const double samplesPerStep = sampleRate * 60.0 / chunkBpm / stepsPerBeat;
 
     // Grabar lo que se toca en el teclado MIDI (solo en modo patrón y sonando)
     if (isPlaying && ! song && midiRecording.load() && ! liveMidi.isEmpty())
@@ -1021,7 +1035,7 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         const auto& tp = trackParams[(size_t) t];
         const bool silenced = tp.mute || (anySolo && ! soloed[(size_t) t]);
         auto& out = mixer[(size_t) t].getBuffer();
-        mixer[(size_t) t].process (n, tp, snap->bpm, silenced);
+        mixer[(size_t) t].process (n, tp, chunkBpm, silenced);
 
         // Envío: una copia (después del volumen) va a otra pista, que aún no se ha procesado
         if (tp.sendTo > t && tp.sendTo < numMixerTracks && tp.sendLevel > 0.0f)
@@ -1043,7 +1057,7 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         master.addFrom (1, 0, out, 1, 0, n);
     }
     if (! (stem > 0 && stem < numMixerTracks))
-        mixer[0].process (n, trackParams[0], snap->bpm, trackParams[0].mute);
+        mixer[0].process (n, trackParams[0], chunkBpm, trackParams[0].mute);
     metronome.render (master, n);
     {
         // Para el analizador de frecuencias

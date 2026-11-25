@@ -29,7 +29,7 @@ double PlaylistGrid::snap (double steps) const
 
 int PlaylistGrid::getTotalBars()
 {
-    return juce::jmax (32, (int) (ctx.project.getSongLengthSteps() / stepsPerBar) + 8);
+    return juce::jmax (32, (int) (ctx.project.getSongLengthSteps() / ctx.project.getStepsPerBar()) + 8);
 }
 
 juce::Rectangle<float> PlaylistGrid::clipBounds (const juce::ValueTree& clip) const
@@ -74,7 +74,7 @@ void PlaylistGrid::paint (juce::Graphics& g)
     // Compases y tiempos
     for (int b = 0; b <= bars; ++b)
     {
-        const float x = stepsToX (b * stepsPerBar);
+        const float x = stepsToX (b * ctx.project.getStepsPerBar());
         g.setColour (b % 4 == 0 ? Colours::outline.brighter (0.35f) : Colours::outline.brighter (0.05f));
         g.drawVerticalLine ((int) x, (float) rulerHeight, (float) getHeight());
         if (pps * stepsPerBeat > 10.0)
@@ -112,7 +112,7 @@ void PlaylistGrid::paint (juce::Graphics& g)
     g.fillRect (0, 0, getWidth(), rulerHeight);
     for (int b = 0; b < bars; ++b)
     {
-        const float x = stepsToX (b * stepsPerBar);
+        const float x = stepsToX (b * ctx.project.getStepsPerBar());
         g.setColour (b % 4 == 0 ? Colours::text : Colours::textDim);
         g.setFont (b % 4 == 0 ? Fonts::bold (12.0f) : Fonts::regular (11.5f));
         g.drawText (juce::String (b + 1), juce::Rectangle<float> (x + 5.0f, 0.0f, 40.0f, (float) rulerHeight - 4.0f), juce::Justification::centredLeft);
@@ -569,7 +569,7 @@ double Playlist::getSnap() const
     {
         case 2:  return stepsPerBeat;
         case 3:  return 1.0;
-        default: return stepsPerBar;
+        default: return ctx.project.getStepsPerBar();
     }
 }
 

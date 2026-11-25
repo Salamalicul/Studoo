@@ -122,6 +122,8 @@ namespace studoo::ids
     STUDOO_ID (scaleRoot)         // proyecto: nota base de la escala (0 = Do ... 11 = Si)
     STUDOO_ID (scaleType)         // proyecto: 0 = sin escala, 1 mayor, 2 menor...
     STUDOO_ID (scaleLock)         // proyecto: las notas nuevas se pegan a la escala
+    STUDOO_ID (timeSigNum)        // proyecto: compás, tiempos (2..7)
+    STUDOO_ID (timeSigDen)        // proyecto: compás, figura (4 = negra, 8 = corchea)
     STUDOO_ID (gateThreshold)     // pista: puerta de ruido, dB (-80 = apagada)
     STUDOO_ID (tuneAmount)        // pista: autotune 0..1 (0 = apagado, 1 = robot)
     STUDOO_ID (tuneRoot)          // pista: nota base de la escala del autotune (0..11)

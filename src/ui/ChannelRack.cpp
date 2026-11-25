@@ -497,6 +497,10 @@ ChannelRack::ChannelRack (AppContext& c)
     makeNonFocusing (patternMenuButton);
 
     addAndMakeVisible (lengthBox);
+    lengthBox.addItem (txt ("12 pasos (1 compás de 3/4 o 6/8)"), 12);
+    lengthBox.addItem (txt ("24 pasos (2 compases de 3/4)"), 24);
+    lengthBox.addItem (txt ("48 pasos (4 compases de 3/4)"), 48);
+    lengthBox.addSeparator();
     lengthBox.addItem (txt ("16 pasos (1 compás)"), 16);
     lengthBox.addItem (txt ("32 pasos (2 compases)"), 32);
     lengthBox.addItem (txt ("64 pasos (4 compases)"), 64);

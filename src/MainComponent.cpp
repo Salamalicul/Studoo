@@ -752,6 +752,16 @@ void MainComponent::showFileMenu()
     menu.addItem (17, txt ("Navegador de sonidos (F4)"), true, browserOpen);
     menu.addItem (9, txt ("Abrir la carpeta de proyectos"));
    #endif
+    {
+        juce::PopupMenu sig;
+        const int num = project.getState().getProperty (ids::timeSigNum, 4), den = project.getState().getProperty (ids::timeSigDen, 4);
+        const std::pair<int, int> sigs[] = { { 4, 4 }, { 3, 4 }, { 6, 8 }, { 2, 4 }, { 5, 4 }, { 7, 8 } };
+        const char* names[] = { "4/4 (casi todo: trap, pop, reggaetón...)", "3/4 (vals, baladas)", "6/8 (balada lenta, afro)",
+                                "2/4 (marcha)", "5/4", "7/8" };
+        for (int i = 0; i < 6; ++i)
+            sig.addItem (40 + i, txt (names[i]), true, sigs[i].first == num && sigs[i].second == den);
+        menu.addSubMenu (txt ("Compás de la canción"), sig);
+    }
     menu.addSeparator();
     {
         const auto mode = settings->getValue ("screenMode", "auto");
@@ -806,6 +816,16 @@ void MainComponent::showFileMenu()
                 break;
             case 14: importProject(); break;
             case 16: exportStems(); break;
+            case 40: case 41: case 42: case 43: case 44: case 45:
+            {
+                const std::pair<int, int> sigs[] = { { 4, 4 }, { 3, 4 }, { 6, 8 }, { 2, 4 }, { 5, 4 }, { 7, 8 } };
+                project.beginTransaction();
+                project.getState().setProperty (ids::timeSigNum, sigs[r - 40].first, project.um());
+                project.getState().setProperty (ids::timeSigDen, sigs[r - 40].second, project.um());
+                setStatus (txt ("Compás de la canción: ") + juce::String (sigs[r - 40].first) + "/" + juce::String (sigs[r - 40].second)
+                           + txt (". Los patrones nuevos duran 1 compás; cambia su duración en el secuenciador."));
+                break;
+            }
             case 17: toggleBrowser(); break;
             case 15:
                 typingPiano = ! typingPiano;

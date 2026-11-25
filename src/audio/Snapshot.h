@@ -140,6 +140,16 @@ namespace studoo
         bool songMode = false;
         int currentPatternIndex = 0;
         double songLength = 16.0;
+        int stepsPerBar = 16;        // compás de la canción (16 = 4/4, 12 = 3/4 o 6/8...)
+        int tempoLane = -1;          // automatización del tempo (índice en 'lanes', -1 = no hay)
+
+        // Tempo en una posición de la canción (con la automatización de tempo, si hay)
+        double bpmAt (double steps) const
+        {
+            if (tempoLane < 0 || tempoLane >= (int) lanes.size())
+                return bpm;
+            return AutomationTarget::fromNormalised (AutomationTarget::Param::bpm, lanes[(size_t) tempoLane].valueAt (steps));
+        }
 
         std::vector<ChannelSnap> channels;
         std::vector<PatternSnap> patterns;

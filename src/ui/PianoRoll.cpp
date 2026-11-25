@@ -103,17 +103,18 @@ void PianoRollGrid::paint (juce::Graphics& g)
     }
 
     // Compases alternos un poco más claros (ayuda a orientarse)
-    for (int bar = 1; bar * 16 < length; bar += 2)
+    const int barSteps = ctx.project.getStepsPerBar();
+    for (int bar = 1; bar * barSteps < length; bar += 2)
     {
         g.setColour (juce::Colours::white.withAlpha (0.018f));
-        g.fillRect (juce::Rectangle<float> (stepsToX (bar * 16), 0.0f, (float) (16.0 * sw), (float) getHeight()));
+        g.fillRect (juce::Rectangle<float> (stepsToX (bar * barSteps), 0.0f, (float) (barSteps * sw), (float) getHeight()));
     }
 
     // Líneas verticales: pasos, tiempos y compases
     for (int s = 0; s <= length; ++s)
     {
         const float x = stepsToX (s);
-        g.setColour (s % 16 == 0 ? Colours::outline.brighter (0.5f) : s % 4 == 0 ? Colours::outline.brighter (0.1f)
+        g.setColour (s % barSteps == 0 ? Colours::outline.brighter (0.5f) : s % 4 == 0 ? Colours::outline.brighter (0.1f)
                                                                                  : Colours::outline.withAlpha (0.3f));
         g.drawVerticalLine ((int) x, 0.0f, (float) getHeight());
     }

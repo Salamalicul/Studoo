@@ -751,6 +751,53 @@ int main (int argc, char* argv[])
                    && hot.getMagnitude (0, 11025, 11025) < 0.95f, "Maximizador: más volumen sin pasar del máximo");
         }
 
+        // Compás y cambios de tempo
+        {
+            Project p;
+            auto& st = p.getState();
+            check (p.getStepsPerBar() == 16, "Compás 4/4: 16 pasos por compás");
+            st.setProperty (ids::timeSigNum, 3, nullptr);
+            check (p.getStepsPerBar() == 12, "Compás 3/4: 12 pasos por compás");
+            st.setProperty (ids::timeSigNum, 6, nullptr);
+            st.setProperty (ids::timeSigDen, 8, nullptr);
+            check (p.getStepsPerBar() == 12, "Compás 6/8: 12 pasos por compás");
+            st.setProperty (ids::timeSigNum, 99, nullptr);
+            st.setProperty (ids::timeSigDen, 3, nullptr);
+            check (p.getStepsPerBar() == 28, "Un compás imposible se limita (7/4 como mucho)");
+
+            // Línea de tempo a 70 BPM (el proyecto está a 140): todo va a la mitad de velocidad
+            auto withTempo = [&] (bool lane)
+            {
+                Project q;
+                auto kick = q.findChannelByBuiltin ("builtin:kick");
+                for (auto ch : q.channels()) if (ch != kick) ch.setProperty (ids::muted, true, nullptr);
+                q.setStep (q.getCurrentPattern(), kick[ids::uid], 4, true);
+                q.getState().setProperty (ids::playMode, "song", nullptr);
+                if (lane)
+                {
+                    AutomationTarget t;
+                    t.kind = AutomationTarget::Kind::project;
+                    t.param = AutomationTarget::Param::bpm;
+                    auto l = q.addAutomationLane (t);
+                    for (auto point : l)
+                        point.setProperty (ids::value, AutomationTarget::toNormalised (t.param, 70.0f), nullptr);
+                }
+                AudioEngine e;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (q.getState(), cache);
+                e.play();
+                auto b = renderSeconds (e, 1.2);
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    if (std::abs (b.getSample (0, i)) > 0.01f) return i;
+                return -1;
+            };
+            const int normal = withTempo (false), slowed = withTempo (true);
+            check (std::abs (normal - samplesPerStep * 4) < 300 && std::abs (slowed - samplesPerStep * 8) < 600,
+                   "Automatización de tempo: a 70 BPM el paso 5 llega el doble de tarde");
+            check (AutomationTarget::parse ("project:0:bpm").isValid() && ! AutomationTarget::parse ("project:0:volume").isValid()
+                   && ! AutomationTarget::parse ("mixer:1:bpm").isValid(), "El tempo solo se automatiza en la canción");
+        }
+
         // Controles MIDI conectados: se guardan con el proyecto y se limpia lo que no vale
         {
             Project p;
