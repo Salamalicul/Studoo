@@ -135,7 +135,7 @@ namespace studoo::help
     inline constexpr const char* learnTitle = "Aprende";
     inline constexpr const char* learnText =
         "Todo para aprender a producir, de cero a terminar canciones. Tiene cuatro pestañas:\n\n"
-        "- Ruta: 60 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
+        "- Ruta: 61 lecciones en 9 niveles, con ilustraciones animadas, retos que Studoo comprueba solo, "
         "un test al final y bases de 11 géneros para cargar y cambiar.\n"
         "- Juegos: entrena el oído (instrumentos, notas, acordes y géneros).\n"
         "- Logros: tu racha de días practicando, tus estadísticas y tus medallas.\n"

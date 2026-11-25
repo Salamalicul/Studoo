@@ -45,7 +45,7 @@ Studoo es tu estudio de música en el bolsillo: crea beats, escribe melodías, m
 • Exporta tu canción y compártela por WhatsApp, Drive o donde quieras.
 
 🎓 APRENDE PRODUCCIÓN MUSICAL
-• 60 lecciones en 9 niveles, de cero a terminar canciones.
+• 61 lecciones en 9 niveles, de cero a terminar canciones.
 • Ilustraciones animadas, pasos claros y vídeos recomendados.
 • Retos que Studoo comprueba solo: haz el ritmo y la app te dice "¡Reto superado!".
 • Test al final de cada lección, juegos para entrenar el oído, logros y racha diaria.

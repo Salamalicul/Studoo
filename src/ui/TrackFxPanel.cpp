@@ -135,8 +135,7 @@ void TrackFxPanel::timerCallback()
         tunerActive = false;
         tunerText = txt ("(canta o toca una nota)");
     }
-    repaint (getLocalBounds().withHeight (130));
-    repaint (eqCurveArea);
+    repaint();
 }
 
 void TrackFxPanel::resized()
