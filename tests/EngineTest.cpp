@@ -10,6 +10,7 @@
 #include "model/Project.h"
 #include "model/MidiIO.h"
 #include "audio/MixerTrack.h"
+#include "audio/Onsets.h"
 
 #include <iostream>
 
@@ -749,6 +750,41 @@ int main (int argc, char* argv[])
             juce::ignoreUnused (d11);
             check (hot.getRMSLevel (0, 11025, 11025) > plain.getRMSLevel (0, 11025, 11025) * 2.0f
                    && hot.getMagnitude (0, 11025, 11025) < 0.95f, "Maximizador: más volumen sin pasar del máximo");
+        }
+
+        // Trocear por golpes y tomas silenciadas
+        {
+            juce::AudioBuffer<float> loop (1, 44100);
+            loop.clear();
+            for (int hit : { 0, 11025, 22050, 33075 })   // 4 golpes, uno cada cuarto de segundo
+                for (int i = 0; i < 3000; ++i)
+                    loop.setSample (0, hit + i, 0.8f * std::exp (-i / 600.0f) * (float) std::sin (i * 0.3));
+            auto points = onsets::detect (loop, 44100.0, 0.0f, 1.0f, 32);
+            bool near = points.size() == 4;
+            for (size_t i = 0; near && i < 4; ++i)
+                near = std::abs (points[i] - 0.25f * (float) i) < 0.02f;
+            check (near, "Trocear por golpes: encuentra los 4 golpes del loop");
+
+            Project p;
+            auto kick = p.findChannelByBuiltin ("builtin:kick");
+            kick.setProperty (ids::slices, 3, nullptr);
+            kick.setProperty (ids::slicePoints, "0,0.2,0.5", nullptr);
+            auto snap = Snapshot::build (p.getState());
+            check (snap->channels[(size_t) p.getChannelIndex (kick[ids::uid])].sampler.numSlicePoints == 3, "Los golpes detectados se usan como trozos");
+            kick.setProperty (ids::slicePoints, "0,0.7,0.5", nullptr);   // desordenados: no valen
+            snap = Snapshot::build (p.getState());
+            check (snap->channels[(size_t) p.getChannelIndex (kick[ids::uid])].sampler.numSlicePoints == 0, "Golpes en mal orden: se ignoran");
+
+            auto voice = p.addChannel (ChannelType::audio, "Voz", 7);
+            voice.setProperty (ids::sample, "builtin:kick", nullptr);
+            auto take1 = p.addClip ("audio", voice[ids::uid], 0, 0.0, 8.0);
+            auto take2 = p.addClip ("audio", voice[ids::uid], 1, 0.0, 8.0);
+            take2.setProperty (ids::clipMuted, true, nullptr);
+            juce::ignoreUnused (take1);
+            snap = Snapshot::build (p.getState());
+            int audioClips = 0;
+            for (auto& c : snap->clips) audioClips += c.isAudio ? 1 : 0;
+            check (audioClips == 1, "Tomas: el trozo silenciado no suena");
         }
 
         // Compás y cambios de tempo

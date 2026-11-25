@@ -42,6 +42,8 @@ namespace studoo
         juce::Rectangle<float> clipBounds (const juce::ValueTree& clip) const;
         double snap (double steps) const;
         void showAudioClipMenu (juce::ValueTree clip, double atSteps);
+        // Editor de audio: crea una copia editada del archivo de la grabación (el original no se toca)
+        void editAudioFile (juce::ValueTree clip, int operation);
         const std::vector<float>& peaksFor (const juce::String& path, double& sampleRate);
         static constexpr int samplesPerPeak = 256;
         std::map<juce::String, std::pair<double, std::vector<float>>> peakCache;

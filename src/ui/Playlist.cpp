@@ -133,6 +133,10 @@ void PlaylistGrid::paint (juce::Graphics& g)
     for (auto clip : ctx.project.playlist())
     {
         auto r = clipBounds (clip).reduced (1.0f, 1.0f);
+        const bool clipMuted = clip.getProperty (ids::clipMuted, false);
+        juce::Graphics::ScopedSaveState mutedState (g);
+        if (clipMuted)
+            g.setOpacity (0.35f);   // toma descartada: se ve apagada
         if (! r.expanded (10.0f).intersects (clipArea))
             continue;   // fuera de la zona que se está redibujando
         const bool audio = clip[ids::kind].toString() == "audio";
@@ -275,6 +279,82 @@ void PlaylistGrid::mouseMove (const juce::MouseEvent& e)
                                 : juce::MouseCursor::NormalCursor);
 }
 
+void PlaylistGrid::editAudioFile (juce::ValueTree clip, int operation)
+{
+    auto channel = ctx.project.findChannel (clip[ids::ref]);
+    auto sample = ctx.samples.get (channel[ids::sample].toString());
+    if (sample == nullptr || sample->buffer.getNumSamples() == 0)
+        return;
+    juce::AudioBuffer<float> b (sample->buffer);
+    const int len = b.getNumSamples();
+    switch (operation)
+    {
+        case 0: { const float m = b.getMagnitude (0, len); if (m > 1.0e-5f) b.applyGain (0.966f / m); break; }   // -0,3 dB
+        case 1: b.reverse (0, len); break;
+        case 2:
+        {
+            // Umbral: un poco por encima del 10% más silencioso de la grabación
+            std::vector<float> levels;
+            for (int i = 0; i + 1024 <= len; i += 1024)
+                levels.push_back (b.getRMSLevel (0, i, 1024));
+            if (levels.empty()) return;
+            std::sort (levels.begin(), levels.end());
+            const float threshold = juce::jmax (0.001f, levels[levels.size() / 10] * 2.5f);
+            float gain = 1.0f, env = 0.0f;
+            for (int i = 0; i < len; ++i)
+            {
+                float level = 0.0f;
+                for (int ch = 0; ch < b.getNumChannels(); ++ch) level = juce::jmax (level, std::abs (b.getSample (ch, i)));
+                env = level > env ? level : env * 0.9995f;
+                gain += ((env > threshold ? 1.0f : 0.0f) - gain) * (env > threshold ? 0.05f : 0.0005f);
+                for (int ch = 0; ch < b.getNumChannels(); ++ch) b.setSample (ch, i, b.getSample (ch, i) * gain);
+            }
+            break;
+        }
+        case 3:
+        {
+            // Quitar silencios: cambia dónde empieza y acaba el trozo (no hace falta otro archivo)
+            const float th = juce::jmax (0.01f, b.getMagnitude (0, len) * 0.03f);
+            int first = 0, last = len - 1;
+            while (first < len && b.getMagnitude (first, juce::jmin (256, len - first)) < th) first += 256;
+            while (last > first && b.getMagnitude (juce::jmax (0, last - 256), 256) < th) last -= 256;
+            const double bpm = juce::jlimit (40.0, 250.0, (double) ctx.project.getState().getProperty (ids::bpm, 140.0));
+            const double samplesPerStep = sample->sampleRate * 60.0 / bpm / stepsPerBeat;
+            const double newOffset = juce::jmax ((double) clip[ids::offset], first / samplesPerStep);
+            const double endSteps = juce::jmin ((double) clip[ids::offset] + (double) clip[ids::length], (last + 256) / samplesPerStep);
+            if (endSteps - newOffset < 0.25)
+                return;
+            ctx.project.beginTransaction();
+            const double shift = newOffset - (double) clip[ids::offset];
+            clip.setProperty (ids::start, (double) clip[ids::start] + shift, ctx.project.um());
+            clip.setProperty (ids::offset, newOffset, ctx.project.um());
+            clip.setProperty (ids::length, endSteps - newOffset, ctx.project.um());
+            return;
+        }
+        case 4: b.applyGain (1.4125f); break;
+        case 5: b.applyGain (0.7079f); break;
+        default: return;
+    }
+    // Nunca por encima del máximo (sin "romper" el sonido)
+    for (int ch = 0; ch < b.getNumChannels(); ++ch)
+        juce::FloatVectorOperations::clip (b.getWritePointer (ch), b.getReadPointer (ch), -1.0f, 1.0f, len);
+
+    auto dir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Studoo").getChildFile ("Grabaciones");
+    dir.createDirectory();
+    auto file = dir.getNonexistentChildFile (juce::File::createLegalFileName (channel[ids::name].toString()) + " (editado)", ".wav", false);
+    {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (new juce::FileOutputStream (file), sample->sampleRate,
+                                                                               (unsigned int) b.getNumChannels(), 24, {}, 0));
+        if (writer == nullptr || ! writer->writeFromAudioSampleBuffer (b, 0, len))
+            return;
+    }
+    ctx.project.beginTransaction();
+    channel.setProperty (ids::sample, file.getFullPathName(), ctx.project.um());
+    peakCache.erase (file.getFullPathName());
+    repaint();
+}
+
 const std::vector<float>& PlaylistGrid::peaksFor (const juce::String& path, double& sampleRate)
 {
     auto it = peakCache.find (path);
@@ -340,6 +420,18 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
     menu.addSubMenu (txt ("Fundido de entrada (sube poco a poco)"), fadeIn);
     menu.addSubMenu (txt ("Fundido de salida (baja poco a poco)"), fadeOut);
     menu.addSeparator();
+    juce::PopupMenu edit;
+    edit.addItem (800, txt ("Normalizar (subir al máximo sin pasarse)"));
+    edit.addItem (801, txt ("Al revés"));
+    edit.addItem (802, txt ("Quitar ruido de fondo (puerta)"));
+    edit.addItem (803, txt ("Quitar los silencios del principio y del final"));
+    edit.addItem (804, txt ("Más fuerte (+3 dB)"));
+    edit.addItem (805, txt ("Más flojo (-3 dB)"));
+    menu.addSubMenu (txt ("Editar el audio (crea una copia)"), edit);
+    const bool muted = clip.getProperty (ids::clipMuted, false);
+    menu.addItem (900, muted ? txt ("Volver a activar este trozo") : txt ("Silenciar este trozo"));
+    menu.addItem (901, txt ("Quedarme con esta toma (silencia las que suenan a la vez)"));
+    menu.addSeparator();
     menu.addItem (3, "Borrar");
 
     juce::Component::SafePointer<PlaylistGrid> safe (this);
@@ -391,6 +483,19 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
         }
         else if (result >= 700 && result <= 724)
             clip.setProperty (ids::clipPitch, result - 700 - 12, um);
+        else if (result >= 800 && result < 900)
+            safe->editAudioFile (clip, result - 800);
+        else if (result == 900)
+            clip.setProperty (ids::clipMuted, ! (bool) clip.getProperty (ids::clipMuted, false), um);
+        else if (result == 901)
+        {
+            // Comping: esta toma suena y las grabaciones que coinciden en el tiempo se silencian
+            clip.setProperty (ids::clipMuted, false, um);
+            for (auto other : project.playlist())
+                if (other != clip && other[ids::kind].toString() == "audio"
+                    && (double) other[ids::start] < start + length && (double) other[ids::start] + (double) other[ids::length] > start)
+                    other.setProperty (ids::clipMuted, true, um);
+        }
     });
 }
 

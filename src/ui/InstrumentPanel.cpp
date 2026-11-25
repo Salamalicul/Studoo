@@ -1,5 +1,6 @@
 #include "InstrumentPanel.h"
 #include "HelpTexts.h"
+#include "audio/Onsets.h"
 
 namespace studoo
 {
@@ -23,7 +24,8 @@ void SampleWaveform::valueTreePropertyChanged (juce::ValueTree& t, const juce::I
         return;
     if (id == ids::sample)
         rebuildPeaks();
-    if (id == ids::sample || id == ids::sampleStart || id == ids::sampleEnd || id == ids::slices || id == ids::reverse)
+    if (id == ids::sample || id == ids::sampleStart || id == ids::sampleEnd || id == ids::slices || id == ids::reverse
+        || id == ids::slicePoints)
         repaint();
 }
 
@@ -94,8 +96,18 @@ void SampleWaveform::paint (juce::Graphics& g)
     }
 
     // Trozos (chops)
-    const int slices = juce::jlimit (1, 16, (int) channel.getProperty (ids::slices, 1));
-    if (slices > 1 && end > start)
+    const int slices = juce::jlimit (1, 64, (int) channel.getProperty (ids::slices, 1));
+    const auto points = juce::StringArray::fromTokens (channel[ids::slicePoints].toString(), ",", "");
+    if (points.size() == slices && slices > 1)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.55f));
+        for (int s = 1; s < points.size(); ++s)
+        {
+            const float x = inner.getX() + inner.getWidth() * juce::jlimit (0.0f, 1.0f, points[s].getFloatValue());
+            g.drawVerticalLine ((int) x, inner.getY(), inner.getBottom());
+        }
+    }
+    else if (slices > 1 && end > start)
     {
         g.setColour (juce::Colours::white.withAlpha (0.35f));
         for (int s = 1; s < slices; ++s)
@@ -237,9 +249,38 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
                      ids::sampleEnd, 0.0, 1.0, 1.0)->setDisplayFunction (pct);
             auto* slices = addKnob ("Trozos", txt ("Corta el sample en trozos iguales (chops). Cada nota del piano roll toca un trozo distinto: "
                                                    "la nota base es el trozo 1, la siguiente el 2..."),
-                                    ids::slices, 1.0, 16.0, 1.0);
-            slices->getSlider().setRange (1.0, 16.0, 1.0);
+                                    ids::slices, 1.0, 64.0, 1.0);
+            slices->getSlider().setRange (1.0, 64.0, 1.0);
             slices->setDisplayFunction ([] (double v) { const int n = (int) std::round (v); return n <= 1 ? txt ("Entero") : juce::String (n) + " trozos"; });
+
+            auto* detect = new juce::TextButton (txt ("Trocear por golpes"));
+            detect->setTooltip (txt ("Studoo busca cada golpe del sample (bombo, caja...) y lo pone en un trozo: "
+                                     "la nota base toca el golpe 1, la siguiente el 2... Ideal para loops de batería."));
+            detect->onClick = [this]
+            {
+                auto sample = ctx.samples.get (channel[ids::sample].toString());
+                if (sample == nullptr)
+                    return;
+                const float start = channel.getProperty (ids::sampleStart, 0.0f), end = channel.getProperty (ids::sampleEnd, 1.0f);
+                auto points = onsets::detect (sample->buffer, sample->sampleRate, start, end, 32);
+                ctx.project.beginTransaction();
+                if (points.size() < 2)
+                {
+                    channel.setProperty (ids::slicePoints, "", ctx.project.um());
+                    infoLabel.setText (txt ("No se han encontrado golpes claros en este sample."), juce::dontSendNotification);
+                    return;
+                }
+                juce::StringArray list;
+                for (float p : points)
+                    list.add (juce::String (p, 5));
+                channel.setProperty (ids::slicePoints, list.joinIntoString (","), ctx.project.um());
+                channel.setProperty (ids::slices, (int) points.size(), ctx.project.um());
+                infoLabel.setText (juce::String ((int) points.size()) + txt (" golpes encontrados: tócalos con notas seguidas desde la nota base."),
+                                   juce::dontSendNotification);
+            };
+            makeNonFocusing (*detect);
+            controls.add (detect);
+            addAndMakeVisible (detect);
 
             auto* reverse = new juce::ToggleButton (txt ("Al revés"));
             reverse->setTooltip (txt ("El sample suena del final al principio (efecto \"reverse\")."));

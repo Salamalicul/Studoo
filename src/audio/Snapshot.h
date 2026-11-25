@@ -37,6 +37,9 @@ namespace studoo
         float start = 0.0f, end = 1.0f; // parte del sample que suena (0..1)
         bool reverse = false;
         int slices = 1;                 // trocear en N partes (cada nota toca un trozo)
+        // Trozos en los golpes detectados (si hay); si no, trozos iguales
+        std::array<float, 64> slicePoints {};
+        int numSlicePoints = 0;
     };
 
     struct Bass808Params

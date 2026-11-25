@@ -67,7 +67,26 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         c.sampler.start = num (ch, ids::sampleStart, 0.0f, 0.99f, 0.0f);
         c.sampler.end = juce::jmax (c.sampler.start + 0.01f, num (ch, ids::sampleEnd, 0.01f, 1.0f, 1.0f));
         c.sampler.reverse = (bool) ch[ids::reverse];
-        c.sampler.slices = juce::jlimit (1, 16, (int) ch.getProperty (ids::slices, 1));
+        c.sampler.slices = juce::jlimit (1, 64, (int) ch.getProperty (ids::slices, 1));
+        {
+            // Golpes detectados: solo valen si son tantos como "Trozos" y van en orden
+            const auto points = juce::StringArray::fromTokens (ch[ids::slicePoints].toString(), ",", "");
+            if (points.size() == c.sampler.slices && points.size() > 1 && points.size() <= 64)
+            {
+                float prev = -1.0f;
+                bool ok = true;
+                for (int i = 0; i < points.size() && ok; ++i)
+                {
+                    const float v = points[i].getFloatValue();
+                    ok = std::isfinite (v) && v >= 0.0f && v < 1.0f && v > prev;
+                    c.sampler.slicePoints[(size_t) i] = v;
+                    prev = v;
+                }
+                c.sampler.numSlicePoints = ok ? points.size() : 0;
+            }
+            if (c.sampler.numSlicePoints == 0)
+                c.sampler.slices = juce::jmin (16, c.sampler.slices);
+        }
 
         c.bass.decay = num (ch, ids::decay, 0.1f, 4.0f, 1.5f);
         c.bass.glide = num (ch, ids::glide, 0.0f, 0.5f, 0.08f);
@@ -145,6 +164,8 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
     {
         ClipSnap cs;
         cs.isAudio = c[ids::kind].toString() == "audio";
+        if ((bool) c.getProperty (ids::clipMuted, false))
+            continue;   // clip en silencio (otra toma elegida)
         // Una canción de Studoo puede durar como mucho 1000 compases
         constexpr double maxSong = 16000.0;
         cs.start = pos (c[ids::start], maxSong);

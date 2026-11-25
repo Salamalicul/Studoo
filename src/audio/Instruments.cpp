@@ -94,7 +94,17 @@ void SamplerInstrument::noteOn (int note, float velocity)
     double from = juce::jlimit (0.0, length - 1.0, (double) params.start * length);
     double to = juce::jlimit (from + 1.0, length, (double) params.end * length);
     double semitones = params.tune;
-    if (params.slices > 1)
+    if (params.numSlicePoints > 1)
+    {
+        // Trozos en los golpes detectados
+        const int n = params.numSlicePoints;
+        const int slice = ((note - root) % n + n) % n;
+        const double a = juce::jlimit (0.0, length - 1.0, (double) params.slicePoints[(size_t) slice] * length);
+        const double b = slice + 1 < n ? (double) params.slicePoints[(size_t) slice + 1] * length : to;
+        from = a;
+        to = juce::jlimit (from + 1.0, length, b);
+    }
+    else if (params.slices > 1)
     {
         const int slice = ((note - root) % params.slices + params.slices) % params.slices;
         const double size = (to - from) / params.slices;
