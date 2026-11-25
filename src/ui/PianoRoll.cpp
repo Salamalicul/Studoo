@@ -1,6 +1,7 @@
 #include "PianoRoll.h"
 #include "HelpTexts.h"
 #include "model/MidiIO.h"
+#include "model/Scales.h"
 #include <map>
 
 namespace studoo
@@ -796,22 +797,6 @@ namespace
     struct ClipNote { double start, length; int pitch; float velocity; };
     std::vector<ClipNote>& clipboard() { static std::vector<ClipNote> c; return c; }
 
-    // Intervalos de cada escala (en semitonos desde la nota base)
-    const std::vector<int>& scaleIntervals (int type)
-    {
-        static const std::vector<std::vector<int>> scales = {
-            {},
-            { 0, 2, 4, 5, 7, 9, 11 },     // Mayor
-            { 0, 2, 3, 5, 7, 8, 10 },     // Menor
-            { 0, 2, 3, 5, 7, 8, 11 },     // Menor armónica
-            { 0, 3, 5, 7, 10 },           // Pentatónica menor
-            { 0, 2, 4, 7, 9 },            // Pentatónica mayor
-            { 0, 3, 5, 6, 7, 10 },        // Blues
-            { 0, 2, 3, 5, 7, 9, 10 },     // Dórica
-            { 0, 1, 3, 5, 7, 8, 10 },     // Frigia (drill, flamenco)
-        };
-        return scales[(size_t) juce::jlimit (0, (int) scales.size() - 1, type)];
-    }
 }
 
 juce::StringArray PianoRoll::scaleNames()
@@ -829,11 +814,7 @@ bool PianoRoll::isInScale (int pitch) const
     const int type = getScaleType();
     if (type == 0)
         return true;
-    const int degree = ((pitch - getScaleRoot()) % 12 + 12) % 12;
-    for (int i : scaleIntervals (type))
-        if (i == degree)
-            return true;
-    return false;
+    return scales::contains (type, getScaleRoot(), pitch);
 }
 
 int PianoRoll::snapToScale (int pitch) const

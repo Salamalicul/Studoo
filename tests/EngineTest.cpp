@@ -9,6 +9,7 @@
 #include "audio/AudioEngine.h"
 #include "model/Project.h"
 #include "model/MidiIO.h"
+#include "audio/MixerTrack.h"
 
 #include <iostream>
 
@@ -642,6 +643,112 @@ int main (int argc, char* argv[])
                 check (fNo > 380.0 && fGlide < fNo * 0.8, "Sinte mono: con glide la nota se desliza (empieza más grave)");
                 check (crossings (withGlide, (int) (sampleRate * 1.0), 4410) > 400.0, "Sinte mono: al final llega a la nota nueva");
             }
+        }
+
+        // Tanda B: efectos avanzados de pista (autotune, puerta, EQ paramétrico, ritmo, maximizador)
+        {
+            // Procesa 'seconds' de un seno por una pista del mezclador con estos ajustes
+            auto runTrack = [] (TrackParams p, double hz, float amp, double seconds, bool playing = false, bool analyse = false)
+            {
+                MixerTrack track;
+                track.prepare (sampleRate, blockSize);
+                track.ensureRhythm();
+                track.setAnalysePitch (analyse);
+                const int total = (int) (seconds * sampleRate);
+                juce::AudioBuffer<float> out (2, total);
+                double phase = 0.0, stepPos = 0.0;
+                const double sps = sampleRate * 60.0 / 120.0 / 4.0;
+                for (int pos = 0; pos < total; pos += blockSize)
+                {
+                    const int n = juce::jmin (blockSize, total - pos);
+                    auto& b = track.getBuffer();
+                    for (int i = 0; i < n; ++i)
+                    {
+                        const float v = amp * (float) std::sin (phase);
+                        phase += juce::MathConstants<double>::twoPi * hz / sampleRate;
+                        b.setSample (0, i, v);
+                        b.setSample (1, i, v);
+                    }
+                    track.setTransport (stepPos, sps, playing);
+                    track.process (n, p, 120.0, false);
+                    stepPos += n / sps;
+                    out.copyFrom (0, pos, b, 0, 0, n);
+                    out.copyFrom (1, pos, b, 1, 0, n);
+                }
+                return std::make_pair (out, track.getDetectedHz());
+            };
+            auto freqOf = [] (const juce::AudioBuffer<float>& b, int from, int len)
+            {
+                int c = 0;
+                for (int i = from + 1; i < from + len; ++i)
+                    c += (b.getSample (0, i - 1) < 0.0f) != (b.getSample (0, i) < 0.0f) ? 1 : 0;
+                return c / 2.0 / (len / sampleRate);
+            };
+            TrackParams base;
+            base.volume = 1.0f;
+            base.pan = 0.0f;
+
+            auto [plain, detected] = runTrack (base, 450.0, 0.3f, 1.0, false, true);
+            check (std::abs (detected - 450.0f) < 5.0f, "Afinador: detecta un tono de 450 Hz");
+            auto tuned = base;
+            tuned.tuneAmount = 1.0f;
+            auto [corrected, d2] = runTrack (tuned, 450.0, 0.3f, 1.5);
+            juce::ignoreUnused (d2);
+            check (std::abs (freqOf (corrected, 44100, 22050) - 440.0) < 6.0 && isFinite (corrected),
+                   "Autotune: 450 Hz se corrige a 440 Hz (La)");
+            auto inScale = tuned;
+            inScale.tuneScale = 1;   // Do mayor: Fa# (370 Hz) no está; va a Fa (349) o Sol (392)
+            auto [scaled, d3] = runTrack (inScale, 370.0, 0.3f, 1.5);
+            juce::ignoreUnused (d3);
+            const double fs = freqOf (scaled, 44100, 22050);
+            check (std::abs (fs - 349.2) < 6.0 || std::abs (fs - 392.0) < 6.0, "Autotune con escala: solo deja notas de la escala");
+
+            auto gated = base;
+            gated.gateThreshold = -30.0f;
+            auto [quiet, d4] = runTrack (gated, 200.0, 0.005f, 0.5);   // unos -46 dB: por debajo del umbral
+            auto [loud, d5] = runTrack (gated, 200.0, 0.3f, 0.5);
+            juce::ignoreUnused (d4, d5);
+            check (quiet.getRMSLevel (0, 11025, 11025) < 0.0005f && loud.getRMSLevel (0, 11025, 11025) > 0.15f,
+                   "Puerta de ruido: corta lo flojo y deja pasar lo fuerte");
+
+            auto boosted = base;
+            boosted.peqFreq[1] = 1000.0f;
+            boosted.peqGain[1] = 12.0f;
+            auto [flat, d6] = runTrack (base, 1000.0, 0.05f, 0.3);
+            auto [peak, d7] = runTrack (boosted, 1000.0, 0.05f, 0.3);
+            auto [away, d8] = runTrack (boosted, 100.0, 0.05f, 0.3);
+            juce::ignoreUnused (d6, d7, d8);
+            check (peak.getRMSLevel (0, 4410, 8820) > flat.getRMSLevel (0, 4410, 8820) * 3.0f
+                   && away.getRMSLevel (0, 4410, 8820) < flat.getRMSLevel (0, 4410, 8820) * 1.3f,
+                   "EQ paramétrico: +12 dB en 1 kHz sube esa frecuencia y no las demás");
+
+            auto halfTime = base;
+            halfTime.rhythmMode = 1;
+            auto [slow, d9] = runTrack (halfTime, 440.0, 0.3f, 1.0, true);
+            juce::ignoreUnused (d9);
+            check (std::abs (freqOf (slow, 4410, 8820) - 220.0) < 10.0, "Half-time: suena a mitad de velocidad (una octava más grave)");
+            auto trance = base;
+            trance.rhythmMode = 4;
+            auto [chopped, d10] = runTrack (trance, 440.0, 0.3f, 1.0, true);
+            juce::ignoreUnused (d10);
+            const float ratio = chopped.getRMSLevel (0, 0, 44100) / plain.getRMSLevel (0, 0, 44100);
+            check (ratio > 0.55f && ratio < 0.85f, "Puerta rítmica: el sonido se corta a ritmo");
+            for (int mode = 2; mode <= 6; ++mode)
+            {
+                auto m = base;
+                m.rhythmMode = mode;
+                auto [o, d] = runTrack (m, 300.0, 0.3f, 2.5, true);
+                juce::ignoreUnused (d);
+                if (! isFinite (o) || o.getMagnitude (0, 0, o.getNumSamples()) > 1.0f)
+                    check (false, ("Efecto de ritmo " + juce::String (mode) + " no da valores raros").toRawUTF8());
+            }
+
+            auto maxed = base;
+            maxed.maximize = 12.0f;
+            auto [hot, d11] = runTrack (maxed, 200.0, 0.3f, 0.5);
+            juce::ignoreUnused (d11);
+            check (hot.getRMSLevel (0, 11025, 11025) > plain.getRMSLevel (0, 11025, 11025) * 2.0f
+                   && hot.getMagnitude (0, 11025, 11025) < 0.95f, "Maximizador: más volumen sin pasar del máximo");
         }
 
         // MIDI: exportar un patrón y volver a importarlo

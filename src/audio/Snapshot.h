@@ -93,6 +93,17 @@ namespace studoo
         int sidechainSource = 1;
         int sendTo = 0;             // 0 = sin envío; si no, una pista de número MAYOR (así no hay bucles)
         float sendLevel = 0.0f;
+        std::array<float, numEqBands> peqFreq { 100.0f, 400.0f, 2000.0f, 8000.0f };
+        std::array<float, numEqBands> peqGain {};   // dB
+        std::array<float, numEqBands> peqQ { 1.0f, 1.0f, 1.0f, 1.0f };
+        float gateThreshold = -80.0f;
+        float tuneAmount = 0.0f;
+        int tuneRoot = 0, tuneScale = 0;
+        int rhythmMode = 0;
+        float rhythmMix = 1.0f;
+        float maximize = 0.0f;
+        std::array<int, numSends - 1> moreSendTo {};      // envíos 2 y 3
+        std::array<float, numSends - 1> moreSendLevel {};
         bool sendOnly = false;      // solo suena por el envío (agrupar pistas en un "bus")
         bool limiter = false;
     };

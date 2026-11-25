@@ -87,6 +87,9 @@ namespace studoo
         juce::AudioPluginInstance* getChannelPlugin (int channelUid);
         void setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginInstance>, int slot = 0);
         juce::AudioPluginInstance* getMixerPlugin (int track, int slot = 0);
+        // Afinador: la nota que suena en una pista (Hz, 0 = ninguna)
+        float getDetectedPitch (int track) const { return juce::isPositiveAndBelow (track, numMixerTracks) ? mixer[(size_t) track].getDetectedHz() : 0.0f; }
+        void setPitchAnalysis (int track, bool on) { if (juce::isPositiveAndBelow (track, numMixerTracks)) mixer[(size_t) track].setAnalysePitch (on); }
         void clearAllPlugins();
         std::function<void (juce::AudioPluginInstance*)> onPluginWillBeDeleted;
 

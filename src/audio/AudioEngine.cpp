@@ -138,6 +138,19 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
     {
         const juce::ScopedLock sl (lock);
 
+        // Pistas que usan el eco (o lo automatizan): reservar su memoria ahora
+        for (int t = 0; t < numMixerTracks; ++t)
+        {
+            bool needsDelay = newSnap->mixer[(size_t) t].delayMix > 0.001f;
+            for (const auto& lane : newSnap->lanes)
+                needsDelay = needsDelay || (lane.target.kind == AutomationTarget::Kind::mixer && lane.target.index == t
+                                            && lane.target.param == AutomationTarget::Param::delayMix);
+            if (needsDelay)
+                mixer[(size_t) t].ensureDelay();
+            if (newSnap->mixer[(size_t) t].rhythmMode > 0)
+                mixer[(size_t) t].ensureRhythm();
+        }
+
         std::vector<std::unique_ptr<ChannelRuntime>> newRuntimes;
         newRuntimes.reserve (newSnap->channels.size());
 
@@ -995,9 +1008,14 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         anySolo = anySolo || tp.solo;
         if (soloed[(size_t) t] && tp.sendTo > t && tp.sendLevel > 0.0f)
             soloed[(size_t) tp.sendTo] = true;
+        for (size_t s = 0; s < tp.moreSendTo.size(); ++s)
+            if (soloed[(size_t) t] && tp.moreSendTo[s] > t && tp.moreSendLevel[s] > 0.0f)
+                soloed[(size_t) tp.moreSendTo[s]] = true;
     }
 
     auto& master = mixer[0].getBuffer();
+    for (auto& track : mixer)
+        track.setTransport (chunkStartPos, samplesPerStep, isPlaying);
     for (int t = 1; t < numMixerTracks; ++t)
     {
         const auto& tp = trackParams[(size_t) t];
@@ -1012,6 +1030,13 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
             dest.addFrom (0, 0, out, 0, 0, n, tp.sendLevel);
             dest.addFrom (1, 0, out, 1, 0, n, tp.sendLevel);
         }
+        for (size_t s = 0; s < tp.moreSendTo.size(); ++s)
+            if (tp.moreSendTo[s] > t && tp.moreSendTo[s] < numMixerTracks && tp.moreSendLevel[s] > 0.0f)
+            {
+                auto& dest = mixer[(size_t) tp.moreSendTo[s]].getBuffer();
+                dest.addFrom (0, 0, out, 0, 0, n, tp.moreSendLevel[s]);
+                dest.addFrom (1, 0, out, 1, 0, n, tp.moreSendLevel[s]);
+            }
         if (tp.sendOnly && tp.sendTo > t && t != stem)
             continue;
         master.addFrom (0, 0, out, 0, 0, n);

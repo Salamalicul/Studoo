@@ -102,7 +102,10 @@ namespace
             ids::lfoAmount, ids::trackFilter, ids::distortion, ids::chorusMix, ids::sidechain, ids::sidechainSource,
             ids::limiter, ids::sendTo, ids::sendLevel, ids::sendOnly, ids::clipGain, ids::fadeIn, ids::fadeOut,
             ids::stretch, ids::clipPitch, ids::recordBpm, ids::scaleRoot, ids::scaleType, ids::scaleLock,
-            juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3"), ids::stepVel, ids::stepPitch, ids::mono };
+            juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3"), ids::stepVel, ids::stepPitch, ids::mono,
+            ids::gateThreshold, ids::tuneAmount, ids::tuneRoot, ids::tuneScale, ids::rhythmMode, ids::rhythmMix, ids::maximize,
+            juce::Identifier ("sendTo2"), juce::Identifier ("sendLevel3"), juce::Identifier ("peqFreq2"),
+            juce::Identifier ("peqGain1"), juce::Identifier ("peqQ4") };
 
         // Recorre todo el árbol y cambia, borra o duplica cosas al azar
         std::function<void (juce::ValueTree)> mutate = [&] (juce::ValueTree t)

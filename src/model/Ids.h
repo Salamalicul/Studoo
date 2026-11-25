@@ -116,6 +116,13 @@ namespace studoo::ids
     STUDOO_ID (scaleRoot)         // proyecto: nota base de la escala (0 = Do ... 11 = Si)
     STUDOO_ID (scaleType)         // proyecto: 0 = sin escala, 1 mayor, 2 menor...
     STUDOO_ID (scaleLock)         // proyecto: las notas nuevas se pegan a la escala
+    STUDOO_ID (gateThreshold)     // pista: puerta de ruido, dB (-80 = apagada)
+    STUDOO_ID (tuneAmount)        // pista: autotune 0..1 (0 = apagado, 1 = robot)
+    STUDOO_ID (tuneRoot)          // pista: nota base de la escala del autotune (0..11)
+    STUDOO_ID (tuneScale)         // pista: escala del autotune (0 = todas las notas)
+    STUDOO_ID (rhythmMode)        // pista: efecto de ritmo (0 apagado, 1 half-time, 2-3 tartamudeo, 4-5 puerta, 6 parada de cinta)
+    STUDOO_ID (rhythmMix)         // pista: mezcla del efecto de ritmo 0..1
+    STUDOO_ID (maximize)          // pista: maximizador, dB de ganancia antes del limitador (0..12)
     STUDOO_ID (stepVel)           // pasos: fuerza de cada paso, "85,40,100..." (0..100)
     STUDOO_ID (stepPitch)         // pasos: tono de cada paso en semitonos, "0,0,12..." (-24..24)
     STUDOO_ID (mono)              // sinte: una sola nota a la vez (con glide si se solapan)

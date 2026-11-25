@@ -1,4 +1,5 @@
 #include "Snapshot.h"
+#include "model/Scales.h"
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -206,6 +207,27 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         m.sendTo = (i > 0 && sendTo > i && sendTo < numMixerTracks) ? sendTo : 0;
         m.sendLevel = m.sendTo > 0 ? num (t, ids::sendLevel, 0.0f, 1.0f, 0.0f) : 0.0f;
         m.sendOnly = m.sendTo > 0 && (bool) t.getProperty (ids::sendOnly, false);
+        for (int b = 0; b < numEqBands; ++b)
+        {
+            static const float defaults[] = { 100.0f, 400.0f, 2000.0f, 8000.0f };
+            m.peqFreq[(size_t) b] = num (t, peqId ("Freq", b), 20.0f, 20000.0f, defaults[b]);
+            m.peqGain[(size_t) b] = num (t, peqId ("Gain", b), -18.0f, 18.0f, 0.0f);
+            m.peqQ[(size_t) b] = num (t, peqId ("Q", b), 0.2f, 10.0f, 1.0f);
+        }
+        m.gateThreshold = num (t, ids::gateThreshold, -80.0f, 0.0f, -80.0f);
+        m.tuneAmount = num (t, ids::tuneAmount, 0.0f, 1.0f, 0.0f);
+        m.tuneRoot = juce::jlimit (0, 11, (int) t.getProperty (ids::tuneRoot, 0));
+        m.tuneScale = juce::jlimit (0, scales::numScales - 1, (int) t.getProperty (ids::tuneScale, 0));
+        m.rhythmMode = juce::jlimit (0, 6, (int) t.getProperty (ids::rhythmMode, 0));
+        m.rhythmMix = num (t, ids::rhythmMix, 0.0f, 1.0f, 1.0f);
+        m.maximize = num (t, ids::maximize, 0.0f, 12.0f, 0.0f);
+        for (int s = 1; s < numSends; ++s)
+        {
+            const int to = t.getProperty (sendToId (s), 0);
+            const bool valid = i > 0 && to > i && to < numMixerTracks;
+            m.moreSendTo[(size_t) s - 1] = valid ? to : 0;
+            m.moreSendLevel[(size_t) s - 1] = valid ? num (t, sendLevelId (s), 0.0f, 1.0f, 0.0f) : 0.0f;
+        }
         // El Master trae el limitador encendido (protege de que suene a tope)
         m.limiter = (bool) t.getProperty (ids::limiter, i == 0);
     }

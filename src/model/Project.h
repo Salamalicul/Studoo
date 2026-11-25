@@ -24,13 +24,21 @@ namespace studoo
     juce::String channelTypeToString (ChannelType);
     ChannelType  channelTypeFromString (const juce::String&);
 
-    constexpr int numMixerTracks    = 17; // 0 = Master, 1..16 = pistas
+    constexpr int numMixerTracks    = 33; // 0 = Master, 1..32 = pistas
     constexpr int numFxSlots        = 4;  // huecos de plugins de efecto en cada pista
+    constexpr int numSends          = 3;  // envíos de cada pista
+
+    // Dónde se guarda cada envío (el envío 0 usa los nombres de siempre)
+    constexpr int numEqBands        = 4;  // bandas del EQ paramétrico
+    inline juce::Identifier peqId (const char* what, int band) { return juce::Identifier (juce::String ("peq") + what + juce::String (band + 1)); }
+
+    inline juce::Identifier sendToId (int i)    { return i == 0 ? juce::Identifier ("sendTo")    : juce::Identifier ("sendTo" + juce::String (i + 1)); }
+    inline juce::Identifier sendLevelId (int i) { return i == 0 ? juce::Identifier ("sendLevel") : juce::Identifier ("sendLevel" + juce::String (i + 1)); }
 
     // Dónde se guarda el plugin de cada hueco (el hueco 0 usa los nombres de siempre)
     inline juce::Identifier fxDescId (int slot)  { return slot == 0 ? juce::Identifier ("pluginDesc")  : juce::Identifier ("pluginDesc" + juce::String (slot)); }
     inline juce::Identifier fxStateId (int slot) { return slot == 0 ? juce::Identifier ("pluginState") : juce::Identifier ("pluginState" + juce::String (slot)); }
-    constexpr int numPlaylistTracks = 16;
+    constexpr int numPlaylistTracks = 32;
     constexpr int stepsPerBar       = 16; // 16 semicorcheas = 1 compás
     constexpr int stepsPerBeat      = 4;
 

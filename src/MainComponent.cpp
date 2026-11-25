@@ -192,7 +192,8 @@ void MainComponent::exportStems()
         for (auto ch : project.channels())
             used = used || (int) ch[ids::mixer] == t;
         for (int s = 1; s < t && ! used; ++s)
-            used = (int) project.getMixerTrack (s).getProperty (ids::sendTo, 0) == t;
+            for (int k = 0; k < numSends && ! used; ++k)
+                used = (int) project.getMixerTrack (s).getProperty (sendToId (k), 0) == t;
         if (used && ! (bool) project.getMixerTrack (t)[ids::muted])
             tracks.push_back ({ t, project.getMixerTrack (t)[ids::name].toString() });
     }

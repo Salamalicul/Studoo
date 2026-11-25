@@ -47,6 +47,7 @@ set(STUDOO_ENGINE_SOURCES
     src/audio/Instruments.cpp
     src/audio/Kits.cpp
     src/audio/MixerTrack.cpp
+    src/audio/TrackFx.cpp
     src/audio/PluginHost.cpp
     src/audio/SampleCache.cpp
     src/audio/Snapshot.cpp)
@@ -75,6 +76,7 @@ target_sources(Studoo PRIVATE
     src/ui/PianoRoll.cpp
     src/ui/Playlist.cpp
     src/ui/MixerView.cpp
+    src/ui/TrackFxPanel.cpp
     src/ui/AutomationView.cpp
     src/ui/LearnView.cpp
     src/ui/LearnProgress.cpp
