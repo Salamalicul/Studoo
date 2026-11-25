@@ -415,6 +415,16 @@ void MixerStrip::resized()
 // ============================================================================
 MixerView::MixerView (AppContext& c) : ctx (c), helpButton (txt (help::mixerTitle), txt (help::mixerText))
 {
+    addAndMakeVisible (analyzerButton);
+    analyzerButton.setButtonText (txt ("Analizador"));
+    analyzerButton.setTooltip (txt ("Muestra las frecuencias del Master: cuántos graves, medios y agudos tiene tu canción."));
+    analyzerButton.onClick = [this]
+    {
+        auto* top = getTopLevelComponent();
+        juce::CallOutBox::launchAsynchronously (std::make_unique<AnalyzerPanel> (ctx), top->getLocalArea (this, analyzerButton.getBounds()), top);
+    };
+    makeNonFocusing (analyzerButton);
+
     addAndMakeVisible (helpButton);
     addAndMakeVisible (infoLabel);
     infoLabel.setText (txt ("Doble clic en el nombre de una pista para renombrarla. Cada canal elige su pista en el secuenciador."),
@@ -473,6 +483,8 @@ void MixerView::resized()
     auto h = headerArea.reduced (8, 7);
     helpButton.setBounds (h.removeFromLeft (26));
     h.removeFromLeft (120);
+    analyzerButton.setBounds (h.removeFromRight (130));
+    h.removeFromRight (8);
     infoLabel.setBounds (h);
 
     viewport.setBounds (area.reduced (6));

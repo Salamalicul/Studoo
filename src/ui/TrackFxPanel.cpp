@@ -265,3 +265,70 @@ void TrackFxPanel::drawEqCurve (juce::Graphics& g)
     g.drawText ("20 kHz", r.reduced (4.0f), juce::Justification::bottomRight);
 }
 }
+
+namespace studoo
+{
+AnalyzerPanel::AnalyzerPanel (AppContext& c) : ctx (c)
+{
+    levels.fill (-100.0f);
+    setSize (620, 280);
+    startTimerHz (25);
+}
+
+void AnalyzerPanel::timerCallback()
+{
+    ctx.engine.getScope (data.data(), size);
+    window.multiplyWithWindowingTable (data.data(), (size_t) size);
+    std::fill (data.begin() + size, data.end(), 0.0f);
+    fft.performFrequencyOnlyForwardTransform (data.data());
+    repaint();
+}
+
+void AnalyzerPanel::paint (juce::Graphics& g)
+{
+    g.fillAll (Colours::panel);
+    g.setColour (Colours::text);
+    g.setFont (Fonts::bold (14.0f));
+    g.drawText (txt ("Analizador del Master"), 14, 6, 300, 18, juce::Justification::centredLeft);
+    g.setColour (Colours::textDim);
+    g.setFont (Fonts::regular (11.0f));
+    g.drawText (txt ("Graves a la izquierda, agudos a la derecha. Compara tu canción con otra que te guste."),
+                14, 24, getWidth() - 28, 14, juce::Justification::centredLeft);
+
+    auto r = getLocalBounds().reduced (14).withTrimmedTop (34).toFloat();
+    g.setColour (juce::Colour (0xff121417));
+    g.fillRoundedRectangle (r, 6.0f);
+    // Rejilla de frecuencias
+    g.setFont (Fonts::regular (9.0f));
+    for (double f : { 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0 })
+    {
+        const float x = r.getX() + r.getWidth() * (float) (std::log (f / 20.0) / std::log (1000.0));
+        g.setColour (Colours::outline);
+        g.drawVerticalLine ((int) x, r.getY(), r.getBottom());
+        g.setColour (Colours::textDim);
+        g.drawText (f >= 1000.0 ? juce::String ((int) (f / 1000.0)) + "k" : juce::String ((int) f), (int) x + 2, (int) r.getBottom() - 12, 30, 10,
+                    juce::Justification::left);
+    }
+    // Espectro
+    const double sr = juce::jmax (8000.0, ctx.engine.getSampleRate());
+    const int columns = juce::jmin ((int) levels.size(), (int) r.getWidth() / 2);
+    juce::Path spectrum;
+    spectrum.startNewSubPath (r.getX(), r.getBottom());
+    for (int c = 0; c < columns; ++c)
+    {
+        const double f0 = 20.0 * std::pow (1000.0, (double) c / columns), f1 = 20.0 * std::pow (1000.0, (double) (c + 1) / columns);
+        const int b0 = juce::jlimit (1, size / 2 - 1, (int) (f0 / sr * size)), b1 = juce::jlimit (b0, size / 2 - 1, (int) (f1 / sr * size));
+        float m = 0.0f;
+        for (int b = b0; b <= b1; ++b)
+            m = juce::jmax (m, data[(size_t) b]);
+        const float db = juce::Decibels::gainToDecibels (m / (float) (size / 4), -100.0f);
+        levels[(size_t) c] = db > levels[(size_t) c] ? db : levels[(size_t) c] - 1.5f;   // cae despacio
+        const float y = r.getBottom() - r.getHeight() * juce::jlimit (0.0f, 1.0f, (levels[(size_t) c] + 90.0f) / 90.0f);
+        spectrum.lineTo (r.getX() + r.getWidth() * (float) c / (float) columns, y);
+    }
+    spectrum.lineTo (r.getRight(), r.getBottom());
+    spectrum.closeSubPath();
+    g.setGradientFill (juce::ColourGradient (Colours::accent.withAlpha (0.8f), 0.0f, r.getY(), Colours::accent.withAlpha (0.15f), 0.0f, r.getBottom(), false));
+    g.fillPath (spectrum);
+}
+}

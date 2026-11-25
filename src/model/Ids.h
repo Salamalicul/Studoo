@@ -20,6 +20,12 @@ namespace studoo::ids
     STUDOO_ID (NOTE)
     STUDOO_ID (PLAYLIST)
     STUDOO_ID (CLIP)
+    STUDOO_ID (MIDILINKS)         // controles MIDI conectados a ruedas de Studoo
+    STUDOO_ID (LINK)
+    STUDOO_ID (cc)                // número de control MIDI (0..127)
+    STUDOO_ID (param)             // nombre de la propiedad que mueve
+    STUDOO_ID (minValue)
+    STUDOO_ID (maxValue)
     STUDOO_ID (MIXER)
     STUDOO_ID (TRACK)
     STUDOO_ID (AUTOMATION)

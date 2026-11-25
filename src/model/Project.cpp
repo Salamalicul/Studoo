@@ -226,11 +226,11 @@ void Project::ensureStructure()
     {
         const auto type = state.getChild (i).getType();
         const bool known = type == ids::CHANNELS || type == ids::PATTERNS || type == ids::PLAYLIST
-                        || type == ids::MIXER || type == ids::AUTOMATION;
+                        || type == ids::MIXER || type == ids::AUTOMATION || type == ids::MIDILINKS;
         if (! known || state.getChildWithName (type) != state.getChild (i))
             state.removeChild (i, nullptr);
     }
-    for (auto id : { ids::CHANNELS, ids::PATTERNS, ids::PLAYLIST, ids::MIXER, ids::AUTOMATION })
+    for (auto id : { ids::CHANNELS, ids::PATTERNS, ids::PLAYLIST, ids::MIXER, ids::AUTOMATION, ids::MIDILINKS })
         if (! state.getChildWithName (id).isValid())
             state.appendChild (juce::ValueTree (id), nullptr);
 
@@ -271,6 +271,7 @@ void Project::ensureStructure()
     keepOnly (patterns(), ids::PATTERN, true, { ids::STEPSET, ids::NOTE });
     keepOnly (playlist(), ids::CLIP, false, {});
     keepOnly (automation(), ids::LANE, false, { ids::POINT });
+    keepOnly (state.getChildWithName (ids::MIDILINKS), ids::LINK, false, {});
 
     // El mezclador: exactamente numMixerTracks pistas, en orden
     {

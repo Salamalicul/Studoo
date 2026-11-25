@@ -40,3 +40,23 @@ namespace studoo
         bool tunerActive = false;
     };
 }
+
+namespace studoo
+{
+    // Analizador de frecuencias del Master (graves a la izquierda, agudos a la derecha)
+    class AnalyzerPanel : public juce::Component, private juce::Timer
+    {
+    public:
+        explicit AnalyzerPanel (AppContext&);
+        void paint (juce::Graphics&) override;
+
+    private:
+        void timerCallback() override;
+        AppContext& ctx;
+        static constexpr int order = 12, size = 1 << order;
+        juce::dsp::FFT fft { order };
+        juce::dsp::WindowingFunction<float> window { (size_t) size, juce::dsp::WindowingFunction<float>::hann };
+        std::array<float, size * 2> data {};
+        std::array<float, 512> levels {};   // dB suavizados por columna
+    };
+}

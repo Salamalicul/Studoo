@@ -751,6 +751,25 @@ int main (int argc, char* argv[])
                    && hot.getMagnitude (0, 11025, 11025) < 0.95f, "Maximizador: más volumen sin pasar del máximo");
         }
 
+        // Controles MIDI conectados: se guardan con el proyecto y se limpia lo que no vale
+        {
+            Project p;
+            auto links = p.getState().getChildWithName (ids::MIDILINKS);
+            juce::ValueTree link (ids::LINK);
+            link.setProperty (ids::cc, 21, nullptr);
+            link.setProperty (ids::kind, "mixer", nullptr);
+            link.setProperty (ids::index, 3, nullptr);
+            link.setProperty (ids::param, "volume", nullptr);
+            links.appendChild (link, nullptr);
+            links.appendChild (juce::ValueTree ("TRAMPA"), nullptr);
+            juce::String error;
+            Project q;
+            const bool loaded = q.loadFromXmlString (p.toXmlString(), error);
+            auto back = q.getState().getChildWithName (ids::MIDILINKS);
+            check (loaded && back.getNumChildren() == 1 && (int) back.getChild (0)[ids::cc] == 21,
+                   "Los controles MIDI conectados se guardan (y se quita lo que no es un control)");
+        }
+
         // MIDI: exportar un patrón y volver a importarlo
         {
             Project p;

@@ -19,12 +19,45 @@ Knob::Knob (const juce::String& labelText, const juce::String& tooltip) : label 
     };
     slider.onDragStart = [this] { if (undo != nullptr) undo->beginNewTransaction(); };
     makeNonFocusing (slider);
+    slider.addMouseListener (this, false);   // clic derecho: conectar a un control MIDI
+    enableLongPressMenu (slider);            // en el móvil: mantener pulsado
+}
+
+Knob::~Knob()
+{
+    slider.removeMouseListener (this);
+}
+
+void Knob::mouseDown (const juce::MouseEvent& e)
+{
+    if (! e.mods.isPopupMenu() || ! boundTree.isValid() || ! onMidiLearn)
+        return;
+    const bool linked = isMidiLinked && isMidiLinked (*this);
+    juce::PopupMenu menu;
+    menu.addSectionHeader (label);
+    menu.addItem (1, txt ("Conectar a un control MIDI (mueve luego una rueda de tu teclado)"));
+    menu.addItem (2, txt ("Quitar el control MIDI"), linked);
+    menu.addItem (3, txt ("Volver al valor por defecto"));
+    juce::Component::SafePointer<Knob> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&slider), [safe] (int r)
+    {
+        if (safe == nullptr) return;
+        if (r == 1 && onMidiLearn)  onMidiLearn (*safe);
+        if (r == 2 && onMidiForget) onMidiForget (*safe);
+        if (r == 3)
+        {
+            if (safe->undo != nullptr) safe->undo->beginNewTransaction();
+            safe->slider.setValue (safe->slider.getDoubleClickReturnValue(), juce::sendNotificationSync);
+        }
+    });
 }
 
 void Knob::bind (juce::ValueTree tree, const juce::Identifier& property, juce::UndoManager* um,
                  double min, double max, double defaultValue, double skewMidPoint)
 {
     undo = um;
+    boundTree = tree;
+    boundProperty = property;
     slider.getValueObject().referTo (juce::Value()); // desconecta el anterior
     slider.setRange (min, max, 0.0);
     if (skewMidPoint > min && skewMidPoint < max)

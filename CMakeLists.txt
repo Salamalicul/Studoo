@@ -77,6 +77,7 @@ target_sources(Studoo PRIVATE
     src/ui/Playlist.cpp
     src/ui/MixerView.cpp
     src/ui/TrackFxPanel.cpp
+    src/ui/Browser.cpp
     src/ui/AutomationView.cpp
     src/ui/LearnView.cpp
     src/ui/LearnProgress.cpp

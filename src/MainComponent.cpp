@@ -280,6 +280,29 @@ MainComponent::MainComponent()
     toolbar->onRecord = [this] { toggleRecording(); };
     addAndMakeVisible (*toolbar);
 
+    browser = std::make_unique<BrowserPanel> (*ctx);
+    addChildComponent (*browser);
+    browser->onStatus = [this] (const juce::String& s) { setStatus (s); };
+    browser->onOpenProject = [this] (const juce::File& f)
+    {
+        checkUnsavedThen ([this, f]
+        {
+            engine.stop();
+            juce::String error;
+            if (project.loadFromFile (f, error))
+                setStatus (txt ("Proyecto abierto: ") + f.getFileNameWithoutExtension());
+            else
+                showMessage (txt ("No se pudo abrir"), error);
+            updateTitle();
+        });
+    };
+    addAndMakeVisible (browserButton);
+    browserButton.setButtonText (txt ("Navegador"));
+    browserButton.setClickingTogglesState (true);
+    browserButton.setTooltip (txt ("Muestra u oculta el navegador de sonidos (F4): escucha samples, kits y sonidos y añádelos con doble clic."));
+    browserButton.onClick = [this] { toggleBrowser(); };
+    makeNonFocusing (browserButton);
+
     channelRack = std::make_unique<ChannelRack> (*ctx);
     pianoRoll = std::make_unique<PianoRoll> (*ctx);
     playlist = std::make_unique<Playlist> (*ctx);
@@ -383,6 +406,46 @@ MainComponent::MainComponent()
     for (auto& midiInput : juce::MidiInput::getAvailableDevices())
         deviceManager.setMidiInputDeviceEnabled (midiInput.identifier, true);
     deviceManager.addMidiInputDeviceCallback ({}, &engine.getMidiCollector());
+    deviceManager.addMidiInputDeviceCallback ({}, &midiLearnInput);
+    {
+        juce::Component::SafePointer<MainComponent> safe (this);
+        midiLearnInput.onController = [safe] (int cc, int value)
+        {
+            // Llega en el hilo del MIDI: se pasa al hilo principal
+            juce::MessageManager::callAsync ([safe, cc, value] { if (safe != nullptr) safe->handleController (cc, value); });
+        };
+        Knob::onMidiLearn = [safe] (Knob& k)
+        {
+            if (safe == nullptr) return;
+            safe->pendingLearn = targetForKnob (k);
+            if (safe->pendingLearn)
+                safe->setStatus (txt ("Mueve ahora una rueda o un deslizador de tu teclado/controlador MIDI para conectarlo a \"")
+                                 + k.getLabel() + "\".");
+        };
+        Knob::isMidiLinked = [safe] (const Knob& k)
+        {
+            if (safe == nullptr) return false;
+            auto t = targetForKnob (k);
+            if (! t) return false;
+            for (auto link : safe->project.getState().getChildWithName (ids::MIDILINKS))
+                if (link[ids::kind].toString() == t->kind && (int) link[ids::index] == t->index && link[ids::param].toString() == t->param)
+                    return true;
+            return false;
+        };
+        Knob::onMidiForget = [safe] (Knob& k)
+        {
+            if (safe == nullptr) return;
+            auto t = targetForKnob (k);
+            auto links = safe->project.getState().getChildWithName (ids::MIDILINKS);
+            for (int i = links.getNumChildren(); --i >= 0 && t;)
+            {
+                auto link = links.getChild (i);
+                if (link[ids::kind].toString() == t->kind && (int) link[ids::index] == t->index && link[ids::param].toString() == t->param)
+                    links.removeChild (i, safe->project.um());
+            }
+            safe->setStatus (txt ("Control MIDI quitado."));
+        };
+    }
     deviceManager.addChangeListener (this);
 
     setWantsKeyboardFocus (true);
@@ -415,6 +478,10 @@ MainComponent::~MainComponent()
     project.removeChangeListener (this);
     deviceManager.removeChangeListener (this);
     deviceManager.removeMidiInputDeviceCallback ({}, &engine.getMidiCollector());
+    deviceManager.removeMidiInputDeviceCallback ({}, &midiLearnInput);
+    Knob::onMidiLearn = nullptr;
+    Knob::onMidiForget = nullptr;
+    Knob::isMidiLinked = nullptr;
     deviceManager.removeAudioCallback (&engine);
     engine.stopRecording();
 
@@ -671,6 +738,7 @@ void MainComponent::showFileMenu()
     menu.addItem (16, txt ("Exportar por pistas (stems)...") + (pro::isUnlocked() ? juce::String() : juce::String (" · Pro")));
     menu.addItem (13, txt ("Compartir este proyecto..."));
     menu.addItem (14, txt ("Importar un proyecto..."));
+    menu.addItem (17, txt ("Navegador de sonidos"), true, browserOpen);
     menu.addSeparator();
     menu.addItem (7, txt ("Tutorial: tu primer beat"));
    #else
@@ -681,6 +749,7 @@ void MainComponent::showFileMenu()
     menu.addItem (7, txt ("Tutorial: tu primer beat"));
     menu.addItem (8, txt ("Atajos de teclado"));
     menu.addItem (15, txt ("Tocar con el teclado del ordenador (como un piano)"), true, typingPiano);
+    menu.addItem (17, txt ("Navegador de sonidos (F4)"), true, browserOpen);
     menu.addItem (9, txt ("Abrir la carpeta de proyectos"));
    #endif
     menu.addSeparator();
@@ -737,6 +806,7 @@ void MainComponent::showFileMenu()
                 break;
             case 14: importProject(); break;
             case 16: exportStems(); break;
+            case 17: toggleBrowser(); break;
             case 15:
                 typingPiano = ! typingPiano;
                 releaseTypingNotes();
@@ -1784,6 +1854,10 @@ void MainComponent::resized()
         auto content = area.reduced (6, 4);
         for (auto* v : views)
             v->setBounds (content);
+        browserButton.setVisible (false);
+        browser->setVisible (browserOpen);   // en el móvil, encima de la pantalla
+        browser->setBounds (content.withWidth (juce::jmin (content.getWidth(), 360)));
+        browser->toFront (false);
         tutorial.setBounds (getLocalBounds());
     proScreen.setBounds (getLocalBounds());
         return;
@@ -1794,6 +1868,9 @@ void MainComponent::resized()
     viewBarArea = area.removeFromTop (40).reduced (10, 6);
     {
         auto bar = viewBarArea;
+        browserButton.setVisible (true);
+        browserButton.setBounds (bar.removeFromRight (110));
+        bar.removeFromRight (8);
         const int w = juce::jmin (175, bar.getWidth() / (int) View::numViews);
         for (auto* b : viewButtons)
         {
@@ -1803,11 +1880,81 @@ void MainComponent::resized()
     }
 
     auto content = area.reduced (10, 4).withTrimmedBottom (4);
+    browser->setVisible (browserOpen);
+    if (browserOpen)
+    {
+        browser->setBounds (content.removeFromLeft (260));
+        content.removeFromLeft (8);
+    }
     for (auto* v : views)
         v->setBounds (content);
 
     tutorial.setBounds (getLocalBounds());
     proScreen.setBounds (getLocalBounds());
+}
+
+std::optional<MainComponent::LearnTarget> MainComponent::targetForKnob (const Knob& k)
+{
+    auto tree = k.getBoundTree();
+    LearnTarget t;
+    if (tree.hasType (ids::TRACK))        { t.kind = "mixer";   t.index = tree[ids::index]; }
+    else if (tree.hasType (ids::CHANNEL)) { t.kind = "channel"; t.index = tree[ids::uid]; }
+    else                                  return std::nullopt;
+    t.param = k.getBoundProperty().toString();
+    t.min = k.getMin();
+    t.max = k.getMax();
+    return t;
+}
+
+void MainComponent::handleController (int cc, int value)
+{
+    if (! juce::isPositiveAndBelow (cc, 128))
+        return;
+    auto links = project.getState().getChildWithName (ids::MIDILINKS);
+    if (pendingLearn)
+    {
+        // Un control solo mueve una rueda: si ya estaba conectado a otra, se cambia
+        for (int i = links.getNumChildren(); --i >= 0;)
+            if ((int) links.getChild (i)[ids::cc] == cc)
+                links.removeChild (i, nullptr);
+        juce::ValueTree link (ids::LINK);
+        link.setProperty (ids::cc, cc, nullptr);
+        link.setProperty (ids::kind, pendingLearn->kind, nullptr);
+        link.setProperty (ids::index, pendingLearn->index, nullptr);
+        link.setProperty (ids::param, pendingLearn->param, nullptr);
+        link.setProperty (ids::minValue, pendingLearn->min, nullptr);
+        link.setProperty (ids::maxValue, pendingLearn->max, nullptr);
+        project.beginTransaction();
+        links.appendChild (link, project.um());
+        pendingLearn.reset();
+        setStatus (txt ("¡Conectado! El control MIDI número ") + juce::String (cc) + txt (" mueve ahora esa rueda."));
+        return;
+    }
+    for (auto link : links)
+    {
+        if ((int) link[ids::cc] != cc)
+            continue;
+        const auto param = link[ids::param].toString();
+        if (param.isEmpty() || ! juce::Identifier::isValidIdentifier (param))
+            continue;
+        juce::ValueTree target = link[ids::kind].toString() == "mixer" ? project.getMixerTrack (link[ids::index])
+                                                                        : project.findChannel (link[ids::index]);
+        if (! target.isValid())
+            continue;
+        const double lo = link[ids::minValue], hi = link[ids::maxValue];
+        if (! std::isfinite (lo) || ! std::isfinite (hi))
+            continue;
+        target.setProperty (juce::Identifier (param), lo + (hi - lo) * value / 127.0, nullptr);
+    }
+}
+
+void MainComponent::toggleBrowser()
+{
+    browserOpen = ! browserOpen;
+    browserButton.setToggleState (browserOpen, juce::dontSendNotification);
+    if (! browserOpen)
+        engine.stopBuffer();
+    resized();
 }
 
 int MainComponent::typingNoteForKey (int keyCode) const
@@ -1913,6 +2060,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     }
     if (! cmd && ! mods.isAltDown() && upper == 'R')   { toggleRecording(); return true; }
 
+    if (code == juce::KeyPress::F4Key) { toggleBrowser(); return true; }
     if (code == juce::KeyPress::F5Key) { showView (View::playlist); return true; }
     if (code == juce::KeyPress::F6Key) { showView (View::channelRack); return true; }
     if (code == juce::KeyPress::F7Key) { showView (View::pianoRoll); return true; }

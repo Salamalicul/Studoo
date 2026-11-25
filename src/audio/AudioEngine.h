@@ -87,6 +87,14 @@ namespace studoo
         juce::AudioPluginInstance* getChannelPlugin (int channelUid);
         void setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginInstance>, int slot = 0);
         juce::AudioPluginInstance* getMixerPlugin (int track, int slot = 0);
+        // Analizador: copia los últimos 'num' sonidos del Master (mezcla de los dos canales)
+        static constexpr int scopeSize = 4096;
+        void getScope (float* dest, int num) const
+        {
+            const int end = scopePos.load();
+            for (int i = 0; i < num; ++i)
+                dest[i] = scope[(size_t) ((end - num + i) & (scopeSize - 1))];
+        }
         // Afinador: la nota que suena en una pista (Hz, 0 = ninguna)
         float getDetectedPitch (int track) const { return juce::isPositiveAndBelow (track, numMixerTracks) ? mixer[(size_t) track].getDetectedHz() : 0.0f; }
         void setPitchAnalysis (int track, bool on) { if (juce::isPositiveAndBelow (track, numMixerTracks)) mixer[(size_t) track].setAnalysePitch (on); }
@@ -164,6 +172,8 @@ namespace studoo
         std::atomic<int> liveChannelUid { 0 };
         std::atomic<bool> midiRecording { false };
         std::atomic<int> stemTrack { -1 };
+        std::array<float, scopeSize> scope {};
+        std::atomic<int> scopePos { 0 };
         static constexpr int recordFifoSize = 1024;
         juce::AbstractFifo recordFifo { recordFifoSize };
         std::array<RecordedMidi, recordFifoSize> recordBuffer {};

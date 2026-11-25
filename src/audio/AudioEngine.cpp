@@ -1045,6 +1045,15 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     if (! (stem > 0 && stem < numMixerTracks))
         mixer[0].process (n, trackParams[0], snap->bpm, trackParams[0].mute);
     metronome.render (master, n);
+    {
+        // Para el analizador de frecuencias
+        int pos = scopePos.load();
+        const float* l = master.getReadPointer (0);
+        const float* r = master.getReadPointer (1);
+        for (int i = 0; i < n; ++i)
+            scope[(size_t) ((pos + i) & (scopeSize - 1))] = 0.5f * (l[i] + r[i]);
+        scopePos.store ((pos + n) & (scopeSize - 1));
+    }
 
     // --- Sonido de los juegos de oído (no pasa por el mezclador) ---------------------------
     if (audition != nullptr)

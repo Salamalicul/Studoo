@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 #include <map>
 // ============================================================================
 //  MainComponent: todo lo que hay dentro de la ventana principal.
@@ -20,6 +21,7 @@
 #include "ui/LearnView.h"
 #include "ui/MixerView.h"
 #include "ui/PianoRoll.h"
+#include "ui/Browser.h"
 #include "ui/Playlist.h"
 #include "ui/StudooLookAndFeel.h"
 #include "ui/Toolbar.h"
@@ -43,6 +45,22 @@ namespace studoo
         bool keyPressed (const juce::KeyPress&) override;
         bool keyStateChanged (bool isKeyDown) override;
         void exportStems();
+
+        // --- Controles MIDI conectados a ruedas (clic derecho en una rueda) ------------------
+        struct MidiLearnInput : juce::MidiInputCallback
+        {
+            std::function<void (int cc, int value)> onController;
+            void handleIncomingMidiMessage (juce::MidiInput*, const juce::MidiMessage& m) override
+            {
+                if (m.isController() && onController)
+                    onController (m.getControllerNumber(), m.getControllerValue());
+            }
+        };
+        MidiLearnInput midiLearnInput;
+        struct LearnTarget { juce::String kind; int index = 0; juce::String param; double min = 0.0, max = 1.0; };
+        std::optional<LearnTarget> pendingLearn;
+        void handleController (int cc, int value);
+        static std::optional<LearnTarget> targetForKnob (const Knob&);
 
         // Tocar con el teclado del ordenador (Z S X D C... y Q 2 W 3 E...)
         bool typingPiano = false;
@@ -120,6 +138,10 @@ namespace studoo
         juce::OwnedArray<juce::TextButton> viewButtons;
         std::unique_ptr<ChannelRack> channelRack;
         std::unique_ptr<PianoRoll> pianoRoll;
+        std::unique_ptr<BrowserPanel> browser;
+        juce::TextButton browserButton;
+        bool browserOpen = false;
+        void toggleBrowser();
         std::unique_ptr<Playlist> playlist;
         std::unique_ptr<MixerView> mixerView;
         std::unique_ptr<AutomationView> automationView;

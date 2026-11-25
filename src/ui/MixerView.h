@@ -56,6 +56,7 @@ namespace studoo
         AppContext& ctx;
         HelpButton helpButton;
         juce::Label infoLabel;
+        juce::TextButton analyzerButton;
         juce::Viewport viewport;
         juce::Component stripHolder;
         juce::OwnedArray<MixerStrip> strips;
