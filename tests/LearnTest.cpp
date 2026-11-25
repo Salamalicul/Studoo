@@ -164,7 +164,8 @@ int main()
     // --- Sonidos de los juegos ------------------------------------------------------------
     std::cout << "Sonidos de los juegos de oído\n";
     {
-        AudioEngine engine;
+        auto engineOwned = std::make_unique<AudioEngine>();
+        auto& engine = *engineOwned;
         learn::Progress progress;
         EarGames games (engine, progress);
 

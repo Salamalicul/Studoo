@@ -64,7 +64,8 @@ int main (int argc, char* argv[])
     outDir.createDirectory();
 
     Project project;
-    AudioEngine engine;
+    auto engineOwned = std::make_unique<AudioEngine>();
+    auto& engine = *engineOwned;
     engine.prepare (sampleRate, blockSize);
 
     std::cout << "Proyecto y secuenciador\n";
@@ -131,7 +132,8 @@ int main (int argc, char* argv[])
         auto pattern = p.getCurrentPattern();
         auto ch = p.findChannelByType (type);
         p.addNote (pattern, ch[ids::uid], 0.0, 8.0, type == ChannelType::synth ? 60 : 36);
-        AudioEngine e;
+        auto eOwned = std::make_unique<AudioEngine>();
+        auto& e = *eOwned;
         e.prepare (sampleRate, blockSize);
         e.updateFromProject (p.getState(), cache);
         e.play();
@@ -226,7 +228,8 @@ int main (int argc, char* argv[])
         for (auto ch : q.channels())
             for (int st : { 0, 4, 8, 12 })
                 q.setStep (qp, ch[ids::uid], st, true);
-        AudioEngine e;
+        auto eOwned = std::make_unique<AudioEngine>();
+        auto& e = *eOwned;
         e.prepare (sampleRate, blockSize);
         e.updateFromProject (q.getState(), cache);
         e.play();
@@ -242,7 +245,8 @@ int main (int argc, char* argv[])
             pp.channels().removeAllChildren (nullptr);
             auto ch = add (pp);
             pp.addNote (pp.getCurrentPattern(), ch[ids::uid], 0.0, 8.0, note);
-            AudioEngine pe;
+            auto peOwned = std::make_unique<AudioEngine>();
+            auto& pe = *peOwned;
             pe.prepare (sampleRate, blockSize);
             pe.updateFromProject (pp.getState(), cache);
             pe.play();
@@ -293,7 +297,8 @@ int main (int argc, char* argv[])
             Project p;
             auto kick = p.findChannelByBuiltin ("builtin:kick");
             setup (p, kick);
-            AudioEngine e;
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
             e.prepare (sampleRate, blockSize);
             e.updateFromProject (p.getState(), cache);
             e.play();
@@ -479,7 +484,8 @@ int main (int argc, char* argv[])
             p.getState().setProperty (ids::playMode, "song", nullptr);
             for (auto ch : p.channels())
                 if (ch != voice) ch.setProperty (ids::muted, true, nullptr);
-            AudioEngine e;
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
             e.prepare (sampleRate, blockSize);
             e.updateFromProject (p.getState(), cache);
             e.play();
@@ -515,7 +521,8 @@ int main (int argc, char* argv[])
                 p.getState().setProperty (ids::playMode, "song", nullptr);
                 for (auto ch : p.channels())
                     if (ch != voice) ch.setProperty (ids::muted, true, nullptr);
-                AudioEngine e;
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
                 e.prepare (sampleRate, blockSize);
                 e.updateFromProject (p.getState(), cache);
                 e.play();
@@ -600,7 +607,8 @@ int main (int argc, char* argv[])
                 auto snare = p.findChannelByBuiltin ("builtin:snare");
                 p.setStep (p.getCurrentPattern(), kick[ids::uid], 0, true);
                 p.setStep (p.getCurrentPattern(), snare[ids::uid], 4, true);
-                AudioEngine e;
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
                 e.prepare (sampleRate, blockSize);
                 e.updateFromProject (p.getState(), cache);
                 e.setStemTrack ((int) snare[ids::mixer]);
@@ -625,7 +633,8 @@ int main (int argc, char* argv[])
                     p.addNote (p.getCurrentPattern(), synth[ids::uid], 0.0, 5.0, 57);   // La3 (220 Hz)
                     p.addNote (p.getCurrentPattern(), synth[ids::uid], 4.0, 8.0, 69);   // La4 (440 Hz), solapada
                     for (auto ch : p.channels()) if (ch != synth) ch.setProperty (ids::muted, true, nullptr);
-                    AudioEngine e;
+                    auto eOwned = std::make_unique<AudioEngine>();
+                    auto& e = *eOwned;
                     e.prepare (sampleRate, blockSize);
                     e.updateFromProject (p.getState(), cache);
                     e.play();
@@ -818,7 +827,8 @@ int main (int argc, char* argv[])
                     for (auto point : l)
                         point.setProperty (ids::value, AutomationTarget::toNormalised (t.param, 70.0f), nullptr);
                 }
-                AudioEngine e;
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
                 e.prepare (sampleRate, blockSize);
                 e.updateFromProject (q.getState(), cache);
                 e.play();
@@ -917,7 +927,8 @@ int main (int argc, char* argv[])
                     point.setProperty (ids::value, value, nullptr);
                 for (auto ch : p.channels())
                     if (ch != bass) ch.setProperty (ids::muted, true, nullptr);
-                AudioEngine e;
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
                 e.prepare (sampleRate, blockSize);
                 e.updateFromProject (p.getState(), cache);
                 e.play();
@@ -983,7 +994,8 @@ int main (int argc, char* argv[])
             Project p;
             auto ch = p.addChannel (ChannelType::plugin, types[0]->name, 0);
             p.addNote (p.getCurrentPattern(), ch[ids::uid], 0.0, 8.0, 69);
-            AudioEngine e;
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
             e.prepare (sampleRate, blockSize);
             e.setChannelPlugin (ch[ids::uid], std::move (instance));
             e.updateFromProject (p.getState(), cache);
@@ -1002,7 +1014,8 @@ int main (int argc, char* argv[])
             auto kick = q.findChannelByBuiltin ("builtin:kick");
             for (int s : { 0, 4, 8, 12 }) q.setStep (q.getCurrentPattern(), kick[ids::uid], s, true);
             for (auto c : q.channels()) if (c != kick) c.setProperty (ids::muted, true, nullptr);
-            AudioEngine fx;
+            auto fxOwned = std::make_unique<AudioEngine>();
+            auto& fx = *fxOwned;
             fx.prepare (sampleRate, blockSize);
             fx.updateFromProject (q.getState(), cache);
             fx.setMixerPlugin ((int) kick[ids::mixer], formats.createPluginInstance (*types[0], sampleRate, blockSize, error), 2);

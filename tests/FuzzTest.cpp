@@ -170,7 +170,8 @@ int main (int argc, char* argv[])
     rng.setSeed (seed);
 
     SampleCache cache;
-    AudioEngine engine;
+    auto engineOwned = std::make_unique<AudioEngine>();
+    auto& engine = *engineOwned;
     engine.prepare (44100.0, 512);
     juce::AudioBuffer<float> block (2, 512);
 
