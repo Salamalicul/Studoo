@@ -32,6 +32,13 @@ namespace studoo
         { transportPos = positionSteps; transportStep = samplesPerStep; transportPlaying = playing; }
         float getDetectedHz() const { return pitch.getDetectedHz(); }   // afinador
         void setAnalysePitch (bool on) { pitch.setAnalyse (on); }
+        // Retraso que añaden sus plugins (en muestras): el motor retrasa las demás pistas lo mismo
+        int getLatency() const
+        {
+            int total = 0;
+            for (auto* p : plugins) if (p != nullptr) total += juce::jmax (0, p->getLatencySamples());
+            return total;
+        }
         bool hasPlugins() const { for (auto* p : plugins) if (p != nullptr) return true; return false; }
         juce::AudioPluginInstance* getPlugin (int slot = 0) const { return juce::isPositiveAndBelow (slot, numFxSlots) ? plugins[(size_t) slot] : nullptr; }
 

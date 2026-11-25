@@ -242,6 +242,43 @@ void PlaylistGrid::paint (juce::Graphics& g)
         }
     }
 
+    // Fila de automatización: la curva elegida en la pestaña Automatización
+    {
+        auto area = automationArea();
+        g.setColour (juce::Colour (0xff16191d));
+        g.fillRect (area.withX (0.0f).withWidth ((float) getWidth()));
+        g.setColour (Colours::outline);
+        g.drawHorizontalLine ((int) area.getY(), 0.0f, (float) getWidth());
+        auto lane = selectedLane();
+        g.setColour (Colours::textDim);
+        g.setFont (Fonts::bold (10.0f));
+        g.drawFittedText (lane.isValid() ? txt ("Automat.") : txt ("Automat.\n(ninguna)"),
+                          juce::Rectangle<int> (4, (int) area.getY() + 4, labelWidth - 8, (int) area.getHeight() - 8),
+                          juce::Justification::centredLeft, 3);
+        if (lane.isValid())
+        {
+            const auto target = AutomationTarget::parse (lane[ids::target].toString());
+            g.setColour (Colours::accent);
+            g.setFont (Fonts::regular (10.0f));
+            g.drawText (ctx.project.describeTarget (target), area.reduced (6.0f, 2.0f).withHeight (14.0f), juce::Justification::centredLeft);
+            juce::Array<juce::ValueTree> points;
+            for (auto p : lane) points.add (p);
+            std::sort (points.begin(), points.end(), [] (const juce::ValueTree& a, const juce::ValueTree& b)
+                       { return (double) a[ids::time] < (double) b[ids::time]; });
+            juce::Path curve;
+            for (int i = 0; i < points.size(); ++i)
+            {
+                const float x = stepsToX (points[i][ids::time]), y = autoValueToY (points[i][ids::value]);
+                if (i == 0) { curve.startNewSubPath (area.getX(), y); curve.lineTo (x, y); }
+                else        curve.lineTo (x, y);
+                if (i == points.size() - 1) curve.lineTo ((float) getWidth(), y);
+            }
+            g.strokePath (curve, juce::PathStrokeType (2.0f));
+            for (auto& p : points)
+                g.fillEllipse (stepsToX (p[ids::time]) - 4.0f, autoValueToY (p[ids::value]) - 4.0f, 8.0f, 8.0f);
+        }
+    }
+
     // Cursor de reproducción
     if (ctx.engine.isSongMode())
     {
@@ -499,6 +536,29 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
     });
 }
 
+juce::ValueTree PlaylistGrid::selectedLane()
+{
+    return ctx.project.automation().getChildWithProperty (ids::uid, ctx.project.getState()[ids::selectedLane]);
+}
+
+juce::Rectangle<float> PlaylistGrid::automationArea() const
+{
+    const float top = (float) (rulerHeight + numPlaylistTracks * trackHeight);
+    return { (float) labelWidth, top, (float) (getWidth() - labelWidth), (float) automationHeight };
+}
+
+float PlaylistGrid::autoValueToY (float v) const
+{
+    auto a = automationArea().reduced (0.0f, 18.0f).withTrimmedBottom (-12.0f);
+    return a.getBottom() - juce::jlimit (0.0f, 1.0f, v) * a.getHeight();
+}
+
+float PlaylistGrid::autoYToValue (float y) const
+{
+    auto a = automationArea().reduced (0.0f, 18.0f).withTrimmedBottom (-12.0f);
+    return juce::jlimit (0.0f, 1.0f, (a.getBottom() - y) / a.getHeight());
+}
+
 void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
 {
     dragMode = DragMode::none;
@@ -506,6 +566,35 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
         return;
 
     const double steps = juce::jmax (0.0, xToSteps (e.position.x));
+
+    // Fila de automatización: añadir, mover o borrar puntos de la curva
+    if (automationArea().contains (e.position))
+    {
+        auto lane = selectedLane();
+        if (! lane.isValid())
+            return;
+        ctx.project.beginTransaction();
+        juce::ValueTree hit;
+        for (auto p : lane)
+            if (juce::Point<float> (stepsToX (p[ids::time]), autoValueToY (p[ids::value])).getDistanceFrom (e.position) < 8.0f)
+                hit = p;
+        if (e.mods.isPopupMenu())
+        {
+            if (hit.isValid() && lane.getNumChildren() > 1)
+                lane.removeChild (hit, ctx.project.um());
+            return;
+        }
+        if (! hit.isValid())
+        {
+            hit = juce::ValueTree (ids::POINT);
+            hit.setProperty (ids::time, snap (steps), nullptr);
+            hit.setProperty (ids::value, autoYToValue (e.position.y), nullptr);
+            lane.appendChild (hit, ctx.project.um());
+        }
+        dragPoint = hit;
+        dragMode = DragMode::automation;
+        return;
+    }
 
     if (e.y < rulerHeight)
     {
@@ -555,6 +644,15 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
 void PlaylistGrid::mouseDrag (const juce::MouseEvent& e)
 {
     const double steps = juce::jmax (0.0, xToSteps (e.position.x));
+    if (dragMode == DragMode::automation)
+    {
+        if (dragPoint.isValid())
+        {
+            dragPoint.setProperty (ids::time, juce::jmax (0.0, std::round (steps / playlist.getSnap() * 4.0) * playlist.getSnap() / 4.0), ctx.project.um());
+            dragPoint.setProperty (ids::value, autoYToValue (e.position.y), ctx.project.um());
+        }
+        return;
+    }
 
     if (dragMode == DragMode::ruler)
     {
@@ -594,6 +692,7 @@ void PlaylistGrid::mouseDrag (const juce::MouseEvent& e)
 
 void PlaylistGrid::mouseUp (const juce::MouseEvent&)
 {
+    dragPoint = {};
     dragMode = DragMode::none;
     dragClip = {};
 }
@@ -719,7 +818,7 @@ void Playlist::paint (juce::Graphics& g)
 void Playlist::layoutGrid()
 {
     const int width = PlaylistGrid::labelWidth + (int) (grid.getTotalBars() * zoomSlider.getValue()) + 20;
-    const int height = PlaylistGrid::rulerHeight + numPlaylistTracks * PlaylistGrid::trackHeight;
+    const int height = PlaylistGrid::rulerHeight + numPlaylistTracks * PlaylistGrid::trackHeight + PlaylistGrid::automationHeight;
     grid.setSize (width, height);
 }
 

@@ -173,6 +173,11 @@ namespace studoo
         std::atomic<int> liveChannelUid { 0 };
         std::atomic<bool> midiRecording { false };
         std::atomic<int> stemTrack { -1 };
+        // Compensación del retraso de los plugins: una línea de retardo por pista (solo si hace falta)
+        static constexpr int pdcSize = 16384;
+        std::array<juce::AudioBuffer<float>, numMixerTracks> pdcLines;
+        std::array<int, numMixerTracks> pdcWrite {};
+        void ensurePdc();
         std::array<float, scopeSize> scope {};
         std::atomic<int> scopePos { 0 };
         static constexpr int recordFifoSize = 1024;

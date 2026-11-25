@@ -337,9 +337,12 @@ void AudioEngine::setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginIn
         plugin->prepareToPlay (sampleRate, blockSize);
     }
 
+    const bool latent = plugin != nullptr && plugin->getLatencySamples() > 0;
     std::unique_ptr<juce::AudioPluginInstance> old;
     {
         const juce::ScopedLock sl (lock);
+        if (latent)
+            ensurePdc();
         old = std::move (mixerPlugins[index]);
         mixerPlugins[index] = std::move (plugin);
         mixer[(size_t) track].setPlugin (mixerPlugins[index].get(), slot);
@@ -372,6 +375,18 @@ void AudioEngine::clearAllPlugins()
     for (auto& p : old)
         if (onPluginWillBeDeleted)
             onPluginWillBeDeleted (p.get());
+}
+
+void AudioEngine::ensurePdc()
+{
+    if (pdcLines[0].getNumSamples() > 0)
+        return;
+    for (auto& line : pdcLines)
+    {
+        line.setSize (2, pdcSize);
+        line.clear();
+    }
+    pdcWrite.fill (0);
 }
 
 juce::AudioPluginInstance* AudioEngine::getMixerPlugin (int track, int slot)
@@ -1030,6 +1045,16 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     auto& master = mixer[0].getBuffer();
     for (auto& track : mixer)
         track.setTransport (chunkStartPos, samplesPerStep, isPlaying);
+
+    // Compensación del retraso de los plugins: todas las pistas se esperan a la más lenta
+    std::array<int, numMixerTracks> latency {};
+    int maxLatency = 0;
+    if (pdcLines[0].getNumSamples() > 0)
+        for (int t = 1; t < numMixerTracks; ++t)
+        {
+            latency[(size_t) t] = juce::jmin (pdcSize - 1, mixer[(size_t) t].getLatency());
+            maxLatency = juce::jmax (maxLatency, latency[(size_t) t]);
+        }
     for (int t = 1; t < numMixerTracks; ++t)
     {
         const auto& tp = trackParams[(size_t) t];
@@ -1053,6 +1078,25 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
             }
         if (tp.sendOnly && tp.sendTo > t && t != stem)
             continue;
+        if (maxLatency > 0)
+        {
+            const int delay = maxLatency - latency[(size_t) t];
+            auto& line = pdcLines[(size_t) t];
+            int& w = pdcWrite[(size_t) t];
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                float* d = out.getWritePointer (ch);
+                float* buf = line.getWritePointer (ch);
+                int pos = w;
+                for (int i = 0; i < n; ++i)
+                {
+                    buf[pos] = d[i];
+                    d[i] = buf[(pos - delay + pdcSize) & (pdcSize - 1)];
+                    pos = (pos + 1) & (pdcSize - 1);
+                }
+            }
+            w = (w + n) & (pdcSize - 1);
+        }
         master.addFrom (0, 0, out, 0, 0, n);
         master.addFrom (1, 0, out, 1, 0, n);
     }

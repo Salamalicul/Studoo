@@ -80,6 +80,8 @@ namespace studoo::kits
         int wave; // 0 sierra, 1 cuadrada, 2 seno, 3 triángulo
         float attack, decay, sustain, release, cutoff, resonance, detune;
         int root; // nota en la que suena el canal cuando usas pasos
+        float timbre = 0.5f;   // FM y tabla de ondas
+        int fmRatio = 2;
     };
     const std::vector<SynthPreset>& synthPresets();
 

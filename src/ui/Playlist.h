@@ -19,6 +19,7 @@ namespace studoo
         static constexpr int rulerHeight = 24;
         static constexpr int trackHeight = 40;
         static constexpr int labelWidth = 80;
+        static constexpr int automationHeight = 90;   // fila de automatización (abajo)
 
         void paint (juce::Graphics&) override;
         void mouseDown (const juce::MouseEvent&) override;
@@ -51,7 +52,12 @@ namespace studoo
         AppContext& ctx;
         Playlist& playlist;
         juce::ValueTree dragClip;
-        enum class DragMode { none, move, resize, trimStart, ruler } dragMode = DragMode::none;
+        enum class DragMode { none, move, resize, trimStart, ruler, automation } dragMode = DragMode::none;
+        juce::ValueTree dragPoint;
+        juce::ValueTree selectedLane();
+        juce::Rectangle<float> automationArea() const;
+        float autoValueToY (float v) const;
+        float autoYToValue (float y) const;
         double dragStartSteps = 0.0, clipStart = 0.0, clipLength = 0.0, clipOffset = 0.0;
         int dragStartTrack = 0, clipTrack = 0;
     };

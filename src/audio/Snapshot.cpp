@@ -50,7 +50,9 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         c.oneShot = ch.getProperty (ids::oneShot, true);
         c.samplePath = ch[ids::sample].toString();
 
-        c.synth.wave = juce::jlimit (0, 3, (int) ch.getProperty (ids::wave, 0));
+        c.synth.wave = juce::jlimit (0, 5, (int) ch.getProperty (ids::wave, 0));
+        c.synth.timbre = num (ch, ids::timbre, 0.0f, 1.0f, 0.5f);
+        c.synth.fmRatio = juce::jlimit (1, 8, (int) ch.getProperty (ids::fmRatio, 2));
         c.synth.attack = num (ch, ids::attack, 0.001f, 2.0f, 0.005f);
         c.synth.decay = num (ch, ids::decay, 0.01f, 3.0f, 0.3f);
         c.synth.sustain = num (ch, ids::sustain, 0.0f, 1.0f, 0.6f);

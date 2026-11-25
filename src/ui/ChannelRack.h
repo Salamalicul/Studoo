@@ -112,7 +112,7 @@ namespace studoo
         AppContext& ctx;
         HelpButton helpButton;
         juce::ComboBox patternBox, lengthBox, swingBox, pageBox;
-        juce::TextButton patternMenuButton, addButton, exampleButton, clearButton, soundButton, graphButton;
+        juce::TextButton patternMenuButton, addButton, exampleButton, clearButton, soundButton, graphButton, padsButton;
         std::unique_ptr<StepGraph> stepGraph;
         bool panelOpen = false; // modo móvil: panel del sonido abierto
 

@@ -134,6 +134,37 @@ jobs:
           path: dist/Studoo-Instalador.exe
 
   # --------------------------------------------------------------------------
+  #  Mac (Apple Silicon e Intel). Sin firmar: la primera vez hay que abrirlo
+  #  con clic derecho > Abrir. Si falla, el resto de versiones se publican igual.
+  # --------------------------------------------------------------------------
+  mac:
+    name: Mac
+    runs-on: macos-14
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSTUDOO_BUILD_TESTS=ON -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+      - name: Compilar
+        run: cmake --build build --config Release -j 4
+
+      - name: Pruebas del motor de audio
+        run: ./build/StudooEngineTest_artefacts/Release/StudooEngineTest
+
+      - name: Empaquetar
+        run: |
+          # Firma "ad hoc" (sin cuenta de Apple) para que macOS deje abrirlo
+          codesign --force --deep --sign - build/Studoo_artefacts/Release/Studoo.app
+          ditto -c -k --keepParent build/Studoo_artefacts/Release/Studoo.app Studoo-Mac.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Studoo-Mac
+          path: Studoo-Mac.zip
+
+  # --------------------------------------------------------------------------
   #  Publicar un "Release" (descarga directa) cuando se sube una etiqueta
   #  de versión, por ejemplo v1.0.0
   # --------------------------------------------------------------------------
@@ -239,8 +270,9 @@ jobs:
 
   release:
     name: Publicar release
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
-    needs: [linux, windows, android]
+    # El Mac es opcional: si su compilación falla, se publica todo lo demás
+    if: always() && needs.linux.result == 'success' && needs.windows.result == 'success' && needs.android.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.version != ''))
+    needs: [linux, windows, android, mac]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -270,6 +302,7 @@ jobs:
           cp artifacts/Studoo-Linux-deb/*.deb Studoo-${{ env.TAG }}-Linux.deb
           cp artifacts/Studoo-Android/Studoo-Android.apk Studoo-${{ env.TAG }}-Android.apk
           cp artifacts/Studoo-GooglePlay/Studoo-GooglePlay.aab Studoo-${{ env.TAG }}-GooglePlay.aab
+          if [ -f artifacts/Studoo-Mac/Studoo-Mac.zip ]; then cp artifacts/Studoo-Mac/Studoo-Mac.zip Studoo-${{ env.TAG }}-Mac.zip; fi
 
       - name: Reemplazar la versión si ya existe
         if: inputs.reemplazar
@@ -290,6 +323,7 @@ jobs:
             Studoo-${{ env.TAG }}-Linux.tar.gz
             Studoo-${{ env.TAG }}-Android.apk
             Studoo-${{ env.TAG }}-GooglePlay.aab
+            Studoo-${{ env.TAG }}-Mac.zip
 
       # Repositorio público de descargas (Salamalicul/Studoo-descargas): ahí
       # buscan las actualizaciones, así el código puede ser privado. Necesita el
@@ -316,3 +350,4 @@ jobs:
             Studoo-${{ env.TAG }}-Linux.deb
             Studoo-${{ env.TAG }}-Linux.tar.gz
             Studoo-${{ env.TAG }}-Android.apk
+            Studoo-${{ env.TAG }}-Mac.zip

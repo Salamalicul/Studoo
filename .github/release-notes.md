@@ -118,6 +118,10 @@
 3. Pulsa **Instalar**. Studoo aparece con su icono.
    - Desde la 1.7, Studoo se actualiza solo. Si vienes de la 1.6 o anterior, desinstala la anterior primero (solo una vez).
 
+**Mac** (nuevo, versión de prueba)
+1. Descarga **`Studoo-...-Mac.zip`** y ábrelo: aparece **Studoo**. Arrástralo a **Aplicaciones**.
+2. La primera vez, haz **clic derecho sobre Studoo > Abrir** y confirma (sale un aviso porque la app no está firmada por Apple).
+
 **Otras distribuciones de Linux** (Fedora, Arch...)
 1. Descarga **`Studoo-...-Linux.tar.gz`**.
 2. En una terminal, en la carpeta de descargas:

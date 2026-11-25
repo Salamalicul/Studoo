@@ -324,6 +324,25 @@ float SynthInstrument::oscillator (double t, double dt) const
             return (float) std::sin (twoPi * t);
         case 3: // triángulo
             return (float) (2.0 * std::abs (2.0 * t - 1.0) - 1.0);
+        case 4: // FM: una onda seno que modula a otra (campanas, pianos eléctricos, bajos "DX")
+            return (float) std::sin (twoPi * t + params.timbre * 6.0 * std::sin (twoPi * params.fmRatio * t));
+        case 5: // Tabla de ondas: el timbre pasa de seno a triángulo, sierra y cuadrada
+        {
+            const float pos = params.timbre * 3.0f;
+            const int a = juce::jmin (2, (int) pos);
+            const float f = pos - (float) a;
+            auto shape = [&] (int k) -> float
+            {
+                switch (k)
+                {
+                    case 0:  return (float) std::sin (twoPi * t);
+                    case 1:  return (float) (2.0 * std::abs (2.0 * t - 1.0) - 1.0);
+                    case 2:  return (float) (2.0 * t - 1.0) - polyBlep (t, dt);
+                    default: return (t < 0.5 ? 1.0f : -1.0f) + polyBlep (t, dt) - polyBlep (std::fmod (t + 0.5, 1.0), dt);
+                }
+            };
+            return shape (a) * (1.0f - f) + shape (a + 1) * f;
+        }
         default: // sierra
             return (float) (2.0 * t - 1.0) - polyBlep (t, dt);
     }

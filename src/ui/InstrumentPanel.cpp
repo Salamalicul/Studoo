@@ -294,7 +294,7 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
         {
             typeName = "Sintetizador";
             auto* wave = new juce::ComboBox();
-            wave->addItemList ({ "Sierra", "Cuadrada", "Seno", txt ("Triángulo") }, 1);
+            wave->addItemList ({ "Sierra", "Cuadrada", "Seno", txt ("Triángulo"), "FM", txt ("Tabla de ondas") }, 1);
             wave->setTooltip (txt ("Forma de onda: el \"color\" básico del sonido."));
             wave->setSelectedId ((int) channel[ids::wave] + 1, juce::dontSendNotification);
             wave->onChange = [this, wave]
@@ -318,6 +318,14 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
             addKnob ("Resonancia", txt ("Realza la zona del filtro (sonido más \"chillón\")."), ids::resonance, 0.0, 1.0, 0.2);
             addKnob ("Desafinar", txt ("Separa los dos osciladores: sonido más ancho."), ids::detune, 0.0, 50.0, 8.0)
                 ->setValueSuffix (" cents", 0);
+            addKnob ("Timbre", txt ("En FM: cuánto se modula (más = más metálico y brillante). En Tabla de ondas: "
+                                    "cambia la forma de la onda de suave (seno) a fuerte (cuadrada)."),
+                     ids::timbre, 0.0, 1.0, 0.5)->setDisplayFunction ([] (double v) { return juce::String ((int) (v * 100.0)) + "%"; });
+            auto* ratio = addKnob ("FM ratio", txt ("Solo en FM: la frecuencia del modulador. 1 = suave (piano), 2-3 = campanas, 4+ = metálico."),
+                                   ids::fmRatio, 1.0, 8.0, 2.0);
+            ratio->getSlider().setRange (1.0, 8.0, 1.0);
+            ratio->setDisplayFunction ([] (double v) { return "x" + juce::String ((int) v); });
+
             auto* mono = new juce::ToggleButton ("Mono");
             mono->setTooltip (txt ("Mono: solo suena una nota a la vez. Si dos notas se solapan en el piano roll, "
                                    "el sonido se desliza de una a otra (con la rueda Glide)."));
@@ -467,9 +475,19 @@ void InstrumentPanel::resized()
         if (dynamic_cast<SampleWaveform*> (c) != nullptr) return 0;
         return 60;
     };
-    int fixed = 0;
+    int fixed = 0, knobs = 0;
     for (auto* c : controls)
+    {
         fixed += widthOf (c) + 6;
+        knobs += dynamic_cast<Knob*> (c) != nullptr ? 1 : 0;
+    }
+    // Si no cabe todo (móvil o sinte con muchas ruedas), las ruedas se estrechan un poco
+    int knobWidth = 60;
+    if (fixed > area.getWidth() && knobs > 0)
+    {
+        knobWidth = juce::jlimit (40, 60, 60 - (fixed - area.getWidth()) / knobs - 1);
+        fixed -= (60 - knobWidth) * knobs;
+    }
     const int waveWidth = juce::jmin (230, area.getWidth() - fixed - 6);
 
     for (auto* c : controls)
@@ -480,7 +498,7 @@ void InstrumentPanel::resized()
             if (waveWidth < 110)
                 continue;
         }
-        int w = 60;
+        int w = knobWidth;
         if (dynamic_cast<juce::TextButton*> (c) != nullptr)   w = 130;
         if (auto* tb = dynamic_cast<juce::ToggleButton*> (c))
             w = juce::GlyphArrangement::getStringWidthInt (juce::FontOptions (15.0f), tb->getButtonText()) + 44;

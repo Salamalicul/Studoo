@@ -174,6 +174,93 @@ StepGrid::StepGrid (AppContext& c, ChannelRack& r) : ctx (c), rack (r)
 }
 
 // ============================================================================
+//  Pads: tocar la batería con 16 botones grandes (y grabarlo en los pasos)
+// ============================================================================
+namespace
+{
+    class PadsPanel : public juce::Component, private juce::Timer
+    {
+    public:
+        PadsPanel (AppContext& c, ChannelRack& r) : ctx (c), rack (r)
+        {
+            addAndMakeVisible (recordToggle);
+            recordToggle.setButtonText (txt ("Grabar en los pasos mientras suena"));
+            makeNonFocusing (recordToggle);
+            setSize (440, 480);
+            startTimerHz (20);
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            g.fillAll (Colours::panel);
+            g.setColour (Colours::text);
+            g.setFont (Fonts::bold (14.0f));
+            g.drawText (txt ("Pads de batería"), 12, 6, 300, 20, juce::Justification::centredLeft);
+            for (int i = 0; i < 16; ++i)
+            {
+                auto r = padBounds (i).toFloat();
+                auto ch = channelFor (i);
+                const auto colour = ch.isValid() ? Colours::forChannelType (ch[ids::type].toString()) : Colours::outline;
+                const float glow = ch.isValid() ? juce::jmin (1.0f, ctx.engine.getChannelActivity (ch[ids::uid]) * 2.0f) : 0.0f;
+                g.setColour (colour.withAlpha (0.25f + 0.6f * glow));
+                g.fillRoundedRectangle (r, 8.0f);
+                g.setColour (colour);
+                g.drawRoundedRectangle (r.reduced (0.5f), 8.0f, 1.5f);
+                g.setColour (Colours::text);
+                g.setFont (Fonts::bold (11.0f));
+                g.drawFittedText (ch.isValid() ? ch[ids::name].toString() : juce::String ("-"), r.reduced (6.0f).toNearestInt(),
+                                  juce::Justification::centredBottom, 2);
+            }
+        }
+
+        void resized() override { recordToggle.setBounds (12, getHeight() - 34, getWidth() - 24, 26); }
+
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            for (int i = 0; i < 16; ++i)
+                if (padBounds (i).contains (e.getPosition()))
+                {
+                    auto ch = channelFor (i);
+                    if (! ch.isValid())
+                        return;
+                    // Más arriba en el pad = golpe más fuerte
+                    const auto r = padBounds (i);
+                    const float vel = juce::jlimit (0.3f, 1.0f, 1.0f - (float) (e.y - r.getY()) / (float) r.getHeight() * 0.7f);
+                    ctx.engine.previewNote (ch[ids::uid], ch.getProperty (ids::root, 60), vel, 0.5);
+                    ctx.project.setSelectedChannel (ch[ids::uid]);
+                    if (recordToggle.getToggleState() && ctx.engine.isPlaying() && ! ctx.engine.isSongMode())
+                    {
+                        const int length = rack.getPatternLength();
+                        const int step = ((int) std::round (ctx.engine.getPlayPosition()) % length + length) % length;
+                        ctx.project.beginTransaction();
+                        ctx.project.setStep (rack.getPattern(), ch[ids::uid], step, true);
+                        ctx.project.setStepValue (rack.getPattern(), ch[ids::uid], step, ids::stepVel, juce::roundToInt (vel * 100.0f));
+                    }
+                    return;
+                }
+        }
+
+    private:
+        void timerCallback() override { repaint(); }
+        juce::Rectangle<int> padBounds (int i) const
+        {
+            const int size = (getWidth() - 24 - 3 * 8) / 4;
+            const int row = 3 - i / 4, col = i % 4;   // el pad 1 abajo a la izquierda, como en las cajas de ritmos
+            return { 12 + col * (size + 8), 32 + row * (size + 8), size, size };
+        }
+        juce::ValueTree channelFor (int i) const
+        {
+            auto chans = ctx.project.channels();
+            return i < chans.getNumChildren() ? chans.getChild (i) : juce::ValueTree();
+        }
+
+        AppContext& ctx;
+        ChannelRack& rack;
+        juce::ToggleButton recordToggle;
+    };
+}
+
+// ============================================================================
 //  StepGraph: el editor de pasos
 // ============================================================================
 StepGraph::StepGraph (AppContext& c, ChannelRack& r, StepGrid& g) : ctx (c), rack (r), grid (g)
@@ -615,6 +702,18 @@ ChannelRack::ChannelRack (AppContext& c)
     graphButton.onClick = [this] { stepGraph->setVisible (graphButton.getToggleState()); resized(); };
     makeNonFocusing (graphButton);
     stepGraph = std::make_unique<StepGraph> (ctx, *this, grid);
+
+    content.addAndMakeVisible (padsButton);
+    padsButton.setButtonText (txt ("Pads"));
+    padsButton.setTooltip (txt ("Toca tus 16 primeros canales con pads grandes (como una caja de ritmos). "
+                                "Puedes grabar lo que tocas en los pasos mientras suena."));
+    padsButton.onClick = [this]
+    {
+        auto* top = getTopLevelComponent();
+        juce::CallOutBox::launchAsynchronously (std::make_unique<PadsPanel> (ctx, *this),
+                                                top->getLocalArea (&content, padsButton.getBounds()), top);
+    };
+    makeNonFocusing (padsButton);
     addChildComponent (*stepGraph);
     content.onPaint = [this] (juce::Graphics& g)
     {
@@ -916,6 +1015,7 @@ void ChannelRack::resized()
     content.setSize (width, rows.size() * rowHeight + rowHeight + 4);
     addRow->setBounds (0, rows.size() * rowHeight + 2, controlsWidth - 4, rowHeight);
     graphButton.setBounds (controlsWidth, rows.size() * rowHeight + 8, 150, rowHeight - 12);
+    padsButton.setBounds (controlsWidth + 158, rows.size() * rowHeight + 8, 80, rowHeight - 12);
     grid.setBounds (controlsWidth, 0, width - controlsWidth - 4, rows.size() * rowHeight);
 
     for (int r = 0; r < rows.size(); ++r)

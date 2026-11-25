@@ -280,6 +280,15 @@ const std::vector<SynthPreset>& synthPresets()
         { "Arpegio",             "Notas muy cortas para patrones rápidos",    1, 0.001f, 0.12f, 0.0f,  0.1f,  4000.0f,  0.5f,  5.0f,  72 },
         { "Ambiente",            "Capa etérea para fondos",                   2, 1.5f,   2.0f,  0.9f,  2.5f,  3000.0f,  0.0f,  9.0f,  60 },
         { "Lead retro 8 bits",   "Como en los videojuegos antiguos",          1, 0.005f, 0.1f,  0.9f,  0.1f,  12000.0f, 0.1f,  0.0f,  72 },
+        // FM y tabla de ondas
+        { "Piano FM (años 80)",  "El piano eléctrico de las baladas de los 80", 4, 0.002f, 1.2f, 0.2f,  0.6f,  12000.0f, 0.0f,  3.0f,  60, 0.35f, 1 },
+        { "Campana FM",          "Campanas metálicas que brillan",            4, 0.001f, 2.0f,  0.0f,  1.5f,  16000.0f, 0.0f,  2.0f,  84, 0.6f,  3 },
+        { "Bajo FM",             "Bajo con golpe, muy usado en el pop",       4, 0.002f, 0.35f, 0.5f,  0.12f, 6000.0f,  0.1f,  0.0f,  36, 0.45f, 1 },
+        { "Pluck FM",            "Pellizco brillante para melodías",          4, 0.001f, 0.3f,  0.0f,  0.25f, 9000.0f,  0.2f,  4.0f,  72, 0.7f,  2 },
+        { "Marimba",             "Madera golpeada, suena tropical",           4, 0.001f, 0.5f,  0.0f,  0.4f,  8000.0f,  0.0f,  0.0f,  72, 0.3f,  4 },
+        { "Pad de tabla",        "Fondo que cambia de color con el LFO",      5, 0.9f,   1.0f,  0.85f, 1.8f,  4000.0f,  0.2f,  16.0f, 60, 0.4f,  2 },
+        { "Lead de tabla",       "Melodía gruesa y moderna",                  5, 0.005f, 0.3f,  0.8f,  0.2f,  9000.0f,  0.25f, 10.0f, 72, 0.75f, 2 },
+        { "Bajo reese",          "Bajo ancho del drum and bass y el dubstep", 5, 0.005f, 0.4f,  0.9f,  0.2f,  1500.0f,  0.3f,  25.0f, 36, 0.66f, 2 },
     };
     return list;
 }

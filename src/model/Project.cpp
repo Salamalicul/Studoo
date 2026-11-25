@@ -658,6 +658,8 @@ juce::ValueTree Project::addSynthPreset (const kits::SynthPreset& p)
     ch.setProperty (ids::resonance, p.resonance, &undoManager);
     ch.setProperty (ids::detune, p.detune, &undoManager);
     ch.setProperty (ids::root, p.root, &undoManager);
+    ch.setProperty (ids::timbre, p.timbre, &undoManager);
+    ch.setProperty (ids::fmRatio, p.fmRatio, &undoManager);
     if (track > 0)
         getMixerTrack (track).setProperty (ids::name, name.substring (0, 12), &undoManager);
     return ch;

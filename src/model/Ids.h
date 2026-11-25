@@ -122,6 +122,8 @@ namespace studoo::ids
     STUDOO_ID (scaleRoot)         // proyecto: nota base de la escala (0 = Do ... 11 = Si)
     STUDOO_ID (scaleType)         // proyecto: 0 = sin escala, 1 mayor, 2 menor...
     STUDOO_ID (scaleLock)         // proyecto: las notas nuevas se pegan a la escala
+    STUDOO_ID (timbre)            // sinte FM / tabla de ondas: brillo del sonido 0..1
+    STUDOO_ID (fmRatio)           // sinte FM: relación del modulador (1..8)
     STUDOO_ID (clipMuted)         // clip: en silencio (para quedarte con otra toma)
     STUDOO_ID (slicePoints)       // sampler: dónde empieza cada trozo, "0,0.12,0.31..." (golpes detectados)
     STUDOO_ID (timeSigNum)        // proyecto: compás, tiempos (2..7)
