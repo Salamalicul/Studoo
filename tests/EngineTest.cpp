@@ -758,6 +758,37 @@ int main (int argc, char* argv[])
                 }, 0.4);
                 check (layered.getRMSLevel (0, 0, 8000) > 0.02f, "Capas: las notas de un canal hacen sonar también sus capas");
             }
+
+            // Modo directo: un patrón lanzado suena; al pararlo, se calla en el siguiente compás
+            {
+                Project p;
+                auto kick = p.findChannelByBuiltin ("builtin:kick");
+                const int patUid = p.getCurrentPatternUid();
+                for (int st = 0; st < 16; st += 2) p.setStep (p.getCurrentPattern(), kick[ids::uid], st, true);
+                auto other = p.addPattern ("Vacío");
+                p.setCurrentPattern (other[ids::uid]);   // el patrón actual está vacío: solo suena lo lanzado
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (p.getState(), cache);
+                auto silentNormal = (e.play(), renderSeconds (e, 0.3));
+                e.stop();
+                e.setLiveMode (true);
+                e.toggleLivePattern (patUid);
+                e.play();
+                auto launched = renderSeconds (e, 0.5);
+                check (silentNormal.getRMSLevel (0, 0, silentNormal.getNumSamples()) < 1.0e-4f
+                       && launched.getRMSLevel (0, 0, launched.getNumSamples()) > 0.02f && e.getLiveState (patUid) == 1,
+                       "Modo directo: el patrón lanzado suena");
+                e.toggleLivePattern (patUid);
+                auto stopping = renderSeconds (e, 0.2);
+                juce::ignoreUnused (stopping);
+                const bool waits = e.getLiveState (patUid) == 3;
+                renderSeconds (e, 2.0);   // pasa el final del compás (a 140 BPM, 1,7 s)
+                auto after = renderSeconds (e, 0.5);
+                check (waits && e.getLiveState (patUid) == 0 && after.getMagnitude (0, 0, after.getNumSamples()) < 0.01f,
+                       "Modo directo: al pararlo espera al compás y luego se calla");
+            }
         }
 
         // Tanda B: efectos avanzados de pista (autotune, puerta, EQ paramétrico, ritmo, maximizador)

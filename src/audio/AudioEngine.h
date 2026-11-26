@@ -58,6 +58,14 @@ namespace studoo
         double getPlayPosition() const      { return position.load(); }
         bool isSongMode() const             { return songModeFlag.load(); }
 
+        // --- Modo directo: lanzar patrones en directo (empiezan y paran en el siguiente compás) ---
+        static constexpr int numLiveSlots = 16;
+        void setLiveMode (bool on)          { liveMode.store (on); }
+        bool isLiveMode() const             { return liveMode.load(); }
+        void toggleLivePattern (int patternUid);
+        // 0 = apagado, 1 = sonando, 2 = va a empezar, 3 = va a parar
+        int getLiveState (int patternUid) const;
+
         // --- Sonar notas desde la interfaz o un teclado MIDI ------------------------
         void previewNote (int channelUid, int note, float velocity, double seconds);
         void setLiveChannel (int channelUid) { liveChannelUid.store (channelUid); }
@@ -151,6 +159,13 @@ namespace studoo
         bool wasPlaying = false;
         bool lastSongMode = false;
         std::atomic<bool> exportingSong { false };
+        std::atomic<bool> liveMode { false };
+        struct LiveSlot { int uid = 0; double start = 0.0; bool starting = false, stopping = false; };
+        std::array<LiveSlot, numLiveSlots> liveSlots;              // solo el hilo de audio
+        std::array<std::atomic<int>, 32> liveCommands {};          // la interfaz pide encender/apagar (uid)
+        std::array<std::atomic<int>, numLiveSlots> liveShowUid {}, liveShowState {};   // para que la interfaz lo vea
+        double liveClock = 0.0;
+        void advanceLive (const Snapshot&, int n, double samplesPerStep, bool isPlaying);
 
         juce::CriticalSection lock;
         std::shared_ptr<const Snapshot> snapshot;

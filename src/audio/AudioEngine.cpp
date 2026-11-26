@@ -681,6 +681,119 @@ void AudioEngine::collectPatternEvents (const Snapshot& snap, const PatternSnap&
     }
 }
 
+// ============================================================================
+//  Modo directo
+// ============================================================================
+void AudioEngine::toggleLivePattern (int patternUid)
+{
+    if (patternUid <= 0)
+        return;
+    for (auto& c : liveCommands)
+    {
+        int expected = 0;
+        if (c.compare_exchange_strong (expected, patternUid))
+            return;
+    }
+}
+
+int AudioEngine::getLiveState (int patternUid) const
+{
+    for (int k = 0; k < numLiveSlots; ++k)
+        if (liveShowUid[(size_t) k].load() == patternUid)
+            return liveShowState[(size_t) k].load();
+    return 0;
+}
+
+void AudioEngine::advanceLive (const Snapshot& snap, int n, double samplesPerStep, bool isPlaying)
+{
+    // Lo que pide la interfaz: encender un patrón que no suena, o apagar uno que suena
+    for (auto& c : liveCommands)
+    {
+        const int uid = c.exchange (0);
+        if (uid == 0)
+            continue;
+        bool found = false;
+        for (auto& slot : liveSlots)
+            if (slot.uid == uid)
+            {
+                found = true;
+                if (slot.starting) slot = {};                 // aún no había empezado: se cancela
+                else               slot.stopping = ! slot.stopping;
+            }
+        if (! found)
+            for (auto& slot : liveSlots)
+                if (slot.uid == 0) { slot = { uid, 0.0, true, false }; break; }
+    }
+
+    auto patternIndex = [&snap] (int uid)
+    {
+        for (size_t i = 0; i < snap.patterns.size(); ++i)
+            if (snap.patterns[i].uid == uid) return (int) i;
+        return -1;
+    };
+
+    if (! isPlaying)
+    {
+        // Parado: lo pedido empieza en cuanto le des al play, todos a la vez
+        liveClock = 0.0;
+        for (auto& slot : liveSlots)
+        {
+            if (slot.stopping) slot = {};
+            slot.start = 0.0;
+        }
+    }
+    else
+    {
+        const double bar = juce::jmax (1, snap.stepsPerBar);
+        const double from = liveClock, to = from + n / samplesPerStep;
+        bool anyPlaying = false, anyPending = false;
+        for (auto& slot : liveSlots)
+        {
+            anyPlaying = anyPlaying || (slot.uid != 0 && ! slot.starting);
+            anyPending = anyPending || slot.starting || slot.stopping;
+        }
+        // Si no suena nada, lo nuevo empieza ya; si no, en el siguiente compás
+        const double boundary = anyPlaying ? std::ceil (from / bar - 1.0e-9) * bar : from;
+
+        auto collect = [&] (double a, double b, int offset)
+        {
+            if (b <= a) return;
+            for (auto& slot : liveSlots)
+            {
+                if (slot.uid == 0 || slot.starting)
+                    continue;
+                const int idx = patternIndex (slot.uid);
+                if (idx < 0) { slot = {}; continue; }   // el patrón se borró
+                collectPatternEvents (snap, snap.patterns[(size_t) idx], a - slot.start, b - slot.start, 1.0e12,
+                                      slot.start, a, offset, samplesPerStep);
+            }
+        };
+        if (anyPending && boundary < to)
+        {
+            collect (from, boundary, 0);
+            for (auto& slot : liveSlots)
+            {
+                if (slot.stopping)      slot = {};
+                else if (slot.starting) { slot.starting = false; slot.start = boundary; }
+            }
+            collect (boundary, to, (int) ((boundary - from) * samplesPerStep));
+        }
+        else
+        {
+            collect (from, to, 0);
+        }
+        liveClock = to;
+        position.store (std::fmod (liveClock, bar * 4.0));
+    }
+
+    for (int k = 0; k < numLiveSlots; ++k)
+    {
+        const auto& slot = liveSlots[(size_t) k];
+        liveShowUid[(size_t) k].store (slot.uid);
+        liveShowState[(size_t) k].store (slot.uid == 0 ? 0 : slot.starting ? 2 : slot.stopping ? 3 : 1);
+    }
+}
+
 void AudioEngine::collectEvents (const Snapshot& snap, double from, double to, int sampleOffset, double samplesPerStep)
 {
     // Metrónomo: un clic en cada tiempo (cada 4 pasos)
@@ -893,7 +1006,11 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         }
     }
 
-    if (isPlaying)
+    if (! song && liveMode.load())
+    {
+        advanceLive (*snap, n, samplesPerStep, isPlaying);
+    }
+    else if (isPlaying)
     {
         double loopEnd = song ? snap->songLength : 16.0;
         if (! song && juce::isPositiveAndBelow (snap->currentPatternIndex, (int) snap->patterns.size()))
