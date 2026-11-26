@@ -172,11 +172,20 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         snap->patterns.push_back (std::move (ps));
     }
 
+    std::map<int, std::vector<LaneSnap::Block>> automationBlocks;   // uid de la línea -> bloques
     // --- Playlist ---------------------------------------------------------------
     double songEnd = 0.0;
     for (auto c : state.getChildWithName (ids::PLAYLIST))
     {
         ClipSnap cs;
+        if (c[ids::kind].toString() == "automation")
+        {
+            // Bloque de automatización: se guarda para su línea (se usa al leer las automatizaciones)
+            const LaneSnap::Block block { pos (c[ids::start], 16000.0), juce::jmax (0.25, pos (c[ids::length], 16000.0)) };
+            automationBlocks[(int) c[ids::ref]].push_back (block);
+            songEnd = juce::jmax (songEnd, block.start + block.length);
+            continue;
+        }
         cs.isAudio = c[ids::kind].toString() == "audio";
         if ((bool) c.getProperty (ids::clipMuted, false))
             continue;   // clip en silencio (otra toma elegida)
@@ -294,6 +303,12 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
 
         for (auto p : lane)
             ls.points.emplace_back (pos (p[ids::time]), num (p, ids::value, 0.0f, 1.0f, 0.5f));
+        if (auto it = automationBlocks.find ((int) lane[ids::uid]); it != automationBlocks.end())
+        {
+            ls.blocks = it->second;
+            std::sort (ls.blocks.begin(), ls.blocks.end(), [] (auto& a, auto& b) { return a.start < b.start; });
+            if (ls.blocks.size() > 2000) ls.blocks.resize (2000);
+        }
         std::sort (ls.points.begin(), ls.points.end());
         if (! ls.points.empty())
         {

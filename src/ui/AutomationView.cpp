@@ -262,6 +262,11 @@ AutomationView::AutomationView (AppContext& c)
         if (lane.isValid())
         {
             ctx.project.beginTransaction();
+            // También sus bloques de la Playlist
+            auto playlist = ctx.project.playlist();
+            for (int i = playlist.getNumChildren(); --i >= 0;)
+                if (playlist.getChild (i)[ids::kind].toString() == "automation" && (int) playlist.getChild (i)[ids::ref] == (int) lane[ids::uid])
+                    playlist.removeChild (i, ctx.project.um());
             ctx.project.automation().removeChild (lane, ctx.project.um());
         }
     };

@@ -121,8 +121,29 @@ namespace studoo
         AutomationTarget target;
         int channelIndex = -1; // si el destino es un canal
         std::vector<std::pair<double, float>> points; // (tiempo en pasos, valor 0..1), ordenados
+        // Bloques de automatización en la Playlist: si hay, la curva se lee dentro de cada bloque
+        // (tiempo desde el principio del bloque) y fuera de ellos se queda el último valor
+        struct Block { double start, length; };
+        std::vector<Block> blocks;   // ordenados por inicio
 
         float valueAt (double time) const
+        {
+            if (! blocks.empty())
+            {
+                const Block* last = nullptr;
+                for (auto& b : blocks)
+                {
+                    if (b.start > time) break;
+                    last = &b;
+                }
+                if (last == nullptr)
+                    return curveAt (0.0);
+                return curveAt (juce::jmin (time - last->start, last->length));
+            }
+            return curveAt (time);
+        }
+
+        float curveAt (double time) const
         {
             if (points.empty()) return 0.0f;
             if (time <= points.front().first) return points.front().second;

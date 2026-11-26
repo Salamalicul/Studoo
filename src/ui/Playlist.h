@@ -71,6 +71,7 @@ namespace studoo
         ~Playlist() override;
 
         int getPatternToPlace();
+        int getLaneToPlace();   // > 0: se colocan bloques de esta automatización (uid de la línea)
         double getSnap() const;
         double getZoom() const { return zoomSlider.getValue(); }
 
@@ -85,6 +86,7 @@ namespace studoo
         void timerCallback() override;
         void refresh();
         void layoutGrid();
+        int lastPlaceId = 1;   // lo elegido en "Colocar" (patrón o automatización)
 
         AppContext& ctx;
         HelpButton helpButton;

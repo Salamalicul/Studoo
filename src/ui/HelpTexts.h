@@ -91,6 +91,8 @@ namespace studoo::help
         "- Arrastra un bloque para moverlo. Arrastra su borde derecho para alargarlo (el patrón se repite).\n"
         "- Clic derecho en un bloque: borrarlo. Doble clic: abrir ese patrón en el secuenciador.\n"
         "- Clic en la regla de arriba: mueve el cursor de reproducción.\n\n"
+        "Bloques de automatización: en \"Colocar\" elige una automatización y haz clic en un hueco. El bloque repite "
+        "su curva donde lo pongas; muévelo, alárgalo o cópialo como un patrón. Doble clic: editar la curva.\n\n"
         "IMPORTANTE: para escuchar la playlist pulsa CANCIÓN en la barra superior (o la tecla L).\n\n"
         "Las grabaciones de voz aparecen aquí como bloques verdes, con su forma de onda. Para editarlas:\n"
         "- Arrastra su borde izquierdo para quitar el principio (o el derecho para quitar el final).\n"

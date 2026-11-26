@@ -12,7 +12,7 @@
 - 🔊 **Sinte con FM y tabla de ondas**, modo **Mono con glide** (notas que se deslizan) y **8 sonidos nuevos**.
 - 🥁 **Pads** para tocar la batería con los dedos y **editor de pasos** (fuerza y tono de cada golpe).
 - ✂️ **Trocear loops por golpes** automáticamente.
-- 🎙️ **Tomas** (quédate con la mejor), **editar el audio** (normalizar, al revés, quitar ruido, quitar silencios) y **automatización en la Playlist**.
+- 🎙️ **Tomas** (quédate con la mejor), **editar el audio** (normalizar, al revés, quitar ruido, quitar silencios) y **bloques de automatización en la Playlist** (como los patrones: se colocan, se mueven, se alargan y se repiten).
 - 📂 **Navegador de sonidos** (F4): escucha y añade sonidos con doble clic.
 - 📤 **Exportar por pistas (stems)**.
 - ⚙️ **Compensación del retraso de los plugins** y versión para **Mac** (de prueba).

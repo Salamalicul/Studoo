@@ -140,12 +140,20 @@ void PlaylistGrid::paint (juce::Graphics& g)
         if (! r.expanded (10.0f).intersects (clipArea))
             continue;   // fuera de la zona que se está redibujando
         const bool audio = clip[ids::kind].toString() == "audio";
+        const bool autoBlock = clip[ids::kind].toString() == "automation";
         juce::String name;
         juce::Colour colour = Colours::green;
+        juce::ValueTree blockLane;
 
         if (audio)
         {
             name = ctx.project.findChannel (clip[ids::ref])[ids::name].toString();
+        }
+        else if (autoBlock)
+        {
+            blockLane = ctx.project.automation().getChildWithProperty (ids::uid, clip[ids::ref]);
+            name = ctx.project.describeTarget (AutomationTarget::parse (blockLane[ids::target].toString()));
+            colour = juce::Colour (0xffb388ff);   // morado: automatización
         }
         else
         {
@@ -172,7 +180,32 @@ void PlaylistGrid::paint (juce::Graphics& g)
         g.drawText (name, head.reduced (6.0f, 0.0f), juce::Justification::centredLeft, true);
 
         auto body = r.withTrimmedTop (17.0f).reduced (3.0f, 2.0f);
-        if (! audio)
+        if (autoBlock)
+        {
+            // La curva del bloque (su tiempo empieza al principio del bloque)
+            juce::Array<juce::ValueTree> points;
+            for (auto p : blockLane) points.add (p);
+            std::sort (points.begin(), points.end(), [] (const juce::ValueTree& a, const juce::ValueTree& b)
+                       { return (double) a[ids::time] < (double) b[ids::time]; });
+            const double start = clip[ids::start], len = clip[ids::length];
+            juce::Path curve;
+            auto yFor = [&body] (float v) { return body.getBottom() - juce::jlimit (0.0f, 1.0f, v) * body.getHeight(); };
+            bool started = false;
+            for (auto& p : points)
+            {
+                const double t = juce::jmin ((double) p[ids::time], len);
+                const float x = stepsToX (start + t), y = yFor (p[ids::value]);
+                if (! started) { curve.startNewSubPath (body.getX(), y); started = true; }
+                curve.lineTo (x, y);
+            }
+            if (started)
+            {
+                curve.lineTo (body.getRight(), yFor (points.getLast()[ids::value]));
+                g.setColour (colour.brighter (0.4f));
+                g.strokePath (curve, juce::PathStrokeType (1.6f));
+            }
+        }
+        else if (! audio)
         {
             // Mini vista de los pasos y notas del patrón
             auto pattern = ctx.project.findPattern (clip[ids::ref]);
@@ -619,12 +652,26 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
 
     if (! clip.isValid())
     {
-        const int patternUid = playlist.getPatternToPlace();
-        auto pattern = ctx.project.findPattern (patternUid);
-        if (! pattern.isValid())
-            return;
-        clip = ctx.project.addClip ("pattern", patternUid, yToTrack (e.position.y), snap (steps),
-                                    Project::getPatternLength (pattern));
+        if (const int laneUid = playlist.getLaneToPlace(); laneUid > 0)
+        {
+            // Bloque de automatización: dura lo que su curva (como mínimo, un compás)
+            auto lane = ctx.project.automation().getChildWithProperty (ids::uid, laneUid);
+            double end = 0.0;
+            for (auto p : lane)
+                end = juce::jmax (end, (double) p[ids::time]);
+            const double bar = ctx.project.getStepsPerBar();
+            const double len = juce::jlimit (bar, bar * 64.0, std::ceil (end / bar) * bar);
+            clip = ctx.project.addClip ("automation", laneUid, yToTrack (e.position.y), snap (steps), len);
+        }
+        else
+        {
+            const int patternUid = playlist.getPatternToPlace();
+            auto pattern = ctx.project.findPattern (patternUid);
+            if (! pattern.isValid())
+                return;
+            clip = ctx.project.addClip ("pattern", patternUid, yToTrack (e.position.y), snap (steps),
+                                        Project::getPatternLength (pattern));
+        }
         edge = false;
     }
 
@@ -701,6 +748,14 @@ void PlaylistGrid::mouseDoubleClick (const juce::MouseEvent& e)
 {
     bool edge = false;
     auto clip = clipAt (e.position, edge);
+    if (clip.isValid() && clip[ids::kind].toString() == "automation")
+    {
+        // Editar la curva de este bloque en la pestaña Automatización
+        ctx.project.getState().setProperty (ids::selectedLane, clip[ids::ref], nullptr);
+        if (ctx.showView)
+            ctx.showView (View::automation);
+        return;
+    }
     if (clip.isValid() && clip[ids::kind].toString() == "pattern")
     {
         ctx.project.setCurrentPattern (clip[ids::ref]);
@@ -721,6 +776,14 @@ Playlist::Playlist (AppContext& c)
     patternBox.setTooltip (txt ("El patrón que se coloca al hacer clic en un hueco de la playlist."));
     patternBox.onChange = [this]
     {
+        lastPlaceId = patternBox.getSelectedId();
+        if (lastPlaceId >= 10000)
+        {
+            auto lane = ctx.project.automation().getChild (lastPlaceId - 10000);
+            if (lane.isValid())
+                ctx.project.getState().setProperty (ids::selectedLane, lane[ids::uid], nullptr);
+            return;
+        }
         auto p = ctx.project.patterns().getChild (patternBox.getSelectedId() - 1);
         if (p.isValid())
             ctx.project.setCurrentPattern (p[ids::uid]);
@@ -761,6 +824,15 @@ Playlist::~Playlist()
     ctx.project.removeChangeListener (this);
 }
 
+int Playlist::getLaneToPlace()
+{
+    const int id = patternBox.getSelectedId();
+    if (id < 10000)
+        return 0;
+    auto lane = ctx.project.automation().getChild (id - 10000);
+    return lane.isValid() ? (int) lane[ids::uid] : 0;
+}
+
 int Playlist::getPatternToPlace()
 {
     auto p = ctx.project.patterns().getChild (patternBox.getSelectedId() - 1);
@@ -791,6 +863,22 @@ void Playlist::refresh()
         if ((int) p[ids::uid] == ctx.project.getCurrentPatternUid())
             select = i;
         patternBox.addItem (txt ("Colocar: ") + p[ids::name].toString(), i++);
+    }
+    // Las automatizaciones también se colocan como bloques
+    {
+        const int previous = patternBox.getSelectedId();
+        juce::ignoreUnused (previous);
+        int laneIndex = 0;
+        bool first = true;
+        for (auto lane : ctx.project.automation())
+        {
+            if (first) { patternBox.addSeparator(); first = false; }
+            patternBox.addItem (txt ("Colocar automatización: ")
+                                    + ctx.project.describeTarget (AutomationTarget::parse (lane[ids::target].toString())),
+                                10000 + laneIndex++);
+        }
+        if (lastPlaceId >= 10000 && lastPlaceId - 10000 < laneIndex)
+            select = lastPlaceId;
     }
     patternBox.setSelectedId (select, juce::dontSendNotification);
 

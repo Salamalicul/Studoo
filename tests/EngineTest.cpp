@@ -846,6 +846,33 @@ int main (int argc, char* argv[])
             check (audioClips == 1, "Tomas: el trozo silenciado no suena");
         }
 
+        // Bloques de automatización en la Playlist: la curva se repite en cada bloque
+        {
+            Project p;
+            AutomationTarget t;
+            t.kind = AutomationTarget::Kind::mixer;
+            t.index = 1;
+            t.param = AutomationTarget::Param::volume;
+            auto lane = p.addAutomationLane (t);
+            lane.removeAllChildren (nullptr);
+            for (auto [time, value] : { std::make_pair (0.0, 0.0f), std::make_pair (16.0, 1.0f) })
+            {
+                juce::ValueTree pt (ids::POINT);
+                pt.setProperty (ids::time, time, nullptr);
+                pt.setProperty (ids::value, value, nullptr);
+                lane.appendChild (pt, nullptr);
+            }
+            p.addClip ("automation", lane[ids::uid], 0, 32.0, 16.0);
+            p.addClip ("automation", lane[ids::uid], 0, 64.0, 16.0);
+            auto snap = Snapshot::build (p.getState());
+            check (snap->lanes.size() == 1 && snap->lanes[0].blocks.size() == 2, "Bloques de automatización: se leen en el Snapshot");
+            const auto& l = snap->lanes[0];
+            check (std::abs (l.valueAt (0.0) - 0.0f) < 0.01f && std::abs (l.valueAt (40.0) - 0.5f) < 0.02f
+                   && std::abs (l.valueAt (50.0) - 1.0f) < 0.01f && std::abs (l.valueAt (72.0) - 0.5f) < 0.02f,
+                   "Bloques de automatización: la curva empieza en cada bloque y fuera se queda el último valor");
+            check (snap->songLength >= 80.0, "Los bloques de automatización cuentan en la duración de la canción");
+        }
+
         // Compás y cambios de tempo
         {
             Project p;
