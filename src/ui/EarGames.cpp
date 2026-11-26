@@ -208,7 +208,8 @@ AudioEngine::SharedBuffer EarGames::renderGenre (const juce::String& genreId)
     if (! genres::load (project, project.getCurrentPattern(), genreId))
         return nullptr;
     SampleCache cache;
-    AudioEngine offline;
+    auto offlineOwned = std::make_unique<AudioEngine>();   // en el heap: el motor es grande para la pila
+    auto& offline = *offlineOwned;
     offline.prepare (gameRate, 512);
     offline.updateFromProject (project.getState(), cache);
     offline.play();

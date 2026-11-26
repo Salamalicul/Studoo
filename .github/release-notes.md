@@ -1,6 +1,25 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 2.0: más cerca de un estudio profesional
+### 🆕 Novedades de la versión 2.1: todo lo de un estudio profesional
+- 🎤 **Autotune con afinador** en cada pista (botón **FX+** del mezclador): cantidad, nota base y escala. Al 100%, el efecto "robot" del trap.
+- 🥁 **Efectos de ritmo** (tipo Gross Beat): half-time, tartamudeo, puerta rítmica y parada de cinta.
+- 🎛️ **EQ paramétrico de 4 bandas** con su curva, **puerta de ruido**, **maximizador** y **analizador de frecuencias** del Master.
+- 🎚️ **32 pistas** en el mezclador y en la Playlist, y **3 envíos** por pista.
+- 📏 **Patrones de hasta 16 compases**, **zoom** en el piano roll y **compases** 3/4, 6/8...
+- ⏱️ **Cambios de tempo** dentro de la canción (Automatización > Canción > Tempo).
+- 🎹 **Toca con el teclado del ordenador** (Z X C V... y Q W E R...) y **conecta las ruedas** a los controles de tu teclado MIDI (clic derecho en una rueda).
+- 🎹 **Sampler multisample**: un instrumento con varios samples (por ejemplo, un piano grabado nota a nota). Studoo lee la nota del nombre del archivo ("Piano C4", "Do4"...) y cada tecla usa el sample más cercano.
+- 🔊 **Sinte con FM y tabla de ondas**, modo **Mono con glide** (notas que se deslizan) y **8 sonidos nuevos**.
+- 🥁 **Pads** para tocar la batería con los dedos y **editor de pasos** (fuerza y tono de cada golpe).
+- ✂️ **Trocear loops por golpes** automáticamente.
+- 🎙️ **Grabar tomas en bucle** (botón **Bucle** de la Playlist: cada vuelta es una toma; quédate con la mejor), **editor de audio** (elige un trozo de la onda y silencia, recorta, borra, haz fundidos, normaliza, quita ruido...) y **bloques de automatización en la Playlist** (como los patrones: se colocan, se mueven, se alargan y se repiten).
+- 📂 **Navegador de sonidos** (F4): escucha y añade sonidos con doble clic.
+- 📤 **Exportar por pistas (stems)**.
+- 🥁 **4 kits nuevos** (Amapiano, UK Garage, Grime y Baile funk) y **4 tipos de 808 nuevos**.
+- ⚙️ **Compensación del retraso de los plugins** (comprobada con un plugin de prueba) y versión para **Mac** (de prueba).
+- 🎓 **Aprende**: lección "Herramientas de estudio profesional", reto de autotune y más palabras en el diccionario.
+
+### Novedades de la versión 2.0: más cerca de un estudio profesional
 - 🎚️ **Velocity de cada nota**: debajo del Piano roll hay un carril con una barra por nota. Arrástrala para que suene más fuerte o más suave.
 - 🧲 **Cuantizar**: un botón coloca todas las notas justo en la cuadrícula.
 - 🖱️ **Piano roll de profesional**: selecciona varias notas y muévelas juntas, copia y pega (Ctrl+C / Ctrl+V), duplica (Ctrl+B), sube o baja el tono con las flechas, **arpegiador** y **escalas** (las notas que no son de la escala se oscurecen y las nuevas se pegan a ella).
@@ -117,6 +136,10 @@
 2. Ábrelo. Android te pedirá permiso para **instalar aplicaciones de origen desconocido**: permítelo para tu navegador o tu gestor de archivos.
 3. Pulsa **Instalar**. Studoo aparece con su icono.
    - Desde la 1.7, Studoo se actualiza solo. Si vienes de la 1.6 o anterior, desinstala la anterior primero (solo una vez).
+
+**Mac** (nuevo, versión de prueba)
+1. Descarga **`Studoo-...-Mac.zip`** y ábrelo: aparece **Studoo**. Arrástralo a **Aplicaciones**.
+2. La primera vez, haz **clic derecho sobre Studoo > Abrir** y confirma (sale un aviso porque la app no está firmada por Apple).
 
 **Otras distribuciones de Linux** (Fedora, Arch...)
 1. Descarga **`Studoo-...-Linux.tar.gz`**.

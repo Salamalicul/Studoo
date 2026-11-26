@@ -27,6 +27,10 @@ namespace studoo
         float attack = 0.005f, decay = 0.3f, sustain = 0.6f, release = 0.3f;
         float cutoff = 5000.0f, resonance = 0.2f, detune = 8.0f;
         float lfoRate = 4.0f, lfoAmount = 0.0f;   // LFO que mueve el filtro
+        float timbre = 0.5f;                      // FM: cuánto modula; tabla de ondas: de seno a cuadrada
+        int fmRatio = 2;                          // FM: frecuencia del modulador (x veces la nota)
+        bool mono = false;                        // una nota a la vez: las notas solapadas se deslizan
+        float glide = 0.0f;                       // segundos que tarda en deslizarse (modo mono)
     };
 
     struct SamplerParams
@@ -35,6 +39,9 @@ namespace studoo
         float start = 0.0f, end = 1.0f; // parte del sample que suena (0..1)
         bool reverse = false;
         int slices = 1;                 // trocear en N partes (cada nota toca un trozo)
+        // Trozos en los golpes detectados (si hay); si no, trozos iguales
+        std::array<float, 64> slicePoints {};
+        int numSlicePoints = 0;
     };
 
     struct Bass808Params
@@ -52,6 +59,9 @@ namespace studoo
         int root = 60;
         bool oneShot = true;
         juce::String samplePath;
+        // Multisample: varios samples, cada uno para un grupo de notas
+        struct Zone { juce::String path; int root = 60, lo = 0, hi = 127; };
+        std::vector<Zone> zones;
         SynthParams synth;
         Bass808Params bass;
         SamplerParams sampler;
@@ -91,6 +101,17 @@ namespace studoo
         int sidechainSource = 1;
         int sendTo = 0;             // 0 = sin envío; si no, una pista de número MAYOR (así no hay bucles)
         float sendLevel = 0.0f;
+        std::array<float, numEqBands> peqFreq { 100.0f, 400.0f, 2000.0f, 8000.0f };
+        std::array<float, numEqBands> peqGain {};   // dB
+        std::array<float, numEqBands> peqQ { 1.0f, 1.0f, 1.0f, 1.0f };
+        float gateThreshold = -80.0f;
+        float tuneAmount = 0.0f;
+        int tuneRoot = 0, tuneScale = 0;
+        int rhythmMode = 0;
+        float rhythmMix = 1.0f;
+        float maximize = 0.0f;
+        std::array<int, numSends - 1> moreSendTo {};      // envíos 2 y 3
+        std::array<float, numSends - 1> moreSendLevel {};
         bool sendOnly = false;      // solo suena por el envío (agrupar pistas en un "bus")
         bool limiter = false;
     };
@@ -100,8 +121,29 @@ namespace studoo
         AutomationTarget target;
         int channelIndex = -1; // si el destino es un canal
         std::vector<std::pair<double, float>> points; // (tiempo en pasos, valor 0..1), ordenados
+        // Bloques de automatización en la Playlist: si hay, la curva se lee dentro de cada bloque
+        // (tiempo desde el principio del bloque) y fuera de ellos se queda el último valor
+        struct Block { double start, length; };
+        std::vector<Block> blocks;   // ordenados por inicio
 
         float valueAt (double time) const
+        {
+            if (! blocks.empty())
+            {
+                const Block* last = nullptr;
+                for (auto& b : blocks)
+                {
+                    if (b.start > time) break;
+                    last = &b;
+                }
+                if (last == nullptr)
+                    return curveAt (0.0);
+                return curveAt (juce::jmin (time - last->start, last->length));
+            }
+            return curveAt (time);
+        }
+
+        float curveAt (double time) const
         {
             if (points.empty()) return 0.0f;
             if (time <= points.front().first) return points.front().second;
@@ -127,6 +169,17 @@ namespace studoo
         bool songMode = false;
         int currentPatternIndex = 0;
         double songLength = 16.0;
+        int stepsPerBar = 16;        // compás de la canción (16 = 4/4, 12 = 3/4 o 6/8...)
+        double loopStart = 0.0, loopEnd = 0.0;   // zona que se repite en modo canción (si loopEnd > loopStart)
+        int tempoLane = -1;          // automatización del tempo (índice en 'lanes', -1 = no hay)
+
+        // Tempo en una posición de la canción (con la automatización de tempo, si hay)
+        double bpmAt (double steps) const
+        {
+            if (tempoLane < 0 || tempoLane >= (int) lanes.size())
+                return bpm;
+            return AutomationTarget::fromNormalised (AutomationTarget::Param::bpm, lanes[(size_t) tempoLane].valueAt (steps));
+        }
 
         std::vector<ChannelSnap> channels;
         std::vector<PatternSnap> patterns;

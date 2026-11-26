@@ -19,6 +19,7 @@ namespace studoo
         static constexpr int rulerHeight = 24;
         static constexpr int trackHeight = 40;
         static constexpr int labelWidth = 80;
+        static constexpr int automationHeight = 90;   // fila de automatización (abajo)
 
         void paint (juce::Graphics&) override;
         void mouseDown (const juce::MouseEvent&) override;
@@ -42,6 +43,8 @@ namespace studoo
         juce::Rectangle<float> clipBounds (const juce::ValueTree& clip) const;
         double snap (double steps) const;
         void showAudioClipMenu (juce::ValueTree clip, double atSteps);
+        // Editor de audio: crea una copia editada del archivo de la grabación (el original no se toca)
+        void editAudioFile (juce::ValueTree clip, int operation);
         const std::vector<float>& peaksFor (const juce::String& path, double& sampleRate);
         static constexpr int samplesPerPeak = 256;
         std::map<juce::String, std::pair<double, std::vector<float>>> peakCache;
@@ -49,7 +52,13 @@ namespace studoo
         AppContext& ctx;
         Playlist& playlist;
         juce::ValueTree dragClip;
-        enum class DragMode { none, move, resize, trimStart, ruler } dragMode = DragMode::none;
+        enum class DragMode { none, move, resize, trimStart, ruler, loop, automation } dragMode = DragMode::none;
+        double loopAnchor = 0.0;
+        juce::ValueTree dragPoint;
+        juce::ValueTree selectedLane();
+        juce::Rectangle<float> automationArea() const;
+        float autoValueToY (float v) const;
+        float autoYToValue (float y) const;
         double dragStartSteps = 0.0, clipStart = 0.0, clipLength = 0.0, clipOffset = 0.0;
         int dragStartTrack = 0, clipTrack = 0;
     };
@@ -63,6 +72,7 @@ namespace studoo
         ~Playlist() override;
 
         int getPatternToPlace();
+        int getLaneToPlace();   // > 0: se colocan bloques de esta automatización (uid de la línea)
         double getSnap() const;
         double getZoom() const { return zoomSlider.getValue(); }
 
@@ -77,10 +87,12 @@ namespace studoo
         void timerCallback() override;
         void refresh();
         void layoutGrid();
+        int lastPlaceId = 1;   // lo elegido en "Colocar" (patrón o automatización)
 
         AppContext& ctx;
         HelpButton helpButton;
         juce::ComboBox patternBox, snapBox;
+        juce::TextButton loopButton;
         juce::Slider zoomSlider;
         juce::Label infoLabel;
         juce::Viewport viewport;

@@ -31,6 +31,18 @@ namespace studoo
     {
     public:
         Knob (const juce::String& labelText, const juce::String& tooltip);
+        ~Knob() override;
+
+        // Conectar a un control MIDI: lo gestiona la ventana principal (clic derecho en la rueda)
+        static inline std::function<void (Knob&)> onMidiLearn;
+        static inline std::function<void (Knob&)> onMidiForget;
+        static inline std::function<bool (const Knob&)> isMidiLinked;
+        juce::ValueTree getBoundTree() const { return boundTree; }
+        juce::Identifier getBoundProperty() const { return boundProperty; }
+        double getMin() const { return slider.getMinimum(); }
+        double getMax() const { return slider.getMaximum(); }
+        juce::String getLabel() const { return label; }
+        void mouseDown (const juce::MouseEvent&) override;
 
         void bind (juce::ValueTree tree, const juce::Identifier& property, juce::UndoManager* um,
                    double min, double max, double defaultValue, double skewMidPoint = 0.0);
@@ -47,6 +59,8 @@ namespace studoo
         int numDecimals = 2;
         std::function<juce::String (double)> displayFunction;
         juce::UndoManager* undo = nullptr;
+        juce::ValueTree boundTree;
+        juce::Identifier boundProperty;
     };
 
     class IconButton : public juce::Button

@@ -20,6 +20,15 @@ namespace studoo::ids
     STUDOO_ID (NOTE)
     STUDOO_ID (PLAYLIST)
     STUDOO_ID (CLIP)
+    STUDOO_ID (ZONE)              // multisample: un sample del instrumento (sample, root, lo, hi)
+    STUDOO_ID (lo)                // multisample: nota más grave que usa este sample
+    STUDOO_ID (hi)                // multisample: nota más aguda
+    STUDOO_ID (MIDILINKS)         // controles MIDI conectados a ruedas de Studoo
+    STUDOO_ID (LINK)
+    STUDOO_ID (cc)                // número de control MIDI (0..127)
+    STUDOO_ID (param)             // nombre de la propiedad que mueve
+    STUDOO_ID (minValue)
+    STUDOO_ID (maxValue)
     STUDOO_ID (MIXER)
     STUDOO_ID (TRACK)
     STUDOO_ID (AUTOMATION)
@@ -116,6 +125,25 @@ namespace studoo::ids
     STUDOO_ID (scaleRoot)         // proyecto: nota base de la escala (0 = Do ... 11 = Si)
     STUDOO_ID (scaleType)         // proyecto: 0 = sin escala, 1 mayor, 2 menor...
     STUDOO_ID (scaleLock)         // proyecto: las notas nuevas se pegan a la escala
+    STUDOO_ID (timbre)            // sinte FM / tabla de ondas: brillo del sonido 0..1
+    STUDOO_ID (fmRatio)           // sinte FM: relación del modulador (1..8)
+    STUDOO_ID (clipMuted)         // clip: en silencio (para quedarte con otra toma)
+    STUDOO_ID (slicePoints)       // sampler: dónde empieza cada trozo, "0,0.12,0.31..." (golpes detectados)
+    STUDOO_ID (loopOn)            // proyecto: repetir una zona de la canción (para grabar tomas)
+    STUDOO_ID (loopStart)         // proyecto: inicio de la zona (pasos)
+    STUDOO_ID (loopEnd)           // proyecto: final de la zona (pasos)
+    STUDOO_ID (timeSigNum)        // proyecto: compás, tiempos (2..7)
+    STUDOO_ID (timeSigDen)        // proyecto: compás, figura (4 = negra, 8 = corchea)
+    STUDOO_ID (gateThreshold)     // pista: puerta de ruido, dB (-80 = apagada)
+    STUDOO_ID (tuneAmount)        // pista: autotune 0..1 (0 = apagado, 1 = robot)
+    STUDOO_ID (tuneRoot)          // pista: nota base de la escala del autotune (0..11)
+    STUDOO_ID (tuneScale)         // pista: escala del autotune (0 = todas las notas)
+    STUDOO_ID (rhythmMode)        // pista: efecto de ritmo (0 apagado, 1 half-time, 2-3 tartamudeo, 4-5 puerta, 6 parada de cinta)
+    STUDOO_ID (rhythmMix)         // pista: mezcla del efecto de ritmo 0..1
+    STUDOO_ID (maximize)          // pista: maximizador, dB de ganancia antes del limitador (0..12)
+    STUDOO_ID (stepVel)           // pasos: fuerza de cada paso, "85,40,100..." (0..100)
+    STUDOO_ID (stepPitch)         // pasos: tono de cada paso en semitonos, "0,0,12..." (-24..24)
+    STUDOO_ID (mono)              // sinte: una sola nota a la vez (con glide si se solapan)
     STUDOO_ID (recordBpm)         // grabación/clip: el BPM con el que se grabó (para seguir el tempo)
     STUDOO_ID (stretch)           // clip de audio: sigue el tempo de la canción sin cambiar el tono
     STUDOO_ID (clipPitch)         // clip de audio: tono en semitonos (-12..12) sin cambiar la velocidad

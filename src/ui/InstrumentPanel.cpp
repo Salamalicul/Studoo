@@ -1,5 +1,6 @@
 #include "InstrumentPanel.h"
 #include "HelpTexts.h"
+#include "audio/Onsets.h"
 
 namespace studoo
 {
@@ -23,7 +24,8 @@ void SampleWaveform::valueTreePropertyChanged (juce::ValueTree& t, const juce::I
         return;
     if (id == ids::sample)
         rebuildPeaks();
-    if (id == ids::sample || id == ids::sampleStart || id == ids::sampleEnd || id == ids::slices || id == ids::reverse)
+    if (id == ids::sample || id == ids::sampleStart || id == ids::sampleEnd || id == ids::slices || id == ids::reverse
+        || id == ids::slicePoints)
         repaint();
 }
 
@@ -94,8 +96,18 @@ void SampleWaveform::paint (juce::Graphics& g)
     }
 
     // Trozos (chops)
-    const int slices = juce::jlimit (1, 16, (int) channel.getProperty (ids::slices, 1));
-    if (slices > 1 && end > start)
+    const int slices = juce::jlimit (1, 64, (int) channel.getProperty (ids::slices, 1));
+    const auto points = juce::StringArray::fromTokens (channel[ids::slicePoints].toString(), ",", "");
+    if (points.size() == slices && slices > 1)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.55f));
+        for (int s = 1; s < points.size(); ++s)
+        {
+            const float x = inner.getX() + inner.getWidth() * juce::jlimit (0.0f, 1.0f, points[s].getFloatValue());
+            g.drawVerticalLine ((int) x, inner.getY(), inner.getBottom());
+        }
+    }
+    else if (slices > 1 && end > start)
     {
         g.setColour (juce::Colours::white.withAlpha (0.35f));
         for (int s = 1; s < slices; ++s)
@@ -237,9 +249,46 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
                      ids::sampleEnd, 0.0, 1.0, 1.0)->setDisplayFunction (pct);
             auto* slices = addKnob ("Trozos", txt ("Corta el sample en trozos iguales (chops). Cada nota del piano roll toca un trozo distinto: "
                                                    "la nota base es el trozo 1, la siguiente el 2..."),
-                                    ids::slices, 1.0, 16.0, 1.0);
-            slices->getSlider().setRange (1.0, 16.0, 1.0);
+                                    ids::slices, 1.0, 64.0, 1.0);
+            slices->getSlider().setRange (1.0, 64.0, 1.0);
             slices->setDisplayFunction ([] (double v) { const int n = (int) std::round (v); return n <= 1 ? txt ("Entero") : juce::String (n) + " trozos"; });
+
+            auto* multi = new juce::TextButton ("Multisample");
+            multi->setTooltip (txt ("Un instrumento con varios samples (por ejemplo, un piano grabado nota a nota): "
+                                    "cada tecla usa el sample más cercano y suena mucho más real."));
+            multi->onClick = [this, multi] { showMultisampleMenu (*multi); };
+            makeNonFocusing (*multi);
+            controls.add (multi);
+            addAndMakeVisible (multi);
+
+            auto* detect = new juce::TextButton (txt ("Trocear por golpes"));
+            detect->setTooltip (txt ("Studoo busca cada golpe del sample (bombo, caja...) y lo pone en un trozo: "
+                                     "la nota base toca el golpe 1, la siguiente el 2... Ideal para loops de batería."));
+            detect->onClick = [this]
+            {
+                auto sample = ctx.samples.get (channel[ids::sample].toString());
+                if (sample == nullptr)
+                    return;
+                const float start = channel.getProperty (ids::sampleStart, 0.0f), end = channel.getProperty (ids::sampleEnd, 1.0f);
+                auto points = onsets::detect (sample->buffer, sample->sampleRate, start, end, 32);
+                ctx.project.beginTransaction();
+                if (points.size() < 2)
+                {
+                    channel.setProperty (ids::slicePoints, "", ctx.project.um());
+                    infoLabel.setText (txt ("No se han encontrado golpes claros en este sample."), juce::dontSendNotification);
+                    return;
+                }
+                juce::StringArray list;
+                for (float p : points)
+                    list.add (juce::String (p, 5));
+                channel.setProperty (ids::slicePoints, list.joinIntoString (","), ctx.project.um());
+                channel.setProperty (ids::slices, (int) points.size(), ctx.project.um());
+                infoLabel.setText (juce::String ((int) points.size()) + txt (" golpes encontrados: tócalos con notas seguidas desde la nota base."),
+                                   juce::dontSendNotification);
+            };
+            makeNonFocusing (*detect);
+            controls.add (detect);
+            addAndMakeVisible (detect);
 
             auto* reverse = new juce::ToggleButton (txt ("Al revés"));
             reverse->setTooltip (txt ("El sample suena del final al principio (efecto \"reverse\")."));
@@ -253,7 +302,7 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
         {
             typeName = "Sintetizador";
             auto* wave = new juce::ComboBox();
-            wave->addItemList ({ "Sierra", "Cuadrada", "Seno", txt ("Triángulo") }, 1);
+            wave->addItemList ({ "Sierra", "Cuadrada", "Seno", txt ("Triángulo"), "FM", txt ("Tabla de ondas") }, 1);
             wave->setTooltip (txt ("Forma de onda: el \"color\" básico del sonido."));
             wave->setSelectedId ((int) channel[ids::wave] + 1, juce::dontSendNotification);
             wave->onChange = [this, wave]
@@ -277,6 +326,23 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
             addKnob ("Resonancia", txt ("Realza la zona del filtro (sonido más \"chillón\")."), ids::resonance, 0.0, 1.0, 0.2);
             addKnob ("Desafinar", txt ("Separa los dos osciladores: sonido más ancho."), ids::detune, 0.0, 50.0, 8.0)
                 ->setValueSuffix (" cents", 0);
+            addKnob ("Timbre", txt ("En FM: cuánto se modula (más = más metálico y brillante). En Tabla de ondas: "
+                                    "cambia la forma de la onda de suave (seno) a fuerte (cuadrada)."),
+                     ids::timbre, 0.0, 1.0, 0.5)->setDisplayFunction ([] (double v) { return juce::String ((int) (v * 100.0)) + "%"; });
+            auto* ratio = addKnob ("FM ratio", txt ("Solo en FM: la frecuencia del modulador. 1 = suave (piano), 2-3 = campanas, 4+ = metálico."),
+                                   ids::fmRatio, 1.0, 8.0, 2.0);
+            ratio->getSlider().setRange (1.0, 8.0, 1.0);
+            ratio->setDisplayFunction ([] (double v) { return "x" + juce::String ((int) v); });
+
+            auto* mono = new juce::ToggleButton ("Mono");
+            mono->setTooltip (txt ("Mono: solo suena una nota a la vez. Si dos notas se solapan en el piano roll, "
+                                   "el sonido se desliza de una a otra (con la rueda Glide)."));
+            mono->getToggleStateValue().referTo (channel.getPropertyAsValue (ids::mono, ctx.project.um()));
+            makeNonFocusing (*mono);
+            controls.add (mono);
+            addAndMakeVisible (mono);
+            addKnob ("Glide", txt ("Cuánto tarda en deslizarse de una nota a otra (en modo Mono, con notas solapadas)."),
+                     ids::glide, 0.0, 1.0, 0.0, 0.2)->setDisplayFunction ([] (double v) { return juce::String ((int) (v * 1000.0)) + " ms"; });
             addKnob ("LFO vel.", txt ("Velocidad del LFO: lo rápido que el filtro sube y baja solo (el \"wobble\" del dubstep)."),
                      ids::lfoRate, 0.1, 20.0, 4.0, 3.0)
                 ->setDisplayFunction ([] (double v) { return juce::String (v, 1) + " Hz"; });
@@ -326,6 +392,114 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
     resized();
 }
 
+namespace
+{
+    // La nota que dice el nombre de un archivo: "Piano C4.wav", "piano_Do4", "cuerda-F#2", "nota_60"...
+    int noteFromFileName (const juce::String& fileName)
+    {
+        static const std::pair<const char*, int> names[] = {
+            { "do#", 1 }, { "reb", 1 }, { "re#", 3 }, { "mib", 3 }, { "fa#", 6 }, { "solb", 6 }, { "sol#", 8 }, { "lab", 8 },
+            { "la#", 10 }, { "sib", 10 }, { "do", 0 }, { "re", 2 }, { "mi", 4 }, { "fa", 5 }, { "sol", 7 }, { "la", 9 }, { "si", 11 },
+            { "c#", 1 }, { "db", 1 }, { "d#", 3 }, { "eb", 3 }, { "f#", 6 }, { "gb", 6 }, { "g#", 8 }, { "ab", 8 },
+            { "a#", 10 }, { "bb", 10 }, { "c", 0 }, { "d", 2 }, { "e", 4 }, { "f", 5 }, { "g", 7 }, { "a", 9 }, { "b", 11 } };
+        auto tokens = juce::StringArray::fromTokens (fileName.toLowerCase(), " _-.()[]", "");
+        for (int t = tokens.size(); --t >= 0;)
+        {
+            const auto& tok = tokens[t];
+            if (tok.containsOnly ("0123456789") && tok.length() <= 3)
+            {
+                const int n = tok.getIntValue();
+                if (n >= 12 && n <= 120) return n;   // número MIDI
+            }
+            for (auto& [name, semitone] : names)
+            {
+                const juce::String nm (name);
+                if (! tok.startsWith (nm) || tok.length() <= nm.length())
+                    continue;
+                const auto rest = tok.substring (nm.length());
+                if (rest.containsOnly ("-0123456789") && rest.length() <= 2)
+                    return juce::jlimit (0, 127, (rest.getIntValue() + 1) * 12 + semitone);   // Do4 = 60
+            }
+        }
+        return -1;
+    }
+}
+
+void InstrumentPanel::showMultisampleMenu (juce::Component& from)
+{
+    int count = 0;
+    for (auto z : channel)
+        count += z.hasType (ids::ZONE) ? 1 : 0;
+    juce::PopupMenu menu;
+    menu.addSectionHeader (count > 0 ? juce::String (count) + txt (" samples en este instrumento") : txt ("Instrumento con varios samples"));
+    menu.addItem (1, txt ("Elegir varios samples (uno por nota)..."));
+    menu.addItem (2, txt ("Quitar el multisample (volver a un solo sample)"), count > 0);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&from), [this] (int r)
+    {
+        if (r == 2)
+        {
+            ctx.project.beginTransaction();
+            for (int i = channel.getNumChildren(); --i >= 0;)
+                if (channel.getChild (i).hasType (ids::ZONE))
+                    channel.removeChild (i, ctx.project.um());
+            refresh();
+        }
+        else if (r == 1)
+        {
+            chooser = std::make_unique<juce::FileChooser> (txt ("Elige varios samples (por ejemplo, Piano C3, Piano C4...)"),
+                                                           juce::File(), ctx.samples.getSupportedWildcard());
+            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+                                      | juce::FileBrowserComponent::canSelectMultipleItems,
+                                  [this] (const juce::FileChooser& fc)
+            {
+                loadMultisample (chosenFiles (fc, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                                                      .getChildFile ("Studoo").getChildFile ("Importados")));
+            });
+        }
+    });
+}
+
+void InstrumentPanel::loadMultisample (const juce::Array<juce::File>& files)
+{
+    // Cada archivo va a su nota (por el nombre); si no tiene nota, se reparten desde Do4 hacia arriba
+    std::vector<std::pair<int, juce::File>> zones;
+    int next = 60;
+    for (auto& f : files)
+    {
+        if (! SampleCache::isAudioFile (f) || zones.size() >= 128)
+            continue;
+        int note = noteFromFileName (f.getFileNameWithoutExtension());
+        if (note < 0) note = next++;
+        zones.push_back ({ note, f });
+    }
+    if (zones.empty())
+        return;
+    std::sort (zones.begin(), zones.end(), [] (auto& a, auto& b) { return a.first < b.first; });
+
+    ctx.project.beginTransaction();
+    auto* um = ctx.project.um();
+    for (int i = channel.getNumChildren(); --i >= 0;)
+        if (channel.getChild (i).hasType (ids::ZONE))
+            channel.removeChild (i, um);
+    for (size_t i = 0; i < zones.size(); ++i)
+    {
+        // Cada sample cubre desde la mitad hasta la nota anterior hasta la mitad hasta la siguiente
+        const int lo = i == 0 ? 0 : (zones[i - 1].first + zones[i].first) / 2 + 1;
+        const int hi = i + 1 == zones.size() ? 127 : (zones[i].first + zones[i + 1].first) / 2;
+        juce::ValueTree z (ids::ZONE);
+        z.setProperty (ids::sample, zones[i].second.getFullPathName(), nullptr);
+        z.setProperty (ids::root, zones[i].first, nullptr);
+        z.setProperty (ids::lo, lo, nullptr);
+        z.setProperty (ids::hi, juce::jmax (lo, hi), nullptr);
+        channel.appendChild (z, um);
+    }
+    // El sample principal (para la forma de onda) es el del medio, y el canal ya no suena "a golpes"
+    channel.setProperty (ids::sample, zones[zones.size() / 2].second.getFullPathName(), um);
+    channel.setProperty (ids::oneShot, false, um);
+    channel.setProperty (ids::slices, 1, um);
+    refresh();
+}
+
 void InstrumentPanel::refresh()
 {
     if (! channel.isValid())
@@ -344,6 +518,16 @@ void InstrumentPanel::refresh()
                                                           : juce::File (path).getFileName();
         if (type == ChannelType::audio)
             text = txt ("Grabación: ") + juce::File (path).getFileName();
+        int zones = 0, lo = 127, hi = 0;
+        for (auto z : channel)
+            if (z.hasType (ids::ZONE))
+            {
+                ++zones;
+                lo = juce::jmin (lo, (int) z[ids::root]);
+                hi = juce::jmax (hi, (int) z[ids::root]);
+            }
+        if (zones > 0)
+            text = "Multisample: " + juce::String (zones) + " samples (" + noteName (lo) + " a " + noteName (hi) + ")";
         infoLabel.setText (text, juce::dontSendNotification);
     }
     else if (type == ChannelType::plugin)
@@ -417,9 +601,19 @@ void InstrumentPanel::resized()
         if (dynamic_cast<SampleWaveform*> (c) != nullptr) return 0;
         return 60;
     };
-    int fixed = 0;
+    int fixed = 0, knobs = 0;
     for (auto* c : controls)
+    {
         fixed += widthOf (c) + 6;
+        knobs += dynamic_cast<Knob*> (c) != nullptr ? 1 : 0;
+    }
+    // Si no cabe todo (móvil o sinte con muchas ruedas), las ruedas se estrechan un poco
+    int knobWidth = 60;
+    if (fixed > area.getWidth() && knobs > 0)
+    {
+        knobWidth = juce::jlimit (40, 60, 60 - (fixed - area.getWidth()) / knobs - 1);
+        fixed -= (60 - knobWidth) * knobs;
+    }
     const int waveWidth = juce::jmin (230, area.getWidth() - fixed - 6);
 
     for (auto* c : controls)
@@ -430,7 +624,7 @@ void InstrumentPanel::resized()
             if (waveWidth < 110)
                 continue;
         }
-        int w = 60;
+        int w = knobWidth;
         if (dynamic_cast<juce::TextButton*> (c) != nullptr)   w = 130;
         if (auto* tb = dynamic_cast<juce::ToggleButton*> (c))
             w = juce::GlyphArrangement::getStringWidthInt (juce::FontOptions (15.0f), tb->getButtonText()) + 44;

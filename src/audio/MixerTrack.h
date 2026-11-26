@@ -9,6 +9,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include "Snapshot.h"
+#include "TrackFx.h"
 
 namespace studoo
 {
@@ -24,6 +25,20 @@ namespace studoo
         void process (int numSamples, const TrackParams& params, double bpm, bool silenced);
 
         void setPlugin (juce::AudioPluginInstance* p, int slot = 0) { if (juce::isPositiveAndBelow (slot, numFxSlots)) plugins[(size_t) slot] = p; }
+        void ensureDelay();   // reserva la memoria del eco (hilo principal, con el candado del motor)
+        void ensureRhythm() { rhythm.ensureMemory(); }
+        // Dónde va la canción (para el efecto de ritmo), antes de process()
+        void setTransport (double positionSteps, double samplesPerStep, bool playing)
+        { transportPos = positionSteps; transportStep = samplesPerStep; transportPlaying = playing; }
+        float getDetectedHz() const { return pitch.getDetectedHz(); }   // afinador
+        void setAnalysePitch (bool on) { pitch.setAnalyse (on); }
+        // Retraso que añaden sus plugins (en muestras): el motor retrasa las demás pistas lo mismo
+        int getLatency() const
+        {
+            int total = 0;
+            for (auto* p : plugins) if (p != nullptr) total += juce::jmax (0, p->getLatencySamples());
+            return total;
+        }
         bool hasPlugins() const { for (auto* p : plugins) if (p != nullptr) return true; return false; }
         juce::AudioPluginInstance* getPlugin (int slot = 0) const { return juce::isPositiveAndBelow (slot, numFxSlots) ? plugins[(size_t) slot] : nullptr; }
 
@@ -55,7 +70,13 @@ namespace studoo
         juce::dsp::Limiter<float> limiter;
 
         std::array<juce::AudioPluginInstance*, numFxSlots> plugins {};   // se procesan en orden
-        juce::int64 silentSamples = 0;   // cuánto lleva la pista en silencio (para no gastar CPU)
+        juce::int64 silentSamples = 0;
+        NoiseGate gate;
+        PitchCorrector pitch;
+        ParametricEq peq;
+        RhythmFx rhythm;
+        double transportPos = 0.0, transportStep = 0.0;
+        bool transportPlaying = false;   // cuánto lleva la pista en silencio (para no gastar CPU)
         std::array<std::atomic<float>, 2> peak { 0.0f, 0.0f };
     };
 }

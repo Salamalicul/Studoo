@@ -40,6 +40,7 @@ AutomationTarget AutomationTarget::parse (const juce::String& s)
 
     if (parts[0] == "mixer")        t.kind = Kind::mixer;
     else if (parts[0] == "channel") t.kind = Kind::channel;
+    else if (parts[0] == "project") t.kind = Kind::project;
 
     t.index = parts[1].getIntValue();
 
@@ -61,12 +62,16 @@ AutomationTarget AutomationTarget::parse (const juce::String& s)
     else if (p == "drive")       t.param = Param::drive;
     else if (p == "sampleTune")  t.param = Param::sampleTune;
     else if (p == "sendLevel")   t.param = Param::sendLevel;
+    else if (p == "bpm")         t.param = Param::bpm;
+    // El tempo solo existe para la canción, y la canción solo tiene tempo
+    if ((t.kind == Kind::project) != (t.param == Param::bpm))
+        t.param = Param::invalid;
     return t;
 }
 
 juce::String AutomationTarget::toString() const
 {
-    return juce::String (kind == Kind::mixer ? "mixer" : "channel") + ":" + juce::String (index) + ":"
+    return juce::String (kind == Kind::mixer ? "mixer" : kind == Kind::project ? "project" : "channel") + ":" + juce::String (index) + ":"
            + paramId (param).toString();
 }
 
@@ -91,6 +96,7 @@ juce::Identifier AutomationTarget::paramId (Param p)
         case Param::drive:       return ids::drive;
         case Param::sampleTune:  return ids::sampleTune;
         case Param::sendLevel:   return ids::sendLevel;
+        case Param::bpm:         return ids::bpm;
         case Param::invalid:   break;
     }
     return ids::volume;
@@ -117,6 +123,7 @@ juce::String AutomationTarget::paramName (Param p)
         case Param::drive:       return juce::String::fromUTF8 ("Distorsión del 808");
         case Param::sampleTune:  return "Tono del sample";
         case Param::sendLevel:   return juce::String::fromUTF8 ("Envío");
+        case Param::bpm:         return "Tempo (BPM)";
         case Param::invalid:   break;
     }
     return {};
@@ -131,6 +138,7 @@ float AutomationTarget::fromNormalised (Param p, float v)
         case Param::trackFilter: return v * 2.0f - 1.0f;
         case Param::cutoff: return 20.0f * std::pow (1000.0f, v);
         case Param::lfoRate: return 0.1f * std::pow (200.0f, v);
+        case Param::bpm:     return 40.0f + v * 210.0f;
         case Param::sampleTune: return std::round (v * 48.0f - 24.0f);
         case Param::eqLow:
         case Param::eqMid:
@@ -147,6 +155,7 @@ float AutomationTarget::toNormalised (Param p, float x)
         case Param::trackFilter: return juce::jlimit (0.0f, 1.0f, (x + 1.0f) * 0.5f);
         case Param::cutoff: return juce::jlimit (0.0f, 1.0f, std::log (juce::jmax (20.0f, x) / 20.0f) / std::log (1000.0f));
         case Param::lfoRate: return juce::jlimit (0.0f, 1.0f, std::log (juce::jmax (0.1f, x) / 0.1f) / std::log (200.0f));
+        case Param::bpm:     return juce::jlimit (0.0f, 1.0f, (x - 40.0f) / 210.0f);
         case Param::sampleTune: return juce::jlimit (0.0f, 1.0f, (x + 24.0f) / 48.0f);
         case Param::eqLow:
         case Param::eqMid:
@@ -226,11 +235,11 @@ void Project::ensureStructure()
     {
         const auto type = state.getChild (i).getType();
         const bool known = type == ids::CHANNELS || type == ids::PATTERNS || type == ids::PLAYLIST
-                        || type == ids::MIXER || type == ids::AUTOMATION;
+                        || type == ids::MIXER || type == ids::AUTOMATION || type == ids::MIDILINKS;
         if (! known || state.getChildWithName (type) != state.getChild (i))
             state.removeChild (i, nullptr);
     }
-    for (auto id : { ids::CHANNELS, ids::PATTERNS, ids::PLAYLIST, ids::MIXER, ids::AUTOMATION })
+    for (auto id : { ids::CHANNELS, ids::PATTERNS, ids::PLAYLIST, ids::MIXER, ids::AUTOMATION, ids::MIDILINKS })
         if (! state.getChildWithName (id).isValid())
             state.appendChild (juce::ValueTree (id), nullptr);
 
@@ -267,10 +276,11 @@ void Project::ensureStructure()
             }
         }
     };
-    keepOnly (channels(), ids::CHANNEL, true, {});
+    keepOnly (channels(), ids::CHANNEL, true, { ids::ZONE });
     keepOnly (patterns(), ids::PATTERN, true, { ids::STEPSET, ids::NOTE });
     keepOnly (playlist(), ids::CLIP, false, {});
     keepOnly (automation(), ids::LANE, false, { ids::POINT });
+    keepOnly (state.getChildWithName (ids::MIDILINKS), ids::LINK, false, {});
 
     // El mezclador: exactamente numMixerTracks pistas, en orden
     {
@@ -648,6 +658,8 @@ juce::ValueTree Project::addSynthPreset (const kits::SynthPreset& p)
     ch.setProperty (ids::resonance, p.resonance, &undoManager);
     ch.setProperty (ids::detune, p.detune, &undoManager);
     ch.setProperty (ids::root, p.root, &undoManager);
+    ch.setProperty (ids::timbre, p.timbre, &undoManager);
+    ch.setProperty (ids::fmRatio, p.fmRatio, &undoManager);
     if (track > 0)
         getMixerTrack (track).setProperty (ids::name, name.substring (0, 12), &undoManager);
     return ch;
@@ -695,7 +707,7 @@ juce::ValueTree Project::addPattern (const juce::String& name)
     juce::ValueTree p (ids::PATTERN);
     p.setProperty (ids::uid, newUid(), nullptr);
     p.setProperty (ids::name, name.isNotEmpty() ? name : juce::String::fromUTF8 ("Patrón ") + juce::String (n + 1), nullptr);
-    p.setProperty (ids::length, 16, nullptr);
+    p.setProperty (ids::length, getStepsPerBar() % 4 == 0 && getStepsPerBar() != 12 ? 16 : getStepsPerBar(), nullptr);
     p.setProperty (ids::colour, (juce::int64) patternColours[(size_t) n % 8], nullptr);
     patterns().appendChild (p, &undoManager);
     return p;
@@ -785,6 +797,51 @@ bool Project::getStep (const juce::ValueTree& pattern, int channelUid, int step)
             return step >= 0 && step < data.length() && data[step] == '1';
         }
     return false;
+}
+
+int Project::parseStepValue (const juce::String& list, int step, const juce::Identifier& which)
+{
+    const int def = stepValueDefault (which);
+    if (list.isEmpty() || step < 0)
+        return def;
+    // Busca el valor número 'step' sin crear listas enteras (puede llamarse mucho)
+    int index = 0, start = 0;
+    for (int i = 0; i <= list.length(); ++i)
+        if (i == list.length() || list[i] == ',')
+        {
+            if (index == step)
+            {
+                const auto token = list.substring (start, i).trim();
+                if (token.isEmpty()) return def;
+                return which == ids::stepVel ? juce::jlimit (0, 100, token.getIntValue()) : juce::jlimit (-24, 24, token.getIntValue());
+            }
+            ++index;
+            start = i + 1;
+        }
+    return def;
+}
+
+int Project::getStepValue (const juce::ValueTree& pattern, int channelUid, int step, const juce::Identifier& which)
+{
+    for (auto c : pattern)
+        if (c.hasType (ids::STEPSET) && (int) c[ids::channel] == channelUid)
+            return parseStepValue (c[which].toString(), step, which);
+    return stepValueDefault (which);
+}
+
+void Project::setStepValue (juce::ValueTree pattern, int channelUid, int step, const juce::Identifier& which, int value)
+{
+    if (! pattern.isValid() || step < 0 || step >= 256)
+        return;
+    auto set = getStepSet (pattern, channelUid, true);
+    auto values = juce::StringArray::fromTokens (set[which].toString(), ",", "");
+    while (values.size() <= step)
+        values.add (juce::String (stepValueDefault (which)));
+    value = which == ids::stepVel ? juce::jlimit (0, 100, value) : juce::jlimit (-24, 24, value);
+    if (values[step].getIntValue() == value && values[step].isNotEmpty())
+        return;
+    values.set (step, juce::String (value));
+    set.setProperty (which, values.joinIntoString (","), &undoManager);
 }
 
 void Project::setStep (juce::ValueTree pattern, int channelUid, int step, bool on)
@@ -885,7 +942,15 @@ double Project::getSongLengthSteps()
         end = juce::jmax (end, (double) c[ids::start] + (double) c[ids::length]);
 
     // Redondeamos al compás siguiente
-    return juce::jmax ((double) stepsPerBar, std::ceil (end / stepsPerBar) * stepsPerBar);
+    const double bar = getStepsPerBar();
+    return juce::jmax (bar, std::ceil (end / bar) * bar);
+}
+
+int Project::stepsPerBarOf (const juce::ValueTree& s)
+{
+    const int num = juce::jlimit (2, 7, (int) s.getProperty (ids::timeSigNum, 4));
+    const int den = (int) s.getProperty (ids::timeSigDen, 4) == 8 ? 8 : 4;
+    return num * 16 / den;
 }
 
 // ----------------------------------------------------------------------------
@@ -906,6 +971,7 @@ juce::ValueTree Project::addAutomationLane (const AutomationTarget& target)
     // Empieza con dos puntos al valor actual del parámetro
     float current = 0.8f;
     juce::ValueTree owner = target.kind == AutomationTarget::Kind::mixer ? getMixerTrack (target.index)
+                          : target.kind == AutomationTarget::Kind::project ? state
                                                                            : findChannel (target.index);
     if (owner.isValid())
         current = (float) owner.getProperty (AutomationTarget::paramId (target.param), current);
@@ -927,7 +993,11 @@ juce::ValueTree Project::addAutomationLane (const AutomationTarget& target)
 juce::String Project::describeTarget (const AutomationTarget& t)
 {
     juce::String owner;
-    if (t.kind == AutomationTarget::Kind::mixer)
+    if (t.kind == AutomationTarget::Kind::project)
+    {
+        owner = juce::String::fromUTF8 ("Canción");
+    }
+    else if (t.kind == AutomationTarget::Kind::mixer)
     {
         auto track = getMixerTrack (t.index);
         owner = t.index == 0 ? juce::String ("Master") : "Pista " + juce::String (t.index) + " (" + track[ids::name].toString() + ")";

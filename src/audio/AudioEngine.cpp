@@ -123,12 +123,22 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
 
     // Cargamos los samples ANTES de bloquear (leer un archivo puede tardar)
     std::vector<SamplePtr> samples (newSnap->channels.size());
+    std::vector<std::vector<SamplerInstrument::Zone>> zones (newSnap->channels.size());
+    std::vector<juce::String> zoneKeys (newSnap->channels.size());
     for (size_t i = 0; i < newSnap->channels.size(); ++i)
     {
         const auto& ch = newSnap->channels[i];
         if (ch.type == ChannelType::sampler || ch.type == ChannelType::audio)
             samples[i] = cache.get (ch.samplePath);
+        // Multisample: un sample por zona (la "clave" dice si ha cambiado algo)
+        for (auto& z : ch.zones)
+        {
+            zoneKeys[i] << z.path << "|" << z.root << "|" << z.lo << "|" << z.hi << ";";
+            if (auto s = cache.get (z.path))
+                zones[i].push_back ({ s, z.root, z.lo, z.hi });
+        }
     }
+    std::vector<std::vector<SamplerInstrument::Zone>> oldZones;
 
     // Cosas que se liberan después de soltar el candado
     std::vector<std::unique_ptr<ChannelRuntime>> oldRuntimes;
@@ -137,6 +147,19 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
 
     {
         const juce::ScopedLock sl (lock);
+
+        // Pistas que usan el eco (o lo automatizan): reservar su memoria ahora
+        for (int t = 0; t < numMixerTracks; ++t)
+        {
+            bool needsDelay = newSnap->mixer[(size_t) t].delayMix > 0.001f;
+            for (const auto& lane : newSnap->lanes)
+                needsDelay = needsDelay || (lane.target.kind == AutomationTarget::Kind::mixer && lane.target.index == t
+                                            && lane.target.param == AutomationTarget::Param::delayMix);
+            if (needsDelay)
+                mixer[(size_t) t].ensureDelay();
+            if (newSnap->mixer[(size_t) t].rhythmMode > 0)
+                mixer[(size_t) t].ensureRhythm();
+        }
 
         std::vector<std::unique_ptr<ChannelRuntime>> newRuntimes;
         newRuntimes.reserve (newSnap->channels.size());
@@ -164,6 +187,8 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
                     oldSamples.push_back (sampler->setSample (samples[i]));
                     sampler->setSamplePath (ch.samplePath);
                 }
+                if (sampler->getZonesKey() != zoneKeys[i])
+                    oldZones.push_back (sampler->setZones (std::move (zones[i]), zoneKeys[i]));
             }
             else if (ch.type == ChannelType::audio && rt->audioSamplePath != ch.samplePath)
             {
@@ -206,6 +231,7 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
         }
 
         currentBpm.store (newSnap->bpm);
+        currentStepsPerBar.store (newSnap->stepsPerBar);
         songModeFlag.store (newSnap->songMode);
         std::swap (snapshot, newSnap);
     }
@@ -323,9 +349,12 @@ void AudioEngine::setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginIn
         plugin->prepareToPlay (sampleRate, blockSize);
     }
 
+    const bool latent = plugin != nullptr && plugin->getLatencySamples() > 0;
     std::unique_ptr<juce::AudioPluginInstance> old;
     {
         const juce::ScopedLock sl (lock);
+        if (latent)
+            ensurePdc();
         old = std::move (mixerPlugins[index]);
         mixerPlugins[index] = std::move (plugin);
         mixer[(size_t) track].setPlugin (mixerPlugins[index].get(), slot);
@@ -360,6 +389,18 @@ void AudioEngine::clearAllPlugins()
             onPluginWillBeDeleted (p.get());
 }
 
+void AudioEngine::ensurePdc()
+{
+    if (pdcLines[0].getNumSamples() > 0)
+        return;
+    for (auto& line : pdcLines)
+    {
+        line.setSize (2, pdcSize);
+        line.clear();
+    }
+    pdcWrite.fill (0);
+}
+
 juce::AudioPluginInstance* AudioEngine::getMixerPlugin (int track, int slot)
 {
     return juce::isPositiveAndBelow (track, numMixerTracks) && juce::isPositiveAndBelow (slot, numFxSlots)
@@ -372,10 +413,11 @@ juce::Optional<juce::AudioPlayHead::PositionInfo> AudioEngine::getPosition() con
     const double bpm = currentBpm.load();
     const double steps = position.load();
     info.setBpm (bpm);
-    info.setTimeSignature (juce::AudioPlayHead::TimeSignature { 4, 4 });
+    const int barSteps = juce::jmax (4, currentStepsPerBar.load());
+    info.setTimeSignature (juce::AudioPlayHead::TimeSignature { barSteps % 4 == 0 ? barSteps / 4 : barSteps / 2, barSteps % 4 == 0 ? 4 : 8 });
     info.setIsPlaying (playing.load());
     info.setPpqPosition (steps / stepsPerBeat);
-    info.setPpqPositionOfLastBarStart (std::floor (steps / stepsPerBar) * 4.0);
+    info.setPpqPositionOfLastBarStart (std::floor (steps / barSteps) * barSteps / stepsPerBeat);
     info.setTimeInSeconds (steps * 60.0 / bpm / stepsPerBeat);
     info.setTimeInSamples ((juce::int64) (steps * 60.0 / bpm / stepsPerBeat * sampleRate));
     return info;
@@ -485,8 +527,17 @@ bool AudioEngine::renderSongToFile (const juce::File& wavFile, double exportRate
         requestedPosition.store (0.0);
         playing.store (true);
 
-        const double samplesPerStep = exportRate * 60.0 / bpm / stepsPerBeat;
-        auto songSamples = (juce::int64) (songLength * samplesPerStep);
+        // Duración de la canción (sumando trocitos: el tempo puede cambiar a lo largo de ella)
+        double songSecondsTotal = 0.0;
+        {
+            const auto snapForTempo = snapshot.get();
+            for (double st = 0.0; st < songLength; st += 0.25)
+            {
+                const double b = snapForTempo != nullptr ? snapForTempo->bpmAt (st) : bpm;
+                songSecondsTotal += 0.25 * 60.0 / juce::jlimit (40.0, 250.0, b) / stepsPerBeat;
+            }
+        }
+        auto songSamples = (juce::int64) (songSecondsTotal * exportRate);
         if (maxSeconds > 0.0)
             songSamples = juce::jmin (songSamples, (juce::int64) (maxSeconds * exportRate));
         const auto totalSamples = songSamples + (juce::int64) (exportRate * 2.0); // 2 s de cola (reverb, delay...)
@@ -618,7 +669,7 @@ void AudioEngine::collectEvents (const Snapshot& snap, double from, double to, i
     {
         for (double beat = std::ceil (from / stepsPerBeat) * stepsPerBeat; beat < to; beat += stepsPerBeat)
         {
-            const bool accent = std::fmod (beat, (double) stepsPerBar) < 0.5;
+            const bool accent = std::fmod (beat, (double) snap.stepsPerBar) < 0.5;
             metronome.trigger (accent, sampleOffset + (int) ((beat - from) * samplesPerStep));
         }
     }
@@ -652,7 +703,7 @@ void AudioEngine::collectEvents (const Snapshot& snap, double from, double to, i
 
 void AudioEngine::renderAudioClips (const Snapshot& snap, double from, double to, int sampleOffset, double samplesPerStep)
 {
-    const double secondsPerStep = 60.0 / snap.bpm / stepsPerBeat;
+    const double secondsPerStep = samplesPerStep / sampleRate;   // sigue los cambios de tempo
 
     for (const auto& clip : snap.clips)
     {
@@ -791,9 +842,12 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     }
 
     // --- Secuenciador: qué notas suenan en este trocito ----------------------------------
-    const double samplesPerStep = sampleRate * 60.0 / snap->bpm / stepsPerBeat;
     const bool song = snap->songMode || exportingSong.load();
     double chunkStartPos = position.load();
+    // Tempo de este trocito (en modo canción puede cambiar con la automatización de tempo)
+    const double chunkBpm = song ? snap->bpmAt (chunkStartPos) : snap->bpm;
+    currentBpm.store (chunkBpm);
+    const double samplesPerStep = sampleRate * 60.0 / chunkBpm / stepsPerBeat;
 
     // Grabar lo que se toca en el teclado MIDI (solo en modo patrón y sonando)
     if (isPlaying && ! song && midiRecording.load() && ! liveMidi.isEmpty())
@@ -820,10 +874,17 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         if (! song && juce::isPositiveAndBelow (snap->currentPatternIndex, (int) snap->patterns.size()))
             loopEnd = snap->patterns[(size_t) snap->currentPatternIndex].length;
         loopEnd = juce::jmax (1.0, loopEnd);
+        // Zona en bucle (modo canción): al llegar al final vuelve a su principio
+        double loopBegin = 0.0;
+        if (song && ! exportingSong.load() && snap->loopEnd > snap->loopStart)
+        {
+            loopBegin = snap->loopStart;
+            loopEnd = snap->loopEnd;
+        }
 
         double pos = chunkStartPos;
         if (pos >= loopEnd)
-            pos = std::fmod (pos, loopEnd);
+            pos = loopBegin + std::fmod (pos - loopBegin, loopEnd - loopBegin);
         chunkStartPos = pos;
 
         double remaining = n / samplesPerStep;
@@ -839,7 +900,7 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
             const double used = segEnd - pos;
             consumed += used;
             remaining -= used;
-            pos = (segEnd >= loopEnd - 1.0e-9) ? 0.0 : segEnd;
+            pos = (segEnd >= loopEnd - 1.0e-9) ? loopBegin : segEnd;
         }
         position.store (pos);
     }
@@ -982,22 +1043,43 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     // Solo: una pista que recibe el envío de una pista en solo también se oye
     std::array<bool, numMixerTracks> soloed {};
     bool anySolo = false;
-    for (int t = 1; t < numMixerTracks; ++t)
+    const int stem = stemTrack.load();
+    if (stem > 0 && stem < numMixerTracks)
+    {
+        anySolo = true;   // exportar por pistas: solo esta pista
+        soloed[(size_t) stem] = true;
+    }
+    else for (int t = 1; t < numMixerTracks; ++t)
     {
         const auto& tp = trackParams[(size_t) t];
         soloed[(size_t) t] = soloed[(size_t) t] || tp.solo;
         anySolo = anySolo || tp.solo;
         if (soloed[(size_t) t] && tp.sendTo > t && tp.sendLevel > 0.0f)
             soloed[(size_t) tp.sendTo] = true;
+        for (size_t s = 0; s < tp.moreSendTo.size(); ++s)
+            if (soloed[(size_t) t] && tp.moreSendTo[s] > t && tp.moreSendLevel[s] > 0.0f)
+                soloed[(size_t) tp.moreSendTo[s]] = true;
     }
 
     auto& master = mixer[0].getBuffer();
+    for (auto& track : mixer)
+        track.setTransport (chunkStartPos, samplesPerStep, isPlaying);
+
+    // Compensación del retraso de los plugins: todas las pistas se esperan a la más lenta
+    std::array<int, numMixerTracks> latency {};
+    int maxLatency = 0;
+    if (pdcLines[0].getNumSamples() > 0)
+        for (int t = 1; t < numMixerTracks; ++t)
+        {
+            latency[(size_t) t] = juce::jmin (pdcSize - 1, mixer[(size_t) t].getLatency());
+            maxLatency = juce::jmax (maxLatency, latency[(size_t) t]);
+        }
     for (int t = 1; t < numMixerTracks; ++t)
     {
         const auto& tp = trackParams[(size_t) t];
         const bool silenced = tp.mute || (anySolo && ! soloed[(size_t) t]);
         auto& out = mixer[(size_t) t].getBuffer();
-        mixer[(size_t) t].process (n, tp, snap->bpm, silenced);
+        mixer[(size_t) t].process (n, tp, chunkBpm, silenced);
 
         // Envío: una copia (después del volumen) va a otra pista, que aún no se ha procesado
         if (tp.sendTo > t && tp.sendTo < numMixerTracks && tp.sendLevel > 0.0f)
@@ -1006,13 +1088,49 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
             dest.addFrom (0, 0, out, 0, 0, n, tp.sendLevel);
             dest.addFrom (1, 0, out, 1, 0, n, tp.sendLevel);
         }
-        if (tp.sendOnly && tp.sendTo > t)
+        for (size_t s = 0; s < tp.moreSendTo.size(); ++s)
+            if (tp.moreSendTo[s] > t && tp.moreSendTo[s] < numMixerTracks && tp.moreSendLevel[s] > 0.0f)
+            {
+                auto& dest = mixer[(size_t) tp.moreSendTo[s]].getBuffer();
+                dest.addFrom (0, 0, out, 0, 0, n, tp.moreSendLevel[s]);
+                dest.addFrom (1, 0, out, 1, 0, n, tp.moreSendLevel[s]);
+            }
+        if (tp.sendOnly && tp.sendTo > t && t != stem)
             continue;
+        if (maxLatency > 0)
+        {
+            const int delay = maxLatency - latency[(size_t) t];
+            auto& line = pdcLines[(size_t) t];
+            int& w = pdcWrite[(size_t) t];
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                float* d = out.getWritePointer (ch);
+                float* buf = line.getWritePointer (ch);
+                int pos = w;
+                for (int i = 0; i < n; ++i)
+                {
+                    buf[pos] = d[i];
+                    d[i] = buf[(pos - delay + pdcSize) & (pdcSize - 1)];
+                    pos = (pos + 1) & (pdcSize - 1);
+                }
+            }
+            w = (w + n) & (pdcSize - 1);
+        }
         master.addFrom (0, 0, out, 0, 0, n);
         master.addFrom (1, 0, out, 1, 0, n);
     }
-    mixer[0].process (n, trackParams[0], snap->bpm, trackParams[0].mute);
+    if (! (stem > 0 && stem < numMixerTracks))
+        mixer[0].process (n, trackParams[0], chunkBpm, trackParams[0].mute);
     metronome.render (master, n);
+    {
+        // Para el analizador de frecuencias
+        int pos = scopePos.load();
+        const float* l = master.getReadPointer (0);
+        const float* r = master.getReadPointer (1);
+        for (int i = 0; i < n; ++i)
+            scope[(size_t) ((pos + i) & (scopeSize - 1))] = 0.5f * (l[i] + r[i]);
+        scopePos.store ((pos + n) & (scopeSize - 1));
+    }
 
     // --- Sonido de los juegos de oído (no pasa por el mezclador) ---------------------------
     if (audition != nullptr)

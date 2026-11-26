@@ -1,5 +1,6 @@
 #include "Playlist.h"
 #include "HelpTexts.h"
+#include "AudioEditor.h"
 
 namespace studoo
 {
@@ -29,7 +30,7 @@ double PlaylistGrid::snap (double steps) const
 
 int PlaylistGrid::getTotalBars()
 {
-    return juce::jmax (32, (int) (ctx.project.getSongLengthSteps() / stepsPerBar) + 8);
+    return juce::jmax (32, (int) (ctx.project.getSongLengthSteps() / ctx.project.getStepsPerBar()) + 8);
 }
 
 juce::Rectangle<float> PlaylistGrid::clipBounds (const juce::ValueTree& clip) const
@@ -74,7 +75,7 @@ void PlaylistGrid::paint (juce::Graphics& g)
     // Compases y tiempos
     for (int b = 0; b <= bars; ++b)
     {
-        const float x = stepsToX (b * stepsPerBar);
+        const float x = stepsToX (b * ctx.project.getStepsPerBar());
         g.setColour (b % 4 == 0 ? Colours::outline.brighter (0.35f) : Colours::outline.brighter (0.05f));
         g.drawVerticalLine ((int) x, (float) rulerHeight, (float) getHeight());
         if (pps * stepsPerBeat > 10.0)
@@ -110,9 +111,25 @@ void PlaylistGrid::paint (juce::Graphics& g)
     // Regla
     g.setGradientFill (juce::ColourGradient (Colours::panelLight, 0.0f, 0.0f, Colours::header, 0.0f, (float) rulerHeight, false));
     g.fillRect (0, 0, getWidth(), rulerHeight);
+    {
+        // Zona en bucle
+        const auto& st = ctx.project.getState();
+        const double a = st.getProperty (ids::loopStart, 0.0), b = st.getProperty (ids::loopEnd, 0.0);
+        if ((bool) st.getProperty (ids::loopOn, false) && b > a)
+        {
+            const float x0 = stepsToX (a), x1 = stepsToX (b);
+            g.setColour (Colours::green.withAlpha (0.35f));
+            g.fillRect (juce::Rectangle<float> (x0, 0.0f, x1 - x0, (float) rulerHeight));
+            g.setColour (Colours::green.withAlpha (0.06f));
+            g.fillRect (juce::Rectangle<float> (x0, (float) rulerHeight, x1 - x0, (float) getHeight()));
+            g.setColour (Colours::green);
+            g.drawVerticalLine ((int) x0, 0.0f, (float) getHeight());
+            g.drawVerticalLine ((int) x1, 0.0f, (float) getHeight());
+        }
+    }
     for (int b = 0; b < bars; ++b)
     {
-        const float x = stepsToX (b * stepsPerBar);
+        const float x = stepsToX (b * ctx.project.getStepsPerBar());
         g.setColour (b % 4 == 0 ? Colours::text : Colours::textDim);
         g.setFont (b % 4 == 0 ? Fonts::bold (12.0f) : Fonts::regular (11.5f));
         g.drawText (juce::String (b + 1), juce::Rectangle<float> (x + 5.0f, 0.0f, 40.0f, (float) rulerHeight - 4.0f), juce::Justification::centredLeft);
@@ -133,15 +150,27 @@ void PlaylistGrid::paint (juce::Graphics& g)
     for (auto clip : ctx.project.playlist())
     {
         auto r = clipBounds (clip).reduced (1.0f, 1.0f);
+        const bool clipMuted = clip.getProperty (ids::clipMuted, false);
+        juce::Graphics::ScopedSaveState mutedState (g);
+        if (clipMuted)
+            g.setOpacity (0.35f);   // toma descartada: se ve apagada
         if (! r.expanded (10.0f).intersects (clipArea))
             continue;   // fuera de la zona que se está redibujando
         const bool audio = clip[ids::kind].toString() == "audio";
+        const bool autoBlock = clip[ids::kind].toString() == "automation";
         juce::String name;
         juce::Colour colour = Colours::green;
+        juce::ValueTree blockLane;
 
         if (audio)
         {
             name = ctx.project.findChannel (clip[ids::ref])[ids::name].toString();
+        }
+        else if (autoBlock)
+        {
+            blockLane = ctx.project.automation().getChildWithProperty (ids::uid, clip[ids::ref]);
+            name = ctx.project.describeTarget (AutomationTarget::parse (blockLane[ids::target].toString()));
+            colour = juce::Colour (0xffb388ff);   // morado: automatización
         }
         else
         {
@@ -168,7 +197,32 @@ void PlaylistGrid::paint (juce::Graphics& g)
         g.drawText (name, head.reduced (6.0f, 0.0f), juce::Justification::centredLeft, true);
 
         auto body = r.withTrimmedTop (17.0f).reduced (3.0f, 2.0f);
-        if (! audio)
+        if (autoBlock)
+        {
+            // La curva del bloque (su tiempo empieza al principio del bloque)
+            juce::Array<juce::ValueTree> points;
+            for (auto p : blockLane) points.add (p);
+            std::sort (points.begin(), points.end(), [] (const juce::ValueTree& a, const juce::ValueTree& b)
+                       { return (double) a[ids::time] < (double) b[ids::time]; });
+            const double start = clip[ids::start], len = clip[ids::length];
+            juce::Path curve;
+            auto yFor = [&body] (float v) { return body.getBottom() - juce::jlimit (0.0f, 1.0f, v) * body.getHeight(); };
+            bool started = false;
+            for (auto& p : points)
+            {
+                const double t = juce::jmin ((double) p[ids::time], len);
+                const float x = stepsToX (start + t), y = yFor (p[ids::value]);
+                if (! started) { curve.startNewSubPath (body.getX(), y); started = true; }
+                curve.lineTo (x, y);
+            }
+            if (started)
+            {
+                curve.lineTo (body.getRight(), yFor (points.getLast()[ids::value]));
+                g.setColour (colour.brighter (0.4f));
+                g.strokePath (curve, juce::PathStrokeType (1.6f));
+            }
+        }
+        else if (! audio)
         {
             // Mini vista de los pasos y notas del patrón
             auto pattern = ctx.project.findPattern (clip[ids::ref]);
@@ -238,6 +292,43 @@ void PlaylistGrid::paint (juce::Graphics& g)
         }
     }
 
+    // Fila de automatización: la curva elegida en la pestaña Automatización
+    {
+        auto area = automationArea();
+        g.setColour (juce::Colour (0xff16191d));
+        g.fillRect (area.withX (0.0f).withWidth ((float) getWidth()));
+        g.setColour (Colours::outline);
+        g.drawHorizontalLine ((int) area.getY(), 0.0f, (float) getWidth());
+        auto lane = selectedLane();
+        g.setColour (Colours::textDim);
+        g.setFont (Fonts::bold (10.0f));
+        g.drawFittedText (lane.isValid() ? txt ("Automat.") : txt ("Automat.\n(ninguna)"),
+                          juce::Rectangle<int> (4, (int) area.getY() + 4, labelWidth - 8, (int) area.getHeight() - 8),
+                          juce::Justification::centredLeft, 3);
+        if (lane.isValid())
+        {
+            const auto target = AutomationTarget::parse (lane[ids::target].toString());
+            g.setColour (Colours::accent);
+            g.setFont (Fonts::regular (10.0f));
+            g.drawText (ctx.project.describeTarget (target), area.reduced (6.0f, 2.0f).withHeight (14.0f), juce::Justification::centredLeft);
+            juce::Array<juce::ValueTree> points;
+            for (auto p : lane) points.add (p);
+            std::sort (points.begin(), points.end(), [] (const juce::ValueTree& a, const juce::ValueTree& b)
+                       { return (double) a[ids::time] < (double) b[ids::time]; });
+            juce::Path curve;
+            for (int i = 0; i < points.size(); ++i)
+            {
+                const float x = stepsToX (points[i][ids::time]), y = autoValueToY (points[i][ids::value]);
+                if (i == 0) { curve.startNewSubPath (area.getX(), y); curve.lineTo (x, y); }
+                else        curve.lineTo (x, y);
+                if (i == points.size() - 1) curve.lineTo ((float) getWidth(), y);
+            }
+            g.strokePath (curve, juce::PathStrokeType (2.0f));
+            for (auto& p : points)
+                g.fillEllipse (stepsToX (p[ids::time]) - 4.0f, autoValueToY (p[ids::value]) - 4.0f, 8.0f, 8.0f);
+        }
+    }
+
     // Cursor de reproducción
     if (ctx.engine.isSongMode())
     {
@@ -273,6 +364,82 @@ void PlaylistGrid::mouseMove (const juce::MouseEvent& e)
     }
     setMouseCursor (c.isValid() ? (edge ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor)
                                 : juce::MouseCursor::NormalCursor);
+}
+
+void PlaylistGrid::editAudioFile (juce::ValueTree clip, int operation)
+{
+    auto channel = ctx.project.findChannel (clip[ids::ref]);
+    auto sample = ctx.samples.get (channel[ids::sample].toString());
+    if (sample == nullptr || sample->buffer.getNumSamples() == 0)
+        return;
+    juce::AudioBuffer<float> b (sample->buffer);
+    const int len = b.getNumSamples();
+    switch (operation)
+    {
+        case 0: { const float m = b.getMagnitude (0, len); if (m > 1.0e-5f) b.applyGain (0.966f / m); break; }   // -0,3 dB
+        case 1: b.reverse (0, len); break;
+        case 2:
+        {
+            // Umbral: un poco por encima del 10% más silencioso de la grabación
+            std::vector<float> levels;
+            for (int i = 0; i + 1024 <= len; i += 1024)
+                levels.push_back (b.getRMSLevel (0, i, 1024));
+            if (levels.empty()) return;
+            std::sort (levels.begin(), levels.end());
+            const float threshold = juce::jmax (0.001f, levels[levels.size() / 10] * 2.5f);
+            float gain = 1.0f, env = 0.0f;
+            for (int i = 0; i < len; ++i)
+            {
+                float level = 0.0f;
+                for (int ch = 0; ch < b.getNumChannels(); ++ch) level = juce::jmax (level, std::abs (b.getSample (ch, i)));
+                env = level > env ? level : env * 0.9995f;
+                gain += ((env > threshold ? 1.0f : 0.0f) - gain) * (env > threshold ? 0.05f : 0.0005f);
+                for (int ch = 0; ch < b.getNumChannels(); ++ch) b.setSample (ch, i, b.getSample (ch, i) * gain);
+            }
+            break;
+        }
+        case 3:
+        {
+            // Quitar silencios: cambia dónde empieza y acaba el trozo (no hace falta otro archivo)
+            const float th = juce::jmax (0.01f, b.getMagnitude (0, len) * 0.03f);
+            int first = 0, last = len - 1;
+            while (first < len && b.getMagnitude (first, juce::jmin (256, len - first)) < th) first += 256;
+            while (last > first && b.getMagnitude (juce::jmax (0, last - 256), 256) < th) last -= 256;
+            const double bpm = juce::jlimit (40.0, 250.0, (double) ctx.project.getState().getProperty (ids::bpm, 140.0));
+            const double samplesPerStep = sample->sampleRate * 60.0 / bpm / stepsPerBeat;
+            const double newOffset = juce::jmax ((double) clip[ids::offset], first / samplesPerStep);
+            const double endSteps = juce::jmin ((double) clip[ids::offset] + (double) clip[ids::length], (last + 256) / samplesPerStep);
+            if (endSteps - newOffset < 0.25)
+                return;
+            ctx.project.beginTransaction();
+            const double shift = newOffset - (double) clip[ids::offset];
+            clip.setProperty (ids::start, (double) clip[ids::start] + shift, ctx.project.um());
+            clip.setProperty (ids::offset, newOffset, ctx.project.um());
+            clip.setProperty (ids::length, endSteps - newOffset, ctx.project.um());
+            return;
+        }
+        case 4: b.applyGain (1.4125f); break;
+        case 5: b.applyGain (0.7079f); break;
+        default: return;
+    }
+    // Nunca por encima del máximo (sin "romper" el sonido)
+    for (int ch = 0; ch < b.getNumChannels(); ++ch)
+        juce::FloatVectorOperations::clip (b.getWritePointer (ch), b.getReadPointer (ch), -1.0f, 1.0f, len);
+
+    auto dir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Studoo").getChildFile ("Grabaciones");
+    dir.createDirectory();
+    auto file = dir.getNonexistentChildFile (juce::File::createLegalFileName (channel[ids::name].toString()) + " (editado)", ".wav", false);
+    {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (new juce::FileOutputStream (file), sample->sampleRate,
+                                                                               (unsigned int) b.getNumChannels(), 24, {}, 0));
+        if (writer == nullptr || ! writer->writeFromAudioSampleBuffer (b, 0, len))
+            return;
+    }
+    ctx.project.beginTransaction();
+    channel.setProperty (ids::sample, file.getFullPathName(), ctx.project.um());
+    peakCache.erase (file.getFullPathName());
+    repaint();
 }
 
 const std::vector<float>& PlaylistGrid::peaksFor (const juce::String& path, double& sampleRate)
@@ -340,6 +507,20 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
     menu.addSubMenu (txt ("Fundido de entrada (sube poco a poco)"), fadeIn);
     menu.addSubMenu (txt ("Fundido de salida (baja poco a poco)"), fadeOut);
     menu.addSeparator();
+    juce::PopupMenu edit;
+    edit.addItem (800, txt ("Normalizar (subir al máximo sin pasarse)"));
+    edit.addItem (801, txt ("Al revés"));
+    edit.addItem (802, txt ("Quitar ruido de fondo (puerta)"));
+    edit.addItem (803, txt ("Quitar los silencios del principio y del final"));
+    edit.addItem (804, txt ("Más fuerte (+3 dB)"));
+    edit.addItem (805, txt ("Más flojo (-3 dB)"));
+    edit.addSeparator();
+    edit.addItem (806, txt ("Abrir el editor de audio (elegir un trozo y editarlo)..."));
+    menu.addSubMenu (txt ("Editar el audio (crea una copia)"), edit);
+    const bool muted = clip.getProperty (ids::clipMuted, false);
+    menu.addItem (900, muted ? txt ("Volver a activar este trozo") : txt ("Silenciar este trozo"));
+    menu.addItem (901, txt ("Quedarme con esta toma (silencia las que suenan a la vez)"));
+    menu.addSeparator();
     menu.addItem (3, "Borrar");
 
     juce::Component::SafePointer<PlaylistGrid> safe (this);
@@ -391,7 +572,56 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
         }
         else if (result >= 700 && result <= 724)
             clip.setProperty (ids::clipPitch, result - 700 - 12, um);
+        else if (result == 806)
+        {
+            auto channel = project.findChannel (clip[ids::ref]);
+            juce::DialogWindow::LaunchOptions options;
+            options.content.setOwned (new AudioEditorPanel (safe->ctx, channel));
+            options.dialogTitle = txt ("Editor de audio");
+            options.dialogBackgroundColour = Colours::panel;
+            options.componentToCentreAround = safe->getTopLevelComponent();
+            options.escapeKeyTriggersCloseButton = true;
+            options.useNativeTitleBar = false;
+            options.resizable = false;
+            options.launchAsync();
+        }
+        else if (result >= 800 && result < 900)
+            safe->editAudioFile (clip, result - 800);
+        else if (result == 900)
+            clip.setProperty (ids::clipMuted, ! (bool) clip.getProperty (ids::clipMuted, false), um);
+        else if (result == 901)
+        {
+            // Comping: esta toma suena y las grabaciones que coinciden en el tiempo se silencian
+            clip.setProperty (ids::clipMuted, false, um);
+            for (auto other : project.playlist())
+                if (other != clip && other[ids::kind].toString() == "audio"
+                    && (double) other[ids::start] < start + length && (double) other[ids::start] + (double) other[ids::length] > start)
+                    other.setProperty (ids::clipMuted, true, um);
+        }
     });
+}
+
+juce::ValueTree PlaylistGrid::selectedLane()
+{
+    return ctx.project.automation().getChildWithProperty (ids::uid, ctx.project.getState()[ids::selectedLane]);
+}
+
+juce::Rectangle<float> PlaylistGrid::automationArea() const
+{
+    const float top = (float) (rulerHeight + numPlaylistTracks * trackHeight);
+    return { (float) labelWidth, top, (float) (getWidth() - labelWidth), (float) automationHeight };
+}
+
+float PlaylistGrid::autoValueToY (float v) const
+{
+    auto a = automationArea().reduced (0.0f, 18.0f).withTrimmedBottom (-12.0f);
+    return a.getBottom() - juce::jlimit (0.0f, 1.0f, v) * a.getHeight();
+}
+
+float PlaylistGrid::autoYToValue (float y) const
+{
+    auto a = automationArea().reduced (0.0f, 18.0f).withTrimmedBottom (-12.0f);
+    return juce::jlimit (0.0f, 1.0f, (a.getBottom() - y) / a.getHeight());
 }
 
 void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
@@ -402,8 +632,50 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
 
     const double steps = juce::jmax (0.0, xToSteps (e.position.x));
 
+    // Fila de automatización: añadir, mover o borrar puntos de la curva
+    if (automationArea().contains (e.position))
+    {
+        auto lane = selectedLane();
+        if (! lane.isValid())
+            return;
+        ctx.project.beginTransaction();
+        juce::ValueTree hit;
+        for (auto p : lane)
+            if (juce::Point<float> (stepsToX (p[ids::time]), autoValueToY (p[ids::value])).getDistanceFrom (e.position) < 8.0f)
+                hit = p;
+        if (e.mods.isPopupMenu())
+        {
+            if (hit.isValid() && lane.getNumChildren() > 1)
+                lane.removeChild (hit, ctx.project.um());
+            return;
+        }
+        if (! hit.isValid())
+        {
+            hit = juce::ValueTree (ids::POINT);
+            hit.setProperty (ids::time, snap (steps), nullptr);
+            hit.setProperty (ids::value, autoYToValue (e.position.y), nullptr);
+            lane.appendChild (hit, ctx.project.um());
+        }
+        dragPoint = hit;
+        dragMode = DragMode::automation;
+        return;
+    }
+
     if (e.y < rulerHeight)
     {
+        auto& st = ctx.project.getState();
+        if ((bool) st.getProperty (ids::loopOn, false))
+        {
+            // Con el bucle encendido, arrastrar en la regla marca la zona que se repite
+            const double bar = ctx.project.getStepsPerBar();
+            loopAnchor = std::floor (steps / bar) * bar;
+            st.setProperty (ids::loopStart, loopAnchor, nullptr);
+            st.setProperty (ids::loopEnd, loopAnchor + bar, nullptr);
+            ctx.engine.setPlayPosition (loopAnchor);
+            dragMode = DragMode::loop;
+            repaint();
+            return;
+        }
         ctx.engine.setPlayPosition (snap (steps));
         dragMode = DragMode::ruler;
         repaint();
@@ -425,12 +697,26 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
 
     if (! clip.isValid())
     {
-        const int patternUid = playlist.getPatternToPlace();
-        auto pattern = ctx.project.findPattern (patternUid);
-        if (! pattern.isValid())
-            return;
-        clip = ctx.project.addClip ("pattern", patternUid, yToTrack (e.position.y), snap (steps),
-                                    Project::getPatternLength (pattern));
+        if (const int laneUid = playlist.getLaneToPlace(); laneUid > 0)
+        {
+            // Bloque de automatización: dura lo que su curva (como mínimo, un compás)
+            auto lane = ctx.project.automation().getChildWithProperty (ids::uid, laneUid);
+            double end = 0.0;
+            for (auto p : lane)
+                end = juce::jmax (end, (double) p[ids::time]);
+            const double bar = ctx.project.getStepsPerBar();
+            const double len = juce::jlimit (bar, bar * 64.0, std::ceil (end / bar) * bar);
+            clip = ctx.project.addClip ("automation", laneUid, yToTrack (e.position.y), snap (steps), len);
+        }
+        else
+        {
+            const int patternUid = playlist.getPatternToPlace();
+            auto pattern = ctx.project.findPattern (patternUid);
+            if (! pattern.isValid())
+                return;
+            clip = ctx.project.addClip ("pattern", patternUid, yToTrack (e.position.y), snap (steps),
+                                        Project::getPatternLength (pattern));
+        }
         edge = false;
     }
 
@@ -450,10 +736,30 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
 void PlaylistGrid::mouseDrag (const juce::MouseEvent& e)
 {
     const double steps = juce::jmax (0.0, xToSteps (e.position.x));
+    if (dragMode == DragMode::automation)
+    {
+        if (dragPoint.isValid())
+        {
+            dragPoint.setProperty (ids::time, juce::jmax (0.0, std::round (steps / playlist.getSnap() * 4.0) * playlist.getSnap() / 4.0), ctx.project.um());
+            dragPoint.setProperty (ids::value, autoYToValue (e.position.y), ctx.project.um());
+        }
+        return;
+    }
 
     if (dragMode == DragMode::ruler)
     {
         ctx.engine.setPlayPosition (snap (steps));
+        repaint();
+        return;
+    }
+    if (dragMode == DragMode::loop)
+    {
+        const double bar = ctx.project.getStepsPerBar();
+        const double other = steps < loopAnchor ? std::floor (steps / bar) * bar : std::ceil (steps / bar) * bar;
+        auto& st = ctx.project.getState();
+        st.setProperty (ids::loopStart, juce::jmin (loopAnchor, other), nullptr);
+        st.setProperty (ids::loopEnd, juce::jmax (loopAnchor + bar, juce::jmax (loopAnchor, other)), nullptr);
+        ctx.engine.setPlayPosition (juce::jmin (loopAnchor, other));
         repaint();
         return;
     }
@@ -489,6 +795,7 @@ void PlaylistGrid::mouseDrag (const juce::MouseEvent& e)
 
 void PlaylistGrid::mouseUp (const juce::MouseEvent&)
 {
+    dragPoint = {};
     dragMode = DragMode::none;
     dragClip = {};
 }
@@ -497,6 +804,14 @@ void PlaylistGrid::mouseDoubleClick (const juce::MouseEvent& e)
 {
     bool edge = false;
     auto clip = clipAt (e.position, edge);
+    if (clip.isValid() && clip[ids::kind].toString() == "automation")
+    {
+        // Editar la curva de este bloque en la pestaña Automatización
+        ctx.project.getState().setProperty (ids::selectedLane, clip[ids::ref], nullptr);
+        if (ctx.showView)
+            ctx.showView (View::automation);
+        return;
+    }
     if (clip.isValid() && clip[ids::kind].toString() == "pattern")
     {
         ctx.project.setCurrentPattern (clip[ids::ref]);
@@ -517,11 +832,41 @@ Playlist::Playlist (AppContext& c)
     patternBox.setTooltip (txt ("El patrón que se coloca al hacer clic en un hueco de la playlist."));
     patternBox.onChange = [this]
     {
+        lastPlaceId = patternBox.getSelectedId();
+        if (lastPlaceId >= 10000)
+        {
+            auto lane = ctx.project.automation().getChild (lastPlaceId - 10000);
+            if (lane.isValid())
+                ctx.project.getState().setProperty (ids::selectedLane, lane[ids::uid], nullptr);
+            return;
+        }
         auto p = ctx.project.patterns().getChild (patternBox.getSelectedId() - 1);
         if (p.isValid())
             ctx.project.setCurrentPattern (p[ids::uid]);
     };
     makeNonFocusing (patternBox);
+
+    addAndMakeVisible (loopButton);
+    loopButton.setButtonText (txt ("Bucle"));
+    loopButton.setClickingTogglesState (true);
+    loopButton.setTooltip (txt ("Repite una zona de la canción. Con el bucle encendido, arrastra sobre la regla (los números) "
+                                "para elegir la zona. Si grabas, cada vuelta se guarda como una toma distinta."));
+    loopButton.onClick = [this]
+    {
+        auto& st = ctx.project.getState();
+        const bool on = loopButton.getToggleState();
+        st.setProperty (ids::loopOn, on, nullptr);
+        if (on && (double) st.getProperty (ids::loopEnd, 0.0) <= (double) st.getProperty (ids::loopStart, 0.0))
+        {
+            // Zona inicial: 4 compases desde donde está el cursor
+            const double bar = ctx.project.getStepsPerBar();
+            const double from = std::floor (ctx.engine.getPlayPosition() / bar) * bar;
+            st.setProperty (ids::loopStart, from, nullptr);
+            st.setProperty (ids::loopEnd, from + 4.0 * bar, nullptr);
+        }
+        grid.repaint();
+    };
+    makeNonFocusing (loopButton);
 
     addAndMakeVisible (snapBox);
     snapBox.addItem (txt ("Ajuste: compás"), 1);
@@ -557,6 +902,15 @@ Playlist::~Playlist()
     ctx.project.removeChangeListener (this);
 }
 
+int Playlist::getLaneToPlace()
+{
+    const int id = patternBox.getSelectedId();
+    if (id < 10000)
+        return 0;
+    auto lane = ctx.project.automation().getChild (id - 10000);
+    return lane.isValid() ? (int) lane[ids::uid] : 0;
+}
+
 int Playlist::getPatternToPlace()
 {
     auto p = ctx.project.patterns().getChild (patternBox.getSelectedId() - 1);
@@ -569,7 +923,7 @@ double Playlist::getSnap() const
     {
         case 2:  return stepsPerBeat;
         case 3:  return 1.0;
-        default: return stepsPerBar;
+        default: return ctx.project.getStepsPerBar();
     }
 }
 
@@ -588,6 +942,22 @@ void Playlist::refresh()
             select = i;
         patternBox.addItem (txt ("Colocar: ") + p[ids::name].toString(), i++);
     }
+    // Las automatizaciones también se colocan como bloques
+    {
+        const int previous = patternBox.getSelectedId();
+        juce::ignoreUnused (previous);
+        int laneIndex = 0;
+        bool first = true;
+        for (auto lane : ctx.project.automation())
+        {
+            if (first) { patternBox.addSeparator(); first = false; }
+            patternBox.addItem (txt ("Colocar automatización: ")
+                                    + ctx.project.describeTarget (AutomationTarget::parse (lane[ids::target].toString())),
+                                10000 + laneIndex++);
+        }
+        if (lastPlaceId >= 10000 && lastPlaceId - 10000 < laneIndex)
+            select = lastPlaceId;
+    }
     patternBox.setSelectedId (select, juce::dontSendNotification);
 
     const bool song = ctx.project.getState()[ids::playMode].toString() == "song";
@@ -596,6 +966,7 @@ void Playlist::refresh()
                        juce::dontSendNotification);
     infoLabel.setColour (juce::Label::textColourId, song ? Colours::green : Colours::accent);
 
+    loopButton.setToggleState ((bool) ctx.project.getState().getProperty (ids::loopOn, false), juce::dontSendNotification);
     layoutGrid();
     grid.repaint();
 }
@@ -614,7 +985,7 @@ void Playlist::paint (juce::Graphics& g)
 void Playlist::layoutGrid()
 {
     const int width = PlaylistGrid::labelWidth + (int) (grid.getTotalBars() * zoomSlider.getValue()) + 20;
-    const int height = PlaylistGrid::rulerHeight + numPlaylistTracks * PlaylistGrid::trackHeight;
+    const int height = PlaylistGrid::rulerHeight + numPlaylistTracks * PlaylistGrid::trackHeight + PlaylistGrid::automationHeight;
     grid.setSize (width, height);
 }
 
@@ -627,6 +998,7 @@ void Playlist::resized()
     h.removeFromLeft (170);
     patternBox.setBounds (h.removeFromLeft (220)); h.removeFromLeft (8);
     snapBox.setBounds (h.removeFromLeft (150)); h.removeFromLeft (8);
+    loopButton.setBounds (h.removeFromLeft (80)); h.removeFromLeft (8);
     zoomSlider.setBounds (h.removeFromRight (120));
     h.removeFromRight (8);
     infoLabel.setBounds (h);

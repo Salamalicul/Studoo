@@ -1,4 +1,5 @@
 #include "Snapshot.h"
+#include "model/Scales.h"
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -48,8 +49,22 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         c.root = juce::jlimit (0, 127, (int) ch.getProperty (ids::root, 60));
         c.oneShot = ch.getProperty (ids::oneShot, true);
         c.samplePath = ch[ids::sample].toString();
+        for (auto z : ch)
+        {
+            if (! z.hasType (ids::ZONE) || c.zones.size() >= 128)
+                continue;
+            ChannelSnap::Zone zone;
+            zone.path = z[ids::sample].toString();
+            zone.root = juce::jlimit (0, 127, (int) z.getProperty (ids::root, 60));
+            zone.lo = juce::jlimit (0, 127, (int) z.getProperty (ids::lo, 0));
+            zone.hi = juce::jlimit (zone.lo, 127, (int) z.getProperty (ids::hi, 127));
+            if (zone.path.isNotEmpty())
+                c.zones.push_back (zone);
+        }
 
-        c.synth.wave = juce::jlimit (0, 3, (int) ch.getProperty (ids::wave, 0));
+        c.synth.wave = juce::jlimit (0, 5, (int) ch.getProperty (ids::wave, 0));
+        c.synth.timbre = num (ch, ids::timbre, 0.0f, 1.0f, 0.5f);
+        c.synth.fmRatio = juce::jlimit (1, 8, (int) ch.getProperty (ids::fmRatio, 2));
         c.synth.attack = num (ch, ids::attack, 0.001f, 2.0f, 0.005f);
         c.synth.decay = num (ch, ids::decay, 0.01f, 3.0f, 0.3f);
         c.synth.sustain = num (ch, ids::sustain, 0.0f, 1.0f, 0.6f);
@@ -59,12 +74,33 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         c.synth.detune = num (ch, ids::detune, 0.0f, 50.0f, 8.0f);
         c.synth.lfoRate = num (ch, ids::lfoRate, 0.1f, 20.0f, 4.0f);
         c.synth.lfoAmount = num (ch, ids::lfoAmount, 0.0f, 1.0f, 0.0f);
+        c.synth.mono = (bool) ch.getProperty (ids::mono, false);
+        c.synth.glide = num (ch, ids::glide, 0.0f, 1.0f, 0.0f);
 
         c.sampler.tune = num (ch, ids::sampleTune, -24.0f, 24.0f, 0.0f);
         c.sampler.start = num (ch, ids::sampleStart, 0.0f, 0.99f, 0.0f);
         c.sampler.end = juce::jmax (c.sampler.start + 0.01f, num (ch, ids::sampleEnd, 0.01f, 1.0f, 1.0f));
         c.sampler.reverse = (bool) ch[ids::reverse];
-        c.sampler.slices = juce::jlimit (1, 16, (int) ch.getProperty (ids::slices, 1));
+        c.sampler.slices = juce::jlimit (1, 64, (int) ch.getProperty (ids::slices, 1));
+        {
+            // Golpes detectados: solo valen si son tantos como "Trozos" y van en orden
+            const auto points = juce::StringArray::fromTokens (ch[ids::slicePoints].toString(), ",", "");
+            if (points.size() == c.sampler.slices && points.size() > 1 && points.size() <= 64)
+            {
+                float prev = -1.0f;
+                bool ok = true;
+                for (int i = 0; i < points.size() && ok; ++i)
+                {
+                    const float v = points[i].getFloatValue();
+                    ok = std::isfinite (v) && v >= 0.0f && v < 1.0f && v > prev;
+                    c.sampler.slicePoints[(size_t) i] = v;
+                    prev = v;
+                }
+                c.sampler.numSlicePoints = ok ? points.size() : 0;
+            }
+            if (c.sampler.numSlicePoints == 0)
+                c.sampler.slices = juce::jmin (16, c.sampler.slices);
+        }
 
         c.bass.decay = num (ch, ids::decay, 0.1f, 4.0f, 1.5f);
         c.bass.glide = num (ch, ids::glide, 0.0f, 0.5f, 0.08f);
@@ -101,10 +137,18 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
                     continue;
                 // Cada paso encendido se convierte en una nota
                 const auto data = item[ids::data].toString();
+                const auto vels = juce::StringArray::fromTokens (item[ids::stepVel].toString(), ",", "");
+                const auto pitches = juce::StringArray::fromTokens (item[ids::stepPitch].toString(), ",", "");
                 const double stepLength = ch.type == ChannelType::bass808 ? 4.0 : 1.0;
                 for (int s = 0; s < juce::jmin (data.length(), (int) ps.length); ++s)
                     if (data[s] == '1')
-                        notes.push_back ({ (double) s, stepLength, ch.root, 0.85f });
+                    {
+                        // Editor de pasos: fuerza y tono de cada golpe (con valores seguros)
+                        const float vel = s < vels.size() && vels[s].isNotEmpty() ? juce::jlimit (0, 100, vels[s].getIntValue()) / 100.0f : 0.85f;
+                        const int pitch = juce::jlimit (0, 127, ch.root + (s < pitches.size() ? juce::jlimit (-24, 24, pitches[s].getIntValue()) : 0));
+                        if (vel > 0.0f)
+                            notes.push_back ({ (double) s, stepLength, pitch, vel });
+                    }
             }
             else if (item.hasType (ids::NOTE))
             {
@@ -128,12 +172,23 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         snap->patterns.push_back (std::move (ps));
     }
 
+    std::map<int, std::vector<LaneSnap::Block>> automationBlocks;   // uid de la línea -> bloques
     // --- Playlist ---------------------------------------------------------------
     double songEnd = 0.0;
     for (auto c : state.getChildWithName (ids::PLAYLIST))
     {
         ClipSnap cs;
+        if (c[ids::kind].toString() == "automation")
+        {
+            // Bloque de automatización: se guarda para su línea (se usa al leer las automatizaciones)
+            const LaneSnap::Block block { pos (c[ids::start], 16000.0), juce::jmax (0.25, pos (c[ids::length], 16000.0)) };
+            automationBlocks[(int) c[ids::ref]].push_back (block);
+            songEnd = juce::jmax (songEnd, block.start + block.length);
+            continue;
+        }
         cs.isAudio = c[ids::kind].toString() == "audio";
+        if ((bool) c.getProperty (ids::clipMuted, false))
+            continue;   // clip en silencio (otra toma elegida)
         // Una canción de Studoo puede durar como mucho 1000 compases
         constexpr double maxSong = 16000.0;
         cs.start = pos (c[ids::start], maxSong);
@@ -162,7 +217,15 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         songEnd = juce::jmax (songEnd, cs.start + cs.length);
         snap->clips.push_back (cs);
     }
-    snap->songLength = juce::jmax ((double) stepsPerBar, std::ceil (songEnd / stepsPerBar) * stepsPerBar);
+    snap->stepsPerBar = Project::stepsPerBarOf (state);
+    if ((bool) state.getProperty (ids::loopOn, false))
+    {
+        snap->loopStart = pos (state[ids::loopStart], 16000.0);
+        snap->loopEnd = pos (state[ids::loopEnd], 16000.0);
+        if (snap->loopEnd < snap->loopStart + 1.0)
+            snap->loopStart = snap->loopEnd = 0.0;
+    }
+    snap->songLength = juce::jmax ((double) snap->stepsPerBar, std::ceil (songEnd / snap->stepsPerBar) * snap->stepsPerBar);
 
     // --- Mezclador ----------------------------------------------------------------
     for (auto t : state.getChildWithName (ids::MIXER))
@@ -196,6 +259,27 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         m.sendTo = (i > 0 && sendTo > i && sendTo < numMixerTracks) ? sendTo : 0;
         m.sendLevel = m.sendTo > 0 ? num (t, ids::sendLevel, 0.0f, 1.0f, 0.0f) : 0.0f;
         m.sendOnly = m.sendTo > 0 && (bool) t.getProperty (ids::sendOnly, false);
+        for (int b = 0; b < numEqBands; ++b)
+        {
+            static const float defaults[] = { 100.0f, 400.0f, 2000.0f, 8000.0f };
+            m.peqFreq[(size_t) b] = num (t, peqId ("Freq", b), 20.0f, 20000.0f, defaults[b]);
+            m.peqGain[(size_t) b] = num (t, peqId ("Gain", b), -18.0f, 18.0f, 0.0f);
+            m.peqQ[(size_t) b] = num (t, peqId ("Q", b), 0.2f, 10.0f, 1.0f);
+        }
+        m.gateThreshold = num (t, ids::gateThreshold, -80.0f, 0.0f, -80.0f);
+        m.tuneAmount = num (t, ids::tuneAmount, 0.0f, 1.0f, 0.0f);
+        m.tuneRoot = juce::jlimit (0, 11, (int) t.getProperty (ids::tuneRoot, 0));
+        m.tuneScale = juce::jlimit (0, scales::numScales - 1, (int) t.getProperty (ids::tuneScale, 0));
+        m.rhythmMode = juce::jlimit (0, 6, (int) t.getProperty (ids::rhythmMode, 0));
+        m.rhythmMix = num (t, ids::rhythmMix, 0.0f, 1.0f, 1.0f);
+        m.maximize = num (t, ids::maximize, 0.0f, 12.0f, 0.0f);
+        for (int s = 1; s < numSends; ++s)
+        {
+            const int to = t.getProperty (sendToId (s), 0);
+            const bool valid = i > 0 && to > i && to < numMixerTracks;
+            m.moreSendTo[(size_t) s - 1] = valid ? to : 0;
+            m.moreSendLevel[(size_t) s - 1] = valid ? num (t, sendLevelId (s), 0.0f, 1.0f, 0.0f) : 0.0f;
+        }
         // El Master trae el limitador encendido (protege de que suene a tope)
         m.limiter = (bool) t.getProperty (ids::limiter, i == 0);
     }
@@ -208,7 +292,12 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         if (! ls.target.isValid())
             continue;
 
-        if (ls.target.kind == AutomationTarget::Kind::channel)
+        if (ls.target.kind == AutomationTarget::Kind::project)
+        {
+            if (snap->tempoLane >= 0)
+                continue;   // solo una línea de tempo
+        }
+        else if (ls.target.kind == AutomationTarget::Kind::channel)
         {
             auto it = channelIndexByUid.find (ls.target.index);
             if (it == channelIndexByUid.end()) continue;
@@ -221,9 +310,19 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
 
         for (auto p : lane)
             ls.points.emplace_back (pos (p[ids::time]), num (p, ids::value, 0.0f, 1.0f, 0.5f));
+        if (auto it = automationBlocks.find ((int) lane[ids::uid]); it != automationBlocks.end())
+        {
+            ls.blocks = it->second;
+            std::sort (ls.blocks.begin(), ls.blocks.end(), [] (auto& a, auto& b) { return a.start < b.start; });
+            if (ls.blocks.size() > 2000) ls.blocks.resize (2000);
+        }
         std::sort (ls.points.begin(), ls.points.end());
         if (! ls.points.empty())
+        {
+            if (ls.target.kind == AutomationTarget::Kind::project)
+                snap->tempoLane = (int) snap->lanes.size();
             snap->lanes.push_back (std::move (ls));
+        }
     }
 
     return snap;

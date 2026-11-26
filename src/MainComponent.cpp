@@ -118,6 +118,126 @@ namespace
     };
 }
 
+namespace
+{
+    // Exportar por pistas: un WAV por cada pista del mezclador que suena
+    class StemJob : public juce::ThreadWithProgressWindow
+    {
+    public:
+        StemJob (AudioEngine& e, juce::AudioDeviceManager& dm, juce::File folder, std::vector<std::pair<int, juce::String>> stemTracks,
+                 std::function<void (bool, const juce::String&)> onDone)
+            : ThreadWithProgressWindow (txt ("Exportando por pistas..."), true, true),
+              engine (e), deviceManager (dm), target (std::move (folder)), tracks (std::move (stemTracks)), done (std::move (onDone))
+        {
+            deviceManager.removeAudioCallback (&engine);
+        }
+
+        void run() override
+        {
+            ok = true;
+            for (size_t i = 0; i < tracks.size() && ok && ! threadShouldExit(); ++i)
+            {
+                const auto& [track, name] = tracks[i];
+                setStatusMessage (txt ("Pista ") + juce::String (track) + ": " + name);
+                engine.setStemTrack (track);
+                auto file = target.getChildFile (juce::String (track).paddedLeft ('0', 2) + " - "
+                                                 + juce::File::createLegalFileName (name) + ".wav");
+                ok = engine.renderSongToFile (file, 44100.0, [this, i] (float p)
+                {
+                    setProgress (((double) i + p) / (double) tracks.size());
+                    return ! threadShouldExit();
+                }, error);
+            }
+            engine.setStemTrack (-1);
+        }
+
+        void threadComplete (bool userPressedCancel) override
+        {
+            engine.setStemTrack (-1);
+            deviceManager.addAudioCallback (&engine);
+            done (ok && ! userPressedCancel, userPressedCancel ? txt ("Exportación cancelada.") : error);
+            delete this;
+        }
+
+    private:
+        AudioEngine& engine;
+        juce::AudioDeviceManager& deviceManager;
+        juce::File target;
+        std::vector<std::pair<int, juce::String>> tracks;
+        std::function<void (bool, const juce::String&)> done;
+        bool ok = false;
+        juce::String error;
+    };
+}
+
+void MainComponent::exportStems()
+{
+    if (project.playlist().getNumChildren() == 0)
+    {
+        showMessage (txt ("La playlist está vacía"),
+                     txt ("Se exporta la canción de la PLAYLIST. Coloca primero tus patrones en la playlist (F5)."));
+        return;
+    }
+    if (! pro::isUnlocked())
+    {
+        proScreen.show (txt ("Exportar por pistas (stems) es de Studoo Pro"));
+        return;
+    }
+
+    // Las pistas que suenan: las que tienen canales o reciben envíos
+    std::vector<std::pair<int, juce::String>> tracks;
+    for (int t = 1; t < numMixerTracks; ++t)
+    {
+        bool used = false;
+        for (auto ch : project.channels())
+            used = used || (int) ch[ids::mixer] == t;
+        for (int s = 1; s < t && ! used; ++s)
+            for (int k = 0; k < numSends && ! used; ++k)
+                used = (int) project.getMixerTrack (s).getProperty (sendToId (k), 0) == t;
+        if (used && ! (bool) project.getMixerTrack (t)[ids::muted])
+            tracks.push_back ({ t, project.getMixerTrack (t)[ids::name].toString() });
+    }
+    if (tracks.empty())
+    {
+        showMessage (txt ("No hay pistas que exportar"), txt ("Ninguna pista del mezclador tiene sonidos."));
+        return;
+    }
+
+    auto folder = getStudooFolder ("Exportados").getNonexistentChildFile (
+        juce::File::createLegalFileName (project.getDisplayName() + " - pistas"), {}, false);
+    folder.createDirectory();
+    engine.stop();
+    juce::Component::SafePointer<MainComponent> safe (this);
+    auto* job = new StemJob (engine, deviceManager, folder, tracks, [safe, folder, count = tracks.size()] (bool ok, const juce::String& error)
+    {
+        if (! ok)
+        {
+            showMessage (txt ("No se pudo exportar"), error);
+            return;
+        }
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                          .withIconType (juce::MessageBoxIconType::NoIcon)
+                                          .withTitle (txt ("¡Pistas exportadas!"))
+                                          .withMessage (juce::String ((int) count) + txt (" archivos WAV (uno por pista del mezclador) en:\n")
+                                                        + folder.getFullPathName()
+                                                        + txt ("\n\nTodos empiezan en el mismo momento: ponlos juntos en cualquier programa y sonarán como la canción."))
+                                         #if ! (JUCE_ANDROID || JUCE_IOS)
+                                          .withButton (txt ("Abrir la carpeta"))
+                                         #endif
+                                          .withButton (txt ("Cerrar")),
+                                      [folder] (int r)
+        {
+           #if ! (JUCE_ANDROID || JUCE_IOS)
+            if (r == 1) folder.startAsProcess();
+           #else
+            juce::ignoreUnused (r);
+           #endif
+        });
+        if (safe != nullptr) safe->setStatus (txt ("Pistas exportadas en: ") + folder.getFileName());
+    });
+    job->launchThread();
+}
+
 // ============================================================================
 //  Construcción
 // ============================================================================
@@ -159,6 +279,29 @@ MainComponent::MainComponent()
     toolbar->onPlugins = [this] { pluginHost->showScanner (this); };
     toolbar->onRecord = [this] { toggleRecording(); };
     addAndMakeVisible (*toolbar);
+
+    browser = std::make_unique<BrowserPanel> (*ctx);
+    addChildComponent (*browser);
+    browser->onStatus = [this] (const juce::String& s) { setStatus (s); };
+    browser->onOpenProject = [this] (const juce::File& f)
+    {
+        checkUnsavedThen ([this, f]
+        {
+            engine.stop();
+            juce::String error;
+            if (project.loadFromFile (f, error))
+                setStatus (txt ("Proyecto abierto: ") + f.getFileNameWithoutExtension());
+            else
+                showMessage (txt ("No se pudo abrir"), error);
+            updateTitle();
+        });
+    };
+    addAndMakeVisible (browserButton);
+    browserButton.setButtonText (txt ("Navegador"));
+    browserButton.setClickingTogglesState (true);
+    browserButton.setTooltip (txt ("Muestra u oculta el navegador de sonidos (F4): escucha samples, kits y sonidos y añádelos con doble clic."));
+    browserButton.onClick = [this] { toggleBrowser(); };
+    makeNonFocusing (browserButton);
 
     channelRack = std::make_unique<ChannelRack> (*ctx);
     pianoRoll = std::make_unique<PianoRoll> (*ctx);
@@ -263,6 +406,46 @@ MainComponent::MainComponent()
     for (auto& midiInput : juce::MidiInput::getAvailableDevices())
         deviceManager.setMidiInputDeviceEnabled (midiInput.identifier, true);
     deviceManager.addMidiInputDeviceCallback ({}, &engine.getMidiCollector());
+    deviceManager.addMidiInputDeviceCallback ({}, &midiLearnInput);
+    {
+        juce::Component::SafePointer<MainComponent> safe (this);
+        midiLearnInput.onController = [safe] (int cc, int value)
+        {
+            // Llega en el hilo del MIDI: se pasa al hilo principal
+            juce::MessageManager::callAsync ([safe, cc, value] { if (safe != nullptr) safe->handleController (cc, value); });
+        };
+        Knob::onMidiLearn = [safe] (Knob& k)
+        {
+            if (safe == nullptr) return;
+            safe->pendingLearn = targetForKnob (k);
+            if (safe->pendingLearn)
+                safe->setStatus (txt ("Mueve ahora una rueda o un deslizador de tu teclado/controlador MIDI para conectarlo a \"")
+                                 + k.getLabel() + "\".");
+        };
+        Knob::isMidiLinked = [safe] (const Knob& k)
+        {
+            if (safe == nullptr) return false;
+            auto t = targetForKnob (k);
+            if (! t) return false;
+            for (auto link : safe->project.getState().getChildWithName (ids::MIDILINKS))
+                if (link[ids::kind].toString() == t->kind && (int) link[ids::index] == t->index && link[ids::param].toString() == t->param)
+                    return true;
+            return false;
+        };
+        Knob::onMidiForget = [safe] (Knob& k)
+        {
+            if (safe == nullptr) return;
+            auto t = targetForKnob (k);
+            auto links = safe->project.getState().getChildWithName (ids::MIDILINKS);
+            for (int i = links.getNumChildren(); --i >= 0 && t;)
+            {
+                auto link = links.getChild (i);
+                if (link[ids::kind].toString() == t->kind && (int) link[ids::index] == t->index && link[ids::param].toString() == t->param)
+                    links.removeChild (i, safe->project.um());
+            }
+            safe->setStatus (txt ("Control MIDI quitado."));
+        };
+    }
     deviceManager.addChangeListener (this);
 
     setWantsKeyboardFocus (true);
@@ -295,6 +478,10 @@ MainComponent::~MainComponent()
     project.removeChangeListener (this);
     deviceManager.removeChangeListener (this);
     deviceManager.removeMidiInputDeviceCallback ({}, &engine.getMidiCollector());
+    deviceManager.removeMidiInputDeviceCallback ({}, &midiLearnInput);
+    Knob::onMidiLearn = nullptr;
+    Knob::onMidiForget = nullptr;
+    Knob::isMidiLinked = nullptr;
     deviceManager.removeAudioCallback (&engine);
     engine.stopRecording();
 
@@ -548,18 +735,33 @@ void MainComponent::showFileMenu()
     menu.addSeparator();
    #if JUCE_ANDROID
     menu.addItem (5, txt ("Exportar canción (WAV) y compartir..."));
+    menu.addItem (16, txt ("Exportar por pistas (stems)...") + (pro::isUnlocked() ? juce::String() : juce::String (" · Pro")));
     menu.addItem (13, txt ("Compartir este proyecto..."));
     menu.addItem (14, txt ("Importar un proyecto..."));
+    menu.addItem (17, txt ("Navegador de sonidos"), true, browserOpen);
     menu.addSeparator();
     menu.addItem (7, txt ("Tutorial: tu primer beat"));
    #else
     menu.addItem (5, txt ("Exportar a WAV..."));
     menu.addItem (6, txt ("Exportar a MP3..."));
+    menu.addItem (16, txt ("Exportar por pistas (stems)...") + (pro::isUnlocked() ? juce::String() : juce::String (" · Pro")));
     menu.addSeparator();
     menu.addItem (7, txt ("Tutorial: tu primer beat"));
     menu.addItem (8, txt ("Atajos de teclado"));
+    menu.addItem (15, txt ("Tocar con el teclado del ordenador (como un piano)"), true, typingPiano);
+    menu.addItem (17, txt ("Navegador de sonidos (F4)"), true, browserOpen);
     menu.addItem (9, txt ("Abrir la carpeta de proyectos"));
    #endif
+    {
+        juce::PopupMenu sig;
+        const int num = project.getState().getProperty (ids::timeSigNum, 4), den = project.getState().getProperty (ids::timeSigDen, 4);
+        const std::pair<int, int> sigs[] = { { 4, 4 }, { 3, 4 }, { 6, 8 }, { 2, 4 }, { 5, 4 }, { 7, 8 } };
+        const char* names[] = { "4/4 (casi todo: trap, pop, reggaetón...)", "3/4 (vals, baladas)", "6/8 (balada lenta, afro)",
+                                "2/4 (marcha)", "5/4", "7/8" };
+        for (int i = 0; i < 6; ++i)
+            sig.addItem (40 + i, txt (names[i]), true, sigs[i].first == num && sigs[i].second == den);
+        menu.addSubMenu (txt ("Compás de la canción"), sig);
+    }
     menu.addSeparator();
     {
         const auto mode = settings->getValue ("screenMode", "auto");
@@ -613,6 +815,26 @@ void MainComponent::showFileMenu()
                 saveProject ([this] { shareFile (project.getFile()); });
                 break;
             case 14: importProject(); break;
+            case 16: exportStems(); break;
+            case 40: case 41: case 42: case 43: case 44: case 45:
+            {
+                const std::pair<int, int> sigs[] = { { 4, 4 }, { 3, 4 }, { 6, 8 }, { 2, 4 }, { 5, 4 }, { 7, 8 } };
+                project.beginTransaction();
+                project.getState().setProperty (ids::timeSigNum, sigs[r - 40].first, project.um());
+                project.getState().setProperty (ids::timeSigDen, sigs[r - 40].second, project.um());
+                setStatus (txt ("Compás de la canción: ") + juce::String (sigs[r - 40].first) + "/" + juce::String (sigs[r - 40].second)
+                           + txt (". Los patrones nuevos duran 1 compás; cambia su duración en el secuenciador."));
+                break;
+            }
+            case 17: toggleBrowser(); break;
+            case 15:
+                typingPiano = ! typingPiano;
+                releaseTypingNotes();
+                setStatus (typingPiano ? txt ("Teclado como piano: Z X C V B N M = Do Re Mi Fa Sol La Si (fila de abajo), "
+                                              "Q W E R T Y U = una octava más arriba. Las teclas de arriba (S D G H J, 2 3 5 6 7) son las negras. "
+                                              "Flechas izquierda/derecha: cambiar de octava.")
+                                       : txt ("Teclado como piano desactivado."));
+                break;
             case 30: proScreen.show ({}); break;
             case 12:
                 settings->setValue ("autoUpdate", ! settings->getBoolValue ("autoUpdate", true));
@@ -957,6 +1179,44 @@ void MainComponent::toggleRecording()
                     && (double) clip[ids::start] + (double) clip[ids::length] > start)
                     used = true;
             if (! used) { freeTrack = t; break; }
+        }
+        // Con la zona en bucle, cada vuelta es una toma (una pista cada una; suena la última)
+        const auto& st = project.getState();
+        const double loopA = st.getProperty (ids::loopStart, 0.0), loopB = st.getProperty (ids::loopEnd, 0.0);
+        if ((bool) st.getProperty (ids::loopOn, false) && loopB > loopA + 1.0 && start >= loopA && start < loopB
+            && result.lengthSteps > loopB - start + 0.5)
+        {
+            std::vector<std::tuple<double, double, double>> takes;   // inicio, duración, desde dónde del archivo
+            double fileOffset = 0.0, takeStart = start;
+            while (fileOffset < result.lengthSteps - 0.25 && takes.size() < 32)
+            {
+                const double len = juce::jmin (loopB - takeStart, result.lengthSteps - fileOffset);
+                takes.emplace_back (takeStart, len, fileOffset);
+                fileOffset += len;
+                takeStart = loopA;
+            }
+            int track = 0;
+            for (size_t i = 0; i < takes.size(); ++i)
+            {
+                // Una pista libre en la zona para cada toma
+                for (; track < numPlaylistTracks; ++track)
+                {
+                    bool used = false;
+                    for (auto clip : project.playlist())
+                        if ((int) clip[ids::track] == track && (double) clip[ids::start] < loopB
+                            && (double) clip[ids::start] + (double) clip[ids::length] > loopA)
+                            used = true;
+                    if (! used) break;
+                }
+                auto [s, len, off] = takes[i];
+                auto clip = project.addClip ("audio", ch[ids::uid], juce::jmin (track, numPlaylistTracks - 1), s, juce::jmax (0.25, len), off);
+                if (i + 1 < takes.size())
+                    clip.setProperty (ids::clipMuted, true, project.um());
+                ++track;
+            }
+            setStatus (juce::String ((int) takes.size()) + txt (" tomas grabadas: suena la última. Clic derecho en otra > \"Quedarme con esta toma\"."));
+            showView (View::playlist);
+            return;
         }
         project.addClip ("audio", ch[ids::uid], freeTrack, start, juce::jmax (1.0, result.lengthSteps));
         setStatus (txt ("Grabación añadida a la playlist."));
@@ -1652,6 +1912,10 @@ void MainComponent::resized()
         auto content = area.reduced (6, 4);
         for (auto* v : views)
             v->setBounds (content);
+        browserButton.setVisible (false);
+        browser->setVisible (browserOpen);   // en el móvil, encima de la pantalla
+        browser->setBounds (content.withWidth (juce::jmin (content.getWidth(), 360)));
+        browser->toFront (false);
         tutorial.setBounds (getLocalBounds());
     proScreen.setBounds (getLocalBounds());
         return;
@@ -1662,6 +1926,9 @@ void MainComponent::resized()
     viewBarArea = area.removeFromTop (40).reduced (10, 6);
     {
         auto bar = viewBarArea;
+        browserButton.setVisible (true);
+        browserButton.setBounds (bar.removeFromRight (110));
+        bar.removeFromRight (8);
         const int w = juce::jmin (175, bar.getWidth() / (int) View::numViews);
         for (auto* b : viewButtons)
         {
@@ -1671,6 +1938,12 @@ void MainComponent::resized()
     }
 
     auto content = area.reduced (10, 4).withTrimmedBottom (4);
+    browser->setVisible (browserOpen);
+    if (browserOpen)
+    {
+        browser->setBounds (content.removeFromLeft (260));
+        content.removeFromLeft (8);
+    }
     for (auto* v : views)
         v->setBounds (content);
 
@@ -1678,10 +1951,145 @@ void MainComponent::resized()
     proScreen.setBounds (getLocalBounds());
 }
 
+std::optional<MainComponent::LearnTarget> MainComponent::targetForKnob (const Knob& k)
+{
+    auto tree = k.getBoundTree();
+    LearnTarget t;
+    if (tree.hasType (ids::TRACK))        { t.kind = "mixer";   t.index = tree[ids::index]; }
+    else if (tree.hasType (ids::CHANNEL)) { t.kind = "channel"; t.index = tree[ids::uid]; }
+    else                                  return std::nullopt;
+    t.param = k.getBoundProperty().toString();
+    t.min = k.getMin();
+    t.max = k.getMax();
+    return t;
+}
+
+void MainComponent::handleController (int cc, int value)
+{
+    if (! juce::isPositiveAndBelow (cc, 128))
+        return;
+    auto links = project.getState().getChildWithName (ids::MIDILINKS);
+    if (pendingLearn)
+    {
+        // Un control solo mueve una rueda: si ya estaba conectado a otra, se cambia
+        for (int i = links.getNumChildren(); --i >= 0;)
+            if ((int) links.getChild (i)[ids::cc] == cc)
+                links.removeChild (i, nullptr);
+        juce::ValueTree link (ids::LINK);
+        link.setProperty (ids::cc, cc, nullptr);
+        link.setProperty (ids::kind, pendingLearn->kind, nullptr);
+        link.setProperty (ids::index, pendingLearn->index, nullptr);
+        link.setProperty (ids::param, pendingLearn->param, nullptr);
+        link.setProperty (ids::minValue, pendingLearn->min, nullptr);
+        link.setProperty (ids::maxValue, pendingLearn->max, nullptr);
+        project.beginTransaction();
+        links.appendChild (link, project.um());
+        pendingLearn.reset();
+        setStatus (txt ("¡Conectado! El control MIDI número ") + juce::String (cc) + txt (" mueve ahora esa rueda."));
+        return;
+    }
+    for (auto link : links)
+    {
+        if ((int) link[ids::cc] != cc)
+            continue;
+        const auto param = link[ids::param].toString();
+        if (param.isEmpty() || ! juce::Identifier::isValidIdentifier (param))
+            continue;
+        juce::ValueTree target = link[ids::kind].toString() == "mixer" ? project.getMixerTrack (link[ids::index])
+                                                                        : project.findChannel (link[ids::index]);
+        if (! target.isValid())
+            continue;
+        const double lo = link[ids::minValue], hi = link[ids::maxValue];
+        if (! std::isfinite (lo) || ! std::isfinite (hi))
+            continue;
+        target.setProperty (juce::Identifier (param), lo + (hi - lo) * value / 127.0, nullptr);
+    }
+}
+
+void MainComponent::toggleBrowser()
+{
+    browserOpen = ! browserOpen;
+    browserButton.setToggleState (browserOpen, juce::dontSendNotification);
+    if (! browserOpen)
+        engine.stopBuffer();
+    resized();
+}
+
+int MainComponent::typingNoteForKey (int keyCode) const
+{
+    // Distribución como en los programas de música: dos filas de teclas = dos octavas
+    static const std::pair<char, int> keys[] = {
+        { 'Z', 0 }, { 'S', 1 }, { 'X', 2 }, { 'D', 3 }, { 'C', 4 }, { 'V', 5 }, { 'G', 6 }, { 'B', 7 },
+        { 'H', 8 }, { 'N', 9 }, { 'J', 10 }, { 'M', 11 }, { ',', 12 },
+        { 'Q', 12 }, { '2', 13 }, { 'W', 14 }, { '3', 15 }, { 'E', 16 }, { 'R', 17 }, { '5', 18 }, { 'T', 19 },
+        { '6', 20 }, { 'Y', 21 }, { '7', 22 }, { 'U', 23 }, { 'I', 24 }, { '9', 25 }, { 'O', 26 }, { '0', 27 }, { 'P', 28 } };
+    const auto upper = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) keyCode);
+    for (auto& [c, offset] : keys)
+        if (upper == (juce::juce_wchar) c)
+            return juce::jlimit (0, 127, (typingOctave - 1) * 12 + offset);   // Z = Do de la octava elegida
+    return -1;
+}
+
+void MainComponent::releaseTypingNotes()
+{
+    for (auto& [key, note] : typingHeld)
+        engine.getMidiCollector().addMessageToQueue (juce::MidiMessage::noteOff (1, note)
+                                                         .withTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001));
+    typingHeld.clear();
+}
+
+bool MainComponent::keyStateChanged (bool)
+{
+    if (! typingPiano)
+        return false;
+    bool handled = false;
+    // Notas que se sueltan
+    for (auto it = typingHeld.begin(); it != typingHeld.end();)
+    {
+        if (! juce::KeyPress::isKeyCurrentlyDown (it->first))
+        {
+            engine.getMidiCollector().addMessageToQueue (juce::MidiMessage::noteOff (1, it->second)
+                                                             .withTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001));
+            it = typingHeld.erase (it);
+            handled = true;
+        }
+        else
+            ++it;
+    }
+    // Notas que se pulsan (sin Ctrl ni Alt, para no estorbar a los atajos)
+    const auto mods = juce::ModifierKeys::getCurrentModifiers();
+    if (! mods.isCommandDown() && ! mods.isAltDown())
+        for (const char* k = "ZSXDCVGBHNJM,Q2W3ER5T6Y7UI9O0P"; *k != 0; ++k)
+        {
+            const int code = juce::CharacterFunctions::toLowerCase ((juce::juce_wchar) *k);
+            for (int c : { (int) *k, code })
+                if (juce::KeyPress::isKeyCurrentlyDown (c) && typingHeld.count ((int) *k) == 0)
+                {
+                    const int note = typingNoteForKey (*k);
+                    if (note >= 0)
+                    {
+                        typingHeld[(int) *k] = note;
+                        engine.getMidiCollector().addMessageToQueue (juce::MidiMessage::noteOn (1, note, 0.8f)
+                                                                         .withTimeStamp (juce::Time::getMillisecondCounterHiRes() * 0.001));
+                        handled = true;
+                    }
+                    break;
+                }
+        }
+    return handled;
+}
+
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     const auto mods = key.getModifiers();
     const int code = key.getKeyCode();
+    if (typingPiano && ! mods.isCommandDown() && ! mods.isAltDown())
+    {
+        if (code == juce::KeyPress::leftKey)  { typingOctave = juce::jmax (1, typingOctave - 1); setStatus (txt ("Octava ") + juce::String (typingOctave)); return true; }
+        if (code == juce::KeyPress::rightKey) { typingOctave = juce::jmin (7, typingOctave + 1); setStatus (txt ("Octava ") + juce::String (typingOctave)); return true; }
+        if (typingNoteForKey (code) >= 0)
+            return true;   // la nota ya suena (keyStateChanged); que no haga su atajo (R, L...)
+    }
     const auto upper = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code);
     const bool cmd = mods.isCommandDown();
 
@@ -1710,6 +2118,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     }
     if (! cmd && ! mods.isAltDown() && upper == 'R')   { toggleRecording(); return true; }
 
+    if (code == juce::KeyPress::F4Key) { toggleBrowser(); return true; }
     if (code == juce::KeyPress::F5Key) { showView (View::playlist); return true; }
     if (code == juce::KeyPress::F6Key) { showView (View::channelRack); return true; }
     if (code == juce::KeyPress::F7Key) { showView (View::pianoRoll); return true; }

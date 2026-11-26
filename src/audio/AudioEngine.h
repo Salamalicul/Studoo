@@ -87,6 +87,17 @@ namespace studoo
         juce::AudioPluginInstance* getChannelPlugin (int channelUid);
         void setMixerPlugin (int track, std::unique_ptr<juce::AudioPluginInstance>, int slot = 0);
         juce::AudioPluginInstance* getMixerPlugin (int track, int slot = 0);
+        // Analizador: copia los últimos 'num' sonidos del Master (mezcla de los dos canales)
+        static constexpr int scopeSize = 4096;
+        void getScope (float* dest, int num) const
+        {
+            const int end = scopePos.load();
+            for (int i = 0; i < num; ++i)
+                dest[i] = scope[(size_t) ((end - num + i) & (scopeSize - 1))];
+        }
+        // Afinador: la nota que suena en una pista (Hz, 0 = ninguna)
+        float getDetectedPitch (int track) const { return juce::isPositiveAndBelow (track, numMixerTracks) ? mixer[(size_t) track].getDetectedHz() : 0.0f; }
+        void setPitchAnalysis (int track, bool on) { if (juce::isPositiveAndBelow (track, numMixerTracks)) mixer[(size_t) track].setAnalysePitch (on); }
         void clearAllPlugins();
         std::function<void (juce::AudioPluginInstance*)> onPluginWillBeDeleted;
 
@@ -100,6 +111,8 @@ namespace studoo
         // --- Exportación (sin tarjeta de sonido) ---------------------------------------
         // Debe llamarse con el motor desconectado de la tarjeta de sonido
         // maxSeconds > 0: solo se exporta ese tiempo (versión gratis)
+        // Exportar por pistas: solo suena esta pista del mezclador (sin los efectos del Master). -1 = normal
+        void setStemTrack (int track) { stemTrack.store (track); }
         bool renderSongToFile (const juce::File& wavFile, double sampleRate,
                                std::function<bool (float progress)> keepGoing, juce::String& error,
                                double maxSeconds = 0.0);
@@ -156,8 +169,17 @@ namespace studoo
         std::atomic<double> position { 0.0 };
         std::atomic<double> requestedPosition { -1.0 };
         std::atomic<double> currentBpm { 140.0 };
+        std::atomic<int> currentStepsPerBar { 16 };
         std::atomic<int> liveChannelUid { 0 };
         std::atomic<bool> midiRecording { false };
+        std::atomic<int> stemTrack { -1 };
+        // Compensación del retraso de los plugins: una línea de retardo por pista (solo si hace falta)
+        static constexpr int pdcSize = 16384;
+        std::array<juce::AudioBuffer<float>, numMixerTracks> pdcLines;
+        std::array<int, numMixerTracks> pdcWrite {};
+        void ensurePdc();
+        std::array<float, scopeSize> scope {};
+        std::atomic<int> scopePos { 0 };
         static constexpr int recordFifoSize = 1024;
         juce::AbstractFifo recordFifo { recordFifoSize };
         std::array<RecordedMidi, recordFifoSize> recordBuffer {};

@@ -26,6 +26,8 @@ namespace studoo
         void mouseDrag (const juce::MouseEvent&) override;
         void mouseUp (const juce::MouseEvent&) override;
         void mouseMove (const juce::MouseEvent&) override;
+        void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+        float keyboardLeft() const;   // el teclado se queda fijo a la izquierda aunque te desplaces
 
         void setPlayhead (double steps);
         bool isSelected (const juce::ValueTree& n) const;
@@ -139,7 +141,20 @@ namespace studoo
         juce::ComboBox channelBox, snapBox, chordBox;
         juce::Label patternLabel;
         juce::TextButton clearButton, quantizeButton, toolsButton, selectButton, recordButton;
-        juce::Viewport viewport;
+        struct ScrollViewport : juce::Viewport
+        {
+            std::function<void()> onScroll;
+            void visibleAreaChanged (const juce::Rectangle<int>&) override { if (onScroll) onScroll(); }
+        };
+        ScrollViewport viewport;
+        juce::TextButton zoomOutButton, zoomInButton;
+        float zoom = 1.0f;   // 1 = 4 compases en la pantalla
+        void updateGridSize();
+    public:
+        void setZoom (float newZoom, float anchorX = -1.0f);
+        float getZoom() const { return zoom; }
+        int viewX() const { return viewport.getViewPositionX(); }
+    private:
         PianoRollGrid grid;
         VelocityLane velocityLane;
         juce::Rectangle<int> headerArea;

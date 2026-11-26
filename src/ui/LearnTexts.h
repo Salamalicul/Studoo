@@ -1401,6 +1401,40 @@ Un **bus** es una pista que junta varias. Por ejemplo, toda la batería:
 [reto:envio])TXT" },
 
     // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Herramientas de estudio profesional", "9 min",
+      "autotune half time stems como usar",
+R"TXT(Studoo tiene las herramientas que usan los estudios profesionales. Aquí tienes para qué sirve cada una y dónde está.
+
+[anim:volumenes|Cada pista del mezclador tiene su botón FX+ con los efectos avanzados]
+
+## Autotune y afinador (Mezclador → FX+)
+- **Autotune**: lleva tu voz a la nota correcta de la escala. Un **20-40%** corrige sin que se note; al **100%** sale el efecto "robot" del trap.
+- Elige la **nota base** y la **escala** de tu canción (por ejemplo, La · Menor). Si no lo sabes, deja "Todas las notas".
+- El **afinador** muestra qué nota cantas (o tocas) y si vas alta o baja: verde = afinado.
+
+## Efectos de ritmo (FX+ → Ritmo)
+- **Half-time**: la pista suena a mitad de velocidad (y una octava más grave). Muy usado en drops de trap y dubstep.
+- **Tartamudeo**: repite el primer trocito de cada tiempo ("ta-ta-ta").
+- **Puerta rítmica**: corta el sonido a ritmo (un pad que hace "tá-tá-tá").
+- **Parada de cinta**: el sonido se frena al final de cada compás, como un disco que se para.
+
+## Más cosas de estudio
+- **Puerta de ruido**: corta el ruido de fondo entre frase y frase.
+- **EQ paramétrico**: 4 bandas para quitar o subir frecuencias exactas (por ejemplo, un pitido).
+- **Maximizar**: en el Master, al final, para que la canción suene fuerte sin romperse.
+- **Exportar por pistas (stems)**: en el menú ☰. Un archivo por pista para mandarlo a quien mezcle tu canción.
+- **Pads** (en el secuenciador): toca tu batería con los dedos y grábala.
+- **Navegador** (F4): escucha y añade sonidos con doble clic.
+- **Controles MIDI**: clic derecho en cualquier rueda → "Conectar a un control MIDI" y mueve una rueda de tu teclado.
+
+> Autotune + un poco de reverb + delay corto = la cadena básica de la voz del trap y el reggaetón.
+
+[ir:mezclador|Ir al Mezclador]
+
+? Graba una frase cantada, ponle Autotune al 60% con la escala de tu canción y prueba el efecto Half-time en la batería durante 1 compás.
+
+[reto:autotune])TXT" },
+
     { "Nivel 9 · Producción avanzada", "Mezclar voces", "8 min",
       "como mezclar voces paso a paso",
 R"TXT(La voz es lo más importante de una canción: si no se entiende o suena "pegada encima" del beat, todo pierde. Mezclar voces tiene unos pasos que casi siempre se repiten.

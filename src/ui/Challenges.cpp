@@ -342,6 +342,16 @@ const std::vector<Challenge>& challenges()
                   for (auto& n : notesOf (p, ch)) pitches.insert ((int) n[ids::pitch]);
                   return pitches.size() >= 3; }); } },
 
+        { "autotune", "Ponle autotune",
+          "En el Mezclador, pulsa FX+ en una pista y sube el Autotune al 20% o más.",
+          "El botón FX+ está al lado de \"+ Plugin\" en cada pista.",
+          View::mixer,
+          [] (Project& p) {
+              for (int t = 0; t < numMixerTracks; ++t)
+                  if ((float) p.getMixerTrack (t).getProperty (ids::tuneAmount, 0.0f) >= 0.2f)
+                      return true;
+              return false; } },
+
         { "escala", "Elige una escala",
           "En el Piano roll, pulsa Herramientas → Escala y elige una (por ejemplo, Menor).",
           "Las filas que no son de la escala se verán más oscuras.",

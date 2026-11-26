@@ -9,6 +9,7 @@
 #include "audio/Kits.h"
 #include "model/GenreBeats.h"
 #include "ui/Challenges.h"
+#include "ui/AudioEditor.h"
 #include "ui/EarGames.h"
 #include "ui/LearnProgress.h"
 #include "Pro.h"
@@ -93,6 +94,7 @@ namespace
         else if (id == "velocity")       p.addNote (pattern, synth[ids::uid], 0.0, 1.0, 60, 0.3f);
         else if (id == "sidechain")      p.getMixerTrack (5).setProperty (ids::sidechain, 0.6, nullptr);
         else if (id == "efectos_creativos") p.getMixerTrack (6).setProperty (ids::chorusMix, 0.5, nullptr);
+        else if (id == "autotune")       p.getMixerTrack (7).setProperty (ids::tuneAmount, 0.5, nullptr);
         else if (id == "escala")         p.getState().setProperty (ids::scaleType, 2, nullptr);
         else if (id == "envio")
         {
@@ -142,6 +144,40 @@ int main()
         check (c.check (p), u ("Al hacerlo, \"") + c.id + "\" se detecta");
     }
 
+    // --- Editor de audio ------------------------------------------------------------------
+    std::cout << "Editor de audio\n";
+    {
+        using Op = AudioEditorPanel::Op;
+        auto make = []
+        {
+            juce::AudioBuffer<float> b (1, 1000);
+            for (int i = 0; i < 1000; ++i) b.setSample (0, i, 0.5f);
+            return b;
+        };
+        auto b = make();
+        AudioEditorPanel::apply (b, Op::silence, 100, 200);
+        check (b.getMagnitude (0, 100, 100) == 0.0f && b.getSample (0, 99) == 0.5f && b.getSample (0, 200) == 0.5f,
+               u ("Silenciar solo el trozo elegido"));
+        b = make();
+        AudioEditorPanel::apply (b, Op::crop, 100, 300);
+        check (b.getNumSamples() == 200, u ("Recortar: se queda solo el trozo"));
+        b = make();
+        AudioEditorPanel::apply (b, Op::remove, 100, 300);
+        check (b.getNumSamples() == 800, u ("Borrar un trozo: lo de después se junta"));
+        b = make();
+        AudioEditorPanel::apply (b, Op::normalise, 0, 1000);
+        check (std::abs (b.getMagnitude (0, 0, 1000) - 0.966f) < 0.01f, u ("Normalizar: sube al máximo sin pasarse"));
+        b = make();
+        AudioEditorPanel::apply (b, Op::fadeIn, 0, 1000);
+        check (b.getSample (0, 0) < 0.01f && b.getSample (0, 999) > 0.45f, u ("Fundido de entrada"));
+        b = make();
+        for (int k = 0; k < 10; ++k) AudioEditorPanel::apply (b, Op::louder, 0, 1000);
+        check (b.getMagnitude (0, 0, 1000) <= 1.0f, u ("Subir mucho el volumen nunca pasa del máximo"));
+        b = make();
+        AudioEditorPanel::apply (b, Op::remove, -50, 5000);   // fuera de los límites
+        check (b.getNumSamples() == 1000, u ("Un trozo imposible no rompe nada"));
+    }
+
     // --- Bases con swing y sidechain ------------------------------------------------------
     std::cout << "Bases con swing y sidechain\n";
     {
@@ -163,7 +199,8 @@ int main()
     // --- Sonidos de los juegos ------------------------------------------------------------
     std::cout << "Sonidos de los juegos de oído\n";
     {
-        AudioEngine engine;
+        auto engineOwned = std::make_unique<AudioEngine>();
+        auto& engine = *engineOwned;
         learn::Progress progress;
         EarGames games (engine, progress);
 

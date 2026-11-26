@@ -28,7 +28,7 @@ Studoo es tu estudio de música en el bolsillo: crea beats, escribe melodías, m
 
 🥁 HAZ BEATS EN MINUTOS
 • Secuenciador de pasos: enciende cuadrados y tu ritmo empieza a sonar.
-• Kits de batería de trap, reggaetón, house, boom bap, lo-fi y más.
+• 23 kits de batería: trap, reggaetón, house, boom bap, lo-fi, amapiano, grime y más.
 • Bajo 808 con glide, sintetizadores y sonidos ya preparados.
 • Bases de géneros listas para cargar y cambiar: aprende cómo se hace cada estilo.
 
@@ -45,7 +45,7 @@ Studoo es tu estudio de música en el bolsillo: crea beats, escribe melodías, m
 • Exporta tu canción y compártela por WhatsApp, Drive o donde quieras.
 
 🎓 APRENDE PRODUCCIÓN MUSICAL
-• 60 lecciones en 9 niveles, de cero a terminar canciones.
+• 61 lecciones en 9 niveles, de cero a terminar canciones.
 • Ilustraciones animadas, pasos claros y vídeos recomendados.
 • Retos que Studoo comprueba solo: haz el ritmo y la app te dice "¡Reto superado!".
 • Test al final de cada lección, juegos para entrenar el oído, logros y racha diaria.
@@ -53,7 +53,7 @@ Studoo es tu estudio de música en el bolsillo: crea beats, escribe melodías, m
 
 ⭐ STUDOO PRO (pago único, sin suscripciones)
 La versión gratis incluye los primeros 4 niveles de Aprende, 5 kits de batería, varios sonidos de sinte y 808, 3 bases de géneros y exportar canciones de hasta 1 minuto. Con Studoo Pro desbloqueas todo para siempre:
-• Los 19 kits de batería y los efectos FX
+• Los 23 kits de batería y los efectos FX
 • Todos los sonidos de sintetizador y de 808
 • Las 11 bases de géneros (drill, techno, phonk, afrobeats, R&B...)
 • Aprende completo: niveles 5 a 9, juegos de oído y logros

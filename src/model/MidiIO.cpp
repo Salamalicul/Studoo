@@ -93,9 +93,9 @@ int importIntoPattern (Project& project, juce::ValueTree pattern, int channelUid
                 continue;
             const double start = e->message.getTimeStamp() * stepsPerTick;
             const double off = e->noteOffObject != nullptr ? e->noteOffObject->message.getTimeStamp() * stepsPerTick : start + 1.0;
-            if (! std::isfinite (start) || start < 0.0 || start >= 64.0)
+            if (! std::isfinite (start) || start < 0.0 || start >= 256.0)
                 continue;
-            const double len = juce::jlimit (0.25, 64.0 - start, std::round ((off - start) * 4.0) / 4.0);
+            const double len = juce::jlimit (0.25, 256.0 - start, std::round ((off - start) * 4.0) / 4.0);
             notes.push_back ({ std::round (start * 4.0) / 4.0, len, e->message.getNoteNumber(), e->message.getFloatVelocity() });
             end = juce::jmax (end, start + len);
         }
@@ -104,7 +104,7 @@ int importIntoPattern (Project& project, juce::ValueTree pattern, int channelUid
         return 0;
 
     auto* um = project.um();
-    const int needed = end > 32.0 ? 64 : end > 16.0 ? 32 : 16;
+    const int needed = end > 128.0 ? 256 : end > 64.0 ? 128 : end > 32.0 ? 64 : end > 16.0 ? 32 : 16;
     if (Project::getPatternLength (pattern) < needed)
         pattern.setProperty (ids::length, needed, um);
     for (auto& n : notes)

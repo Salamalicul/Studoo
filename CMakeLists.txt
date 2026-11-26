@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # instalar nada extra para abrir la app.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-project(Studoo VERSION 2.0.0 LANGUAGES C CXX)
+project(Studoo VERSION 2.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -47,6 +47,7 @@ set(STUDOO_ENGINE_SOURCES
     src/audio/Instruments.cpp
     src/audio/Kits.cpp
     src/audio/MixerTrack.cpp
+    src/audio/TrackFx.cpp
     src/audio/PluginHost.cpp
     src/audio/SampleCache.cpp
     src/audio/Snapshot.cpp)
@@ -75,6 +76,9 @@ target_sources(Studoo PRIVATE
     src/ui/PianoRoll.cpp
     src/ui/Playlist.cpp
     src/ui/MixerView.cpp
+    src/ui/TrackFxPanel.cpp
+    src/ui/Browser.cpp
+    src/ui/AudioEditor.cpp
     src/ui/AutomationView.cpp
     src/ui/LearnView.cpp
     src/ui/LearnProgress.cpp
@@ -151,7 +155,7 @@ if(STUDOO_BUILD_TESTS)
     juce_add_console_app(StudooLearnTest PRODUCT_NAME "StudooLearnTest")
     target_sources(StudooLearnTest PRIVATE tests/LearnTest.cpp ${STUDOO_ENGINE_SOURCES}
         src/Pro.cpp src/ui/Challenges.cpp src/ui/EarGames.cpp src/ui/LearnProgress.cpp
-        src/ui/StudooLookAndFeel.cpp src/ui/Widgets.cpp)
+        src/ui/StudooLookAndFeel.cpp src/ui/Widgets.cpp src/ui/AudioEditor.cpp)
     target_include_directories(StudooLearnTest PRIVATE src src/ui)
     target_compile_definitions(StudooLearnTest PRIVATE ${STUDOO_DEFINITIONS})
     target_link_libraries(StudooLearnTest

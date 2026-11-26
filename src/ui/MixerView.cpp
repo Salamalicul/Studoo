@@ -1,4 +1,5 @@
 #include "MixerView.h"
+#include "TrackFxPanel.h"
 #include "HelpTexts.h"
 
 namespace studoo
@@ -105,6 +106,18 @@ MixerStrip::MixerStrip (AppContext& c, int trackIndex) : ctx (c), index (trackIn
     pluginButton.setTooltip (txt ("Añadir, abrir o quitar un efecto VST3 en esta pista."));
     pluginButton.onClick = [this] { if (ctx.showMixerPluginMenu) ctx.showMixerPluginMenu (index); };
     makeNonFocusing (pluginButton);
+
+    addAndMakeVisible (fxButton);
+    fxButton.setButtonText ("FX+");
+    fxButton.setTooltip (txt ("Más efectos: autotune y afinador, puerta de ruido, maximizador, efectos de ritmo "
+                              "(half-time, tartamudeo...), EQ paramétrico y envíos 2 y 3."));
+    fxButton.onClick = [this]
+    {
+        auto panel = std::make_unique<TrackFxPanel> (ctx, index);
+        auto* top = getTopLevelComponent();
+        juce::CallOutBox::launchAsynchronously (std::move (panel), top->getLocalArea (this, fxButton.getBounds()), top);
+    };
+    makeNonFocusing (fxButton);
 
     addAndMakeVisible (fader);
     fader.setSliderStyle (juce::Slider::LinearVertical);
@@ -376,7 +389,12 @@ void MixerStrip::resized()
         area.removeFromTop (knobHeight + 12);   // el Master no envía: deja el hueco para que todo quede alineado
     }
     area.removeFromTop (-8);
-    pluginButton.setBounds (area.removeFromTop (24));
+    {
+        auto r = area.removeFromTop (24);
+        fxButton.setBounds (r.removeFromRight (42));
+        r.removeFromRight (3);
+        pluginButton.setBounds (r);
+    }
     area.removeFromTop (6);
     {
         auto r = area.removeFromTop (knobHeight);
@@ -397,6 +415,16 @@ void MixerStrip::resized()
 // ============================================================================
 MixerView::MixerView (AppContext& c) : ctx (c), helpButton (txt (help::mixerTitle), txt (help::mixerText))
 {
+    addAndMakeVisible (analyzerButton);
+    analyzerButton.setButtonText (txt ("Analizador"));
+    analyzerButton.setTooltip (txt ("Muestra las frecuencias del Master: cuántos graves, medios y agudos tiene tu canción."));
+    analyzerButton.onClick = [this]
+    {
+        auto* top = getTopLevelComponent();
+        juce::CallOutBox::launchAsynchronously (std::make_unique<AnalyzerPanel> (ctx), top->getLocalArea (this, analyzerButton.getBounds()), top);
+    };
+    makeNonFocusing (analyzerButton);
+
     addAndMakeVisible (helpButton);
     addAndMakeVisible (infoLabel);
     infoLabel.setText (txt ("Doble clic en el nombre de una pista para renombrarla. Cada canal elige su pista en el secuenciador."),
@@ -455,6 +483,8 @@ void MixerView::resized()
     auto h = headerArea.reduced (8, 7);
     helpButton.setBounds (h.removeFromLeft (26));
     h.removeFromLeft (120);
+    analyzerButton.setBounds (h.removeFromRight (130));
+    h.removeFromRight (8);
     infoLabel.setBounds (h);
 
     viewport.setBounds (area.reduced (6));

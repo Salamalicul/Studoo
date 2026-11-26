@@ -31,7 +31,7 @@ namespace studoo
              *reverbMix, *reverbSize, *pan, *filter, *distortion, *chorus, *sidechain, *send;
         juce::ToggleButton compOn, limiterOn, sendOnly;
         juce::ComboBox sidechainSource, sendTarget;
-        juce::TextButton muteButton, soloButton, pluginButton;
+        juce::TextButton muteButton, soloButton, pluginButton, fxButton;
         juce::Slider fader;
         float meterL = 0.0f, meterR = 0.0f;
         juce::Rectangle<int> meterArea, nameArea;
@@ -56,6 +56,7 @@ namespace studoo
         AppContext& ctx;
         HelpButton helpButton;
         juce::Label infoLabel;
+        juce::TextButton analyzerButton;
         juce::Viewport viewport;
         juce::Component stripHolder;
         juce::OwnedArray<MixerStrip> strips;

@@ -219,6 +219,44 @@ namespace
                              {}, {} });
             c.room = 0.12;
         }
+        // --- Amapiano ------------------------------------------------------------------------------
+        {
+            auto& c = add ({ "amapiano", "Amapiano", "El sonido de Sudáfrica: bombo suave, shaker, bloques de madera y el famoso \"log drum\".",
+                             { { "kick", "Bombo" }, { "rim", "Rim" }, { "clap", "Palmada" }, { "shaker", "Shaker" },
+                               { "hihat", "Hi-hat" }, { "openhat", "Hi-hat abierto" }, { "woodblock", "Bloque de madera" },
+                               { "conga", "Conga" }, { "perc", "Log drum" }, { "tambourine", "Pandereta" } },
+                             { true, 1.2f, 0.12f, 0.2f }, {} });
+            c.kF0 = 140; c.kF1 = 50; c.kAmpDecay = 9; c.kClick = 0.2; c.kDrive = 1.5;
+            c.percF0 = 180; c.percF1 = 70; c.percDecay = 6;   // el log drum: un tom grave que baja
+            c.room = 0.1;
+        }
+        // --- UK Garage ------------------------------------------------------------------------------
+        {
+            auto& c = add ({ "ukgarage", "UK Garage", "Ritmo saltarín de Londres: bombo con golpe, caja seca y hi-hats rápidos.",
+                             { { "kick", "Bombo" }, { "snare", "Caja" }, { "clap", "Palmada" }, { "rim", "Rim" },
+                               { "hihat", "Hi-hat" }, { "openhat", "Hi-hat abierto" }, { "shaker", "Shaker" }, { "perc", "Perc" } },
+                             { true, 0.9f, 0.05f, 0.3f }, {} });
+            c.kF0 = 160; c.kF1 = 55; c.kAmpDecay = 10; c.kClick = 0.45;
+            c.sTone = 230; c.sNoiseDecay = 22; c.hDecay = 70;
+        }
+        // --- Grime ------------------------------------------------------------------------------------
+        {
+            auto& c = add ({ "grime", "Grime", "Oscuro y frío, a 140 BPM: bombo duro, caja metálica y percusiones raras.",
+                             { { "kick", "Bombo" }, { "snare", "Caja" }, { "clap", "Palmada" }, { "hihat", "Hi-hat" },
+                               { "openhat", "Hi-hat abierto" }, { "perc", "Perc metálico" }, { "rim", "Rim" }, { "crash", "Platillo" } },
+                             { true, 1.6f, 0.08f, 0.6f }, {} });
+            c.kF0 = 180; c.kF1 = 52; c.kClick = 0.55; c.kDrive = 3.0;
+            c.sTone = 280; c.sCentre = 5200; c.percF0 = 1600; c.percF1 = 1400; c.extraDrive = 0.3;
+        }
+        // --- Baile funk ---------------------------------------------------------------------------------
+        {
+            auto& c = add ({ "bailefunk", "Baile funk (Brasil)", "El funk carioca: bombo con mucho golpe, palmadas y el ritmo tamborzão.",
+                             { { "kick", "Bombo" }, { "kick2", "Bombo corto" }, { "snare", "Caja" }, { "clap", "Palmada" },
+                               { "hihat", "Hi-hat" }, { "conga", "Atabaque" }, { "tomlo", "Surdo" }, { "cowbell", "Cencerro" },
+                               { "tambourine", "Pandeiro" } },
+                             { true, 1.4f, 0.1f, 0.7f }, {} });
+            c.kF0 = 200; c.kF1 = 50; c.kClick = 0.6; c.kDrive = 3.5; c.extraDrive = 0.25;
+        }
         // --- Efectos (FX) ---------------------------------------------------------------------------------------------------
         {
             KitInfo fx { "fx", "Efectos (FX)", "Sonidos para transiciones y momentos especiales: subidas, impactos, caídas y más.",
@@ -280,6 +318,15 @@ const std::vector<SynthPreset>& synthPresets()
         { "Arpegio",             "Notas muy cortas para patrones rápidos",    1, 0.001f, 0.12f, 0.0f,  0.1f,  4000.0f,  0.5f,  5.0f,  72 },
         { "Ambiente",            "Capa etérea para fondos",                   2, 1.5f,   2.0f,  0.9f,  2.5f,  3000.0f,  0.0f,  9.0f,  60 },
         { "Lead retro 8 bits",   "Como en los videojuegos antiguos",          1, 0.005f, 0.1f,  0.9f,  0.1f,  12000.0f, 0.1f,  0.0f,  72 },
+        // FM y tabla de ondas
+        { "Piano FM (años 80)",  "El piano eléctrico de las baladas de los 80", 4, 0.002f, 1.2f, 0.2f,  0.6f,  12000.0f, 0.0f,  3.0f,  60, 0.35f, 1 },
+        { "Campana FM",          "Campanas metálicas que brillan",            4, 0.001f, 2.0f,  0.0f,  1.5f,  16000.0f, 0.0f,  2.0f,  84, 0.6f,  3 },
+        { "Bajo FM",             "Bajo con golpe, muy usado en el pop",       4, 0.002f, 0.35f, 0.5f,  0.12f, 6000.0f,  0.1f,  0.0f,  36, 0.45f, 1 },
+        { "Pluck FM",            "Pellizco brillante para melodías",          4, 0.001f, 0.3f,  0.0f,  0.25f, 9000.0f,  0.2f,  4.0f,  72, 0.7f,  2 },
+        { "Marimba",             "Madera golpeada, suena tropical",           4, 0.001f, 0.5f,  0.0f,  0.4f,  8000.0f,  0.0f,  0.0f,  72, 0.3f,  4 },
+        { "Pad de tabla",        "Fondo que cambia de color con el LFO",      5, 0.9f,   1.0f,  0.85f, 1.8f,  4000.0f,  0.2f,  16.0f, 60, 0.4f,  2 },
+        { "Lead de tabla",       "Melodía gruesa y moderna",                  5, 0.005f, 0.3f,  0.8f,  0.2f,  9000.0f,  0.25f, 10.0f, 72, 0.75f, 2 },
+        { "Bajo reese",          "Bajo ancho del drum and bass y el dubstep", 5, 0.005f, 0.4f,  0.9f,  0.2f,  1500.0f,  0.3f,  25.0f, 36, 0.66f, 2 },
     };
     return list;
 }
@@ -293,6 +340,10 @@ const std::vector<Bass808Named>& bass808Presets()
         { "808 distorsionado",      "Fuerte y agresivo, se oye en el móvil",    2.0f, 0.08f, 0.8f },
         { "808 con mucho glide",    "Se desliza mucho entre notas (drill)",     2.2f, 0.25f, 0.4f },
         { "808 sub limpio",         "Muy grave y sin distorsión",               2.0f, 0.06f, 0.0f },
+        { "808 drill UK",           "Largo, con glide marcado y algo de suciedad", 2.6f, 0.18f, 0.5f },
+        { "808 reggaetón",          "Corto y redondo para el dembow",           0.9f, 0.04f, 0.2f },
+        { "808 phonk",              "Muy saturado, casi roto (phonk)",          1.8f, 0.10f, 1.0f },
+        { "808 trap melódico",      "Suave y musical para melodías tristes",    2.4f, 0.12f, 0.15f },
     };
     return list;
 }

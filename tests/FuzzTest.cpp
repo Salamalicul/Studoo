@@ -102,7 +102,10 @@ namespace
             ids::lfoAmount, ids::trackFilter, ids::distortion, ids::chorusMix, ids::sidechain, ids::sidechainSource,
             ids::limiter, ids::sendTo, ids::sendLevel, ids::sendOnly, ids::clipGain, ids::fadeIn, ids::fadeOut,
             ids::stretch, ids::clipPitch, ids::recordBpm, ids::scaleRoot, ids::scaleType, ids::scaleLock,
-            juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3") };
+            juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3"), ids::stepVel, ids::stepPitch, ids::mono,
+            ids::gateThreshold, ids::tuneAmount, ids::tuneRoot, ids::tuneScale, ids::rhythmMode, ids::rhythmMix, ids::maximize,
+            juce::Identifier ("sendTo2"), juce::Identifier ("sendLevel3"), juce::Identifier ("peqFreq2"),
+            juce::Identifier ("peqGain1"), juce::Identifier ("peqQ4"), ids::timeSigNum, ids::timeSigDen, ids::slicePoints, ids::clipMuted, ids::lo, ids::hi, ids::timbre, ids::fmRatio, ids::loopOn, ids::loopStart, ids::loopEnd };
 
         // Recorre todo el árbol y cambia, borra o duplica cosas al azar
         std::function<void (juce::ValueTree)> mutate = [&] (juce::ValueTree t)
@@ -129,7 +132,7 @@ namespace
         if (rng.nextInt (4) == 0)
         {
             static const juce::Identifier types[] = { ids::CHANNEL, ids::PATTERN, ids::NOTE, ids::STEPSET, ids::CLIP,
-                                                      ids::TRACK, ids::LANE, ids::POINT, ids::CHANNELS, ids::MIXER };
+                                                      ids::TRACK, ids::LANE, ids::POINT, ids::CHANNELS, ids::MIXER, ids::ZONE };
             for (int i = 0; i < 5; ++i)
             {
                 juce::ValueTree n (types[rng.nextInt ((int) std::size (types))]);
@@ -167,7 +170,8 @@ int main (int argc, char* argv[])
     rng.setSeed (seed);
 
     SampleCache cache;
-    AudioEngine engine;
+    auto engineOwned = std::make_unique<AudioEngine>();
+    auto& engine = *engineOwned;
     engine.prepare (44100.0, 512);
     juce::AudioBuffer<float> block (2, 512);
 
@@ -251,7 +255,7 @@ int main (int argc, char* argv[])
                 for (auto n : pattern)
                     if (n.hasType (ids::NOTE)
                         && (! std::isfinite ((double) n[ids::start]) || (double) n[ids::start] < 0.0
-                            || (double) n[ids::start] + (double) n[ids::length] > 64.0 + 1.0e-6))
+                            || (double) n[ids::start] + (double) n[ids::length] > 256.0 + 1.0e-6))
                         ++failures;
                 ++midiOk;
             }

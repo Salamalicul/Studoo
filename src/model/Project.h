@@ -24,13 +24,21 @@ namespace studoo
     juce::String channelTypeToString (ChannelType);
     ChannelType  channelTypeFromString (const juce::String&);
 
-    constexpr int numMixerTracks    = 17; // 0 = Master, 1..16 = pistas
+    constexpr int numMixerTracks    = 33; // 0 = Master, 1..32 = pistas
     constexpr int numFxSlots        = 4;  // huecos de plugins de efecto en cada pista
+    constexpr int numSends          = 3;  // envíos de cada pista
+
+    // Dónde se guarda cada envío (el envío 0 usa los nombres de siempre)
+    constexpr int numEqBands        = 4;  // bandas del EQ paramétrico
+    inline juce::Identifier peqId (const char* what, int band) { return juce::Identifier (juce::String ("peq") + what + juce::String (band + 1)); }
+
+    inline juce::Identifier sendToId (int i)    { return i == 0 ? juce::Identifier ("sendTo")    : juce::Identifier ("sendTo" + juce::String (i + 1)); }
+    inline juce::Identifier sendLevelId (int i) { return i == 0 ? juce::Identifier ("sendLevel") : juce::Identifier ("sendLevel" + juce::String (i + 1)); }
 
     // Dónde se guarda el plugin de cada hueco (el hueco 0 usa los nombres de siempre)
     inline juce::Identifier fxDescId (int slot)  { return slot == 0 ? juce::Identifier ("pluginDesc")  : juce::Identifier ("pluginDesc" + juce::String (slot)); }
     inline juce::Identifier fxStateId (int slot) { return slot == 0 ? juce::Identifier ("pluginState") : juce::Identifier ("pluginState" + juce::String (slot)); }
-    constexpr int numPlaylistTracks = 16;
+    constexpr int numPlaylistTracks = 32;
     constexpr int stepsPerBar       = 16; // 16 semicorcheas = 1 compás
     constexpr int stepsPerBeat      = 4;
 
@@ -39,10 +47,10 @@ namespace studoo
     // ------------------------------------------------------------------------
     struct AutomationTarget
     {
-        enum class Kind { mixer, channel, invalid };
+        enum class Kind { mixer, channel, project, invalid };
         enum class Param { volume, pan, reverbMix, delayMix, cutoff, eqLow, eqHigh,
                            eqMid, trackFilter, distortion, chorusMix,
-                           resonance, lfoRate, lfoAmount, drive, sampleTune, sendLevel, invalid };
+                           resonance, lfoRate, lfoAmount, drive, sampleTune, sendLevel, bpm, invalid };
 
         // ¿Es un control del instrumento (sinte, 808, sampler) y no del volumen/pan del canal?
         static bool isInstrumentParam (Param p)
@@ -75,6 +83,10 @@ namespace studoo
         ~Project() override;
 
         juce::ValueTree& getState()        { return state; }
+
+        // Compás de la canción (4/4, 3/4, 6/8...): cuántos pasos (semicorcheas) tiene un compás
+        static int stepsPerBarOf (const juce::ValueTree& projectState);
+        int getStepsPerBar() const         { return stepsPerBarOf (state); }
         juce::UndoManager& getUndo()       { return undoManager; }
         juce::UndoManager* um()            { return &undoManager; }
         void beginTransaction()            { undoManager.beginNewTransaction(); }
@@ -136,6 +148,11 @@ namespace studoo
         static int getPatternLength (const juce::ValueTree& pattern);
         bool getStep (const juce::ValueTree& pattern, int channelUid, int step);
         void setStep (juce::ValueTree pattern, int channelUid, int step, bool on);
+        // Editor de pasos: un valor por paso (fuerza 0..100 o tono -24..24)
+        int getStepValue (const juce::ValueTree& pattern, int channelUid, int step, const juce::Identifier& which);
+        void setStepValue (juce::ValueTree pattern, int channelUid, int step, const juce::Identifier& which, int value);
+        static int stepValueDefault (const juce::Identifier& which) { return which == ids::stepVel ? 85 : 0; }
+        static int parseStepValue (const juce::String& list, int step, const juce::Identifier& which);
         void clearPattern (juce::ValueTree pattern);
         void loadExampleBeat (juce::ValueTree pattern);
 

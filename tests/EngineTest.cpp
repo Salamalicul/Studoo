@@ -9,6 +9,8 @@
 #include "audio/AudioEngine.h"
 #include "model/Project.h"
 #include "model/MidiIO.h"
+#include "audio/MixerTrack.h"
+#include "audio/Onsets.h"
 
 #include <iostream>
 
@@ -43,6 +45,50 @@ static juce::AudioBuffer<float> renderSeconds (AudioEngine& engine, double secon
     return out;
 }
 
+// Plugin de prueba que retrasa el sonido 1000 muestras (y lo dice, como los plugins de verdad)
+class LatentDelayPlugin : public juce::AudioPluginInstance
+{
+public:
+    LatentDelayPlugin() : AudioPluginInstance (BusesProperties().withInput ("In", juce::AudioChannelSet::stereo(), true)
+                                                             .withOutput ("Out", juce::AudioChannelSet::stereo(), true))
+    {
+        setLatencySamples (latency);
+    }
+    void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = "Retraso de prueba"; }
+    const juce::String getName() const override { return "Retraso de prueba"; }
+    void prepareToPlay (double, int) override { line.setSize (2, 4096); line.clear(); pos = 0; }
+    void releaseResources() override {}
+    void processBlock (juce::AudioBuffer<float>& b, juce::MidiBuffer&) override
+    {
+        for (int i = 0; i < b.getNumSamples(); ++i)
+        {
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                const float in = b.getSample (ch, i);
+                b.setSample (ch, i, line.getSample (ch, (pos - latency + 4096) % 4096));
+                line.setSample (ch, pos, in);
+            }
+            pos = (pos + 1) % 4096;
+        }
+    }
+    double getTailLengthSeconds() const override { return 0.0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override {}
+    void setStateInformation (const void*, int) override {}
+    static constexpr int latency = 1000;
+private:
+    juce::AudioBuffer<float> line;
+    int pos = 0;
+};
+
 static bool isFinite (const juce::AudioBuffer<float>& b)
 {
     for (int ch = 0; ch < b.getNumChannels(); ++ch)
@@ -62,7 +108,8 @@ int main (int argc, char* argv[])
     outDir.createDirectory();
 
     Project project;
-    AudioEngine engine;
+    auto engineOwned = std::make_unique<AudioEngine>();
+    auto& engine = *engineOwned;
     engine.prepare (sampleRate, blockSize);
 
     std::cout << "Proyecto y secuenciador\n";
@@ -129,7 +176,8 @@ int main (int argc, char* argv[])
         auto pattern = p.getCurrentPattern();
         auto ch = p.findChannelByType (type);
         p.addNote (pattern, ch[ids::uid], 0.0, 8.0, type == ChannelType::synth ? 60 : 36);
-        AudioEngine e;
+        auto eOwned = std::make_unique<AudioEngine>();
+        auto& e = *eOwned;
         e.prepare (sampleRate, blockSize);
         e.updateFromProject (p.getState(), cache);
         e.play();
@@ -224,7 +272,8 @@ int main (int argc, char* argv[])
         for (auto ch : q.channels())
             for (int st : { 0, 4, 8, 12 })
                 q.setStep (qp, ch[ids::uid], st, true);
-        AudioEngine e;
+        auto eOwned = std::make_unique<AudioEngine>();
+        auto& e = *eOwned;
         e.prepare (sampleRate, blockSize);
         e.updateFromProject (q.getState(), cache);
         e.play();
@@ -240,7 +289,8 @@ int main (int argc, char* argv[])
             pp.channels().removeAllChildren (nullptr);
             auto ch = add (pp);
             pp.addNote (pp.getCurrentPattern(), ch[ids::uid], 0.0, 8.0, note);
-            AudioEngine pe;
+            auto peOwned = std::make_unique<AudioEngine>();
+            auto& pe = *peOwned;
             pe.prepare (sampleRate, blockSize);
             pe.updateFromProject (pp.getState(), cache);
             pe.play();
@@ -291,7 +341,8 @@ int main (int argc, char* argv[])
             Project p;
             auto kick = p.findChannelByBuiltin ("builtin:kick");
             setup (p, kick);
-            AudioEngine e;
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
             e.prepare (sampleRate, blockSize);
             e.updateFromProject (p.getState(), cache);
             e.play();
@@ -477,7 +528,8 @@ int main (int argc, char* argv[])
             p.getState().setProperty (ids::playMode, "song", nullptr);
             for (auto ch : p.channels())
                 if (ch != voice) ch.setProperty (ids::muted, true, nullptr);
-            AudioEngine e;
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
             e.prepare (sampleRate, blockSize);
             e.updateFromProject (p.getState(), cache);
             e.play();
@@ -513,7 +565,8 @@ int main (int argc, char* argv[])
                 p.getState().setProperty (ids::playMode, "song", nullptr);
                 for (auto ch : p.channels())
                     if (ch != voice) ch.setProperty (ids::muted, true, nullptr);
-                AudioEngine e;
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
                 e.prepare (sampleRate, blockSize);
                 e.updateFromProject (p.getState(), cache);
                 e.play();
@@ -541,6 +594,447 @@ int main (int argc, char* argv[])
                    "Tono +12: una octava más aguda y dura lo mismo");
             check (isFinite (slow) && isFinite (up), "Estirar y cambiar el tono no da valores raros");
             wav.deleteFile();
+        }
+
+        // Tanda A: patrones largos, editor de pasos, stems y glide del sinte
+        {
+            auto firstAbove = [] (const juce::AudioBuffer<float>& b, float th)
+            {
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    if (std::abs (b.getSample (0, i)) > th) return i;
+                return -1;
+            };
+            // Un patrón de 8 compases: el paso 100 suena a su hora
+            auto longPattern = renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                p.getCurrentPattern().setProperty (ids::length, 128, nullptr);
+                p.getState().setProperty (ids::bpm, 240.0, nullptr);
+                stepAt (p, k, 100);
+            }, 6.6);
+            check (std::abs (firstAbove (longPattern, 0.01f) - sampleRate * 60.0 / 240.0 / 4.0 * 100) < 300,
+                   "Patrón de 8 compases: el paso 100 suena a su hora");
+
+            // Editor de pasos: fuerza 30 suena más flojo; fuerza 0 no suena
+            auto loudStep = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); }, 0.5);
+            auto softStep = renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                stepAt (p, k, 0);
+                p.setStepValue (p.getCurrentPattern(), k[ids::uid], 0, ids::stepVel, 30);
+            }, 0.5);
+            auto mutedStep = renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                stepAt (p, k, 0);
+                p.setStepValue (p.getCurrentPattern(), k[ids::uid], 0, ids::stepVel, 0);
+            }, 0.5);
+            check (rms (softStep) < rms (loudStep) * 0.6f && rms (mutedStep) < 1.0e-5f, "Editor de pasos: la fuerza de cada golpe cambia el volumen");
+            auto upStep = renderKick ([&] (Project& p, juce::ValueTree k)
+            {
+                stepAt (p, k, 0);
+                p.setStepValue (p.getCurrentPattern(), k[ids::uid], 0, ids::stepPitch, 12);
+            }, 1.0);
+            auto baseStep = renderKick ([&] (Project& p, juce::ValueTree k) { stepAt (p, k, 0); }, 1.0);
+            check (lastSound (upStep) < lastSound (baseStep) * 0.7, "Editor de pasos: +12 semitonos suena más agudo");
+            {
+                Project p;
+                const int uid = p.channels().getChild (0)[ids::uid];
+                p.setStepValue (p.getCurrentPattern(), uid, 5, ids::stepVel, 500);
+                p.setStepValue (p.getCurrentPattern(), uid, 6, ids::stepPitch, -99);
+                check (p.getStepValue (p.getCurrentPattern(), uid, 5, ids::stepVel) == 100
+                       && p.getStepValue (p.getCurrentPattern(), uid, 6, ids::stepPitch) == -24
+                       && p.getStepValue (p.getCurrentPattern(), uid, 7, ids::stepVel) == 85, "Editor de pasos: los valores se limitan y tienen valor por defecto");
+            }
+
+            // Exportar por pistas: con el bombo en su pista, la pista de la caja queda en silencio
+            {
+                Project p;
+                auto kick = p.findChannelByBuiltin ("builtin:kick");
+                auto snare = p.findChannelByBuiltin ("builtin:snare");
+                p.setStep (p.getCurrentPattern(), kick[ids::uid], 0, true);
+                p.setStep (p.getCurrentPattern(), snare[ids::uid], 4, true);
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (p.getState(), cache);
+                e.setStemTrack ((int) snare[ids::mixer]);
+                e.play();
+                auto onlySnare = renderSeconds (e, 0.5);
+                const int snareStart = (int) (samplesPerStep * 4);
+                check (onlySnare.getMagnitude (0, 0, snareStart - 200) < 1.0e-4f && onlySnare.getMagnitude (0, snareStart, 4000) > 0.01f,
+                       "Exportar por pistas: solo suena la pista elegida");
+            }
+
+            // Sinte mono con glide: la segunda nota empieza con el tono de la primera
+            {
+                auto glideRender = [&] (float glide)
+                {
+                    Project p;
+                    auto synth = p.findChannelByType (ChannelType::synth);
+                    synth.setProperty (ids::mono, true, nullptr);
+                    synth.setProperty (ids::glide, glide, nullptr);
+                    synth.setProperty (ids::wave, 2, nullptr);
+                    synth.setProperty (ids::sustain, 1.0f, nullptr);
+                    synth.setProperty (ids::cutoff, 18000.0f, nullptr);
+                    p.addNote (p.getCurrentPattern(), synth[ids::uid], 0.0, 5.0, 57);   // La3 (220 Hz)
+                    p.addNote (p.getCurrentPattern(), synth[ids::uid], 4.0, 8.0, 69);   // La4 (440 Hz), solapada
+                    for (auto ch : p.channels()) if (ch != synth) ch.setProperty (ids::muted, true, nullptr);
+                    auto eOwned = std::make_unique<AudioEngine>();
+                    auto& e = *eOwned;
+                    e.prepare (sampleRate, blockSize);
+                    e.updateFromProject (p.getState(), cache);
+                    e.play();
+                    return renderSeconds (e, 1.2);
+                };
+                auto crossings = [] (const juce::AudioBuffer<float>& b, int from, int len)
+                {
+                    int c = 0;
+                    for (int i = from + 1; i < from + len; ++i)
+                        c += (b.getSample (0, i - 1) < 0.0f) != (b.getSample (0, i) < 0.0f) ? 1 : 0;
+                    return c / 2.0 / (len / sampleRate);
+                };
+                const int second = (int) (samplesPerStep * 4);
+                auto noGlide = glideRender (0.0f), withGlide = glideRender (0.5f);
+                const double fNo = crossings (noGlide, second + 600, 2205), fGlide = crossings (withGlide, second + 600, 2205);
+                check (fNo > 380.0 && fGlide < fNo * 0.8, "Sinte mono: con glide la nota se desliza (empieza más grave)");
+                check (crossings (withGlide, (int) (sampleRate * 1.0), 4410) > 400.0, "Sinte mono: al final llega a la nota nueva");
+            }
+        }
+
+        // Tanda B: efectos avanzados de pista (autotune, puerta, EQ paramétrico, ritmo, maximizador)
+        {
+            // Procesa 'seconds' de un seno por una pista del mezclador con estos ajustes
+            auto runTrack = [] (TrackParams p, double hz, float amp, double seconds, bool playing = false, bool analyse = false)
+            {
+                MixerTrack track;
+                track.prepare (sampleRate, blockSize);
+                track.ensureRhythm();
+                track.setAnalysePitch (analyse);
+                const int total = (int) (seconds * sampleRate);
+                juce::AudioBuffer<float> out (2, total);
+                double phase = 0.0, stepPos = 0.0;
+                const double sps = sampleRate * 60.0 / 120.0 / 4.0;
+                for (int pos = 0; pos < total; pos += blockSize)
+                {
+                    const int n = juce::jmin (blockSize, total - pos);
+                    auto& b = track.getBuffer();
+                    for (int i = 0; i < n; ++i)
+                    {
+                        const float v = amp * (float) std::sin (phase);
+                        phase += juce::MathConstants<double>::twoPi * hz / sampleRate;
+                        b.setSample (0, i, v);
+                        b.setSample (1, i, v);
+                    }
+                    track.setTransport (stepPos, sps, playing);
+                    track.process (n, p, 120.0, false);
+                    stepPos += n / sps;
+                    out.copyFrom (0, pos, b, 0, 0, n);
+                    out.copyFrom (1, pos, b, 1, 0, n);
+                }
+                return std::make_pair (out, track.getDetectedHz());
+            };
+            auto freqOf = [] (const juce::AudioBuffer<float>& b, int from, int len)
+            {
+                int c = 0;
+                for (int i = from + 1; i < from + len; ++i)
+                    c += (b.getSample (0, i - 1) < 0.0f) != (b.getSample (0, i) < 0.0f) ? 1 : 0;
+                return c / 2.0 / (len / sampleRate);
+            };
+            TrackParams base;
+            base.volume = 1.0f;
+            base.pan = 0.0f;
+
+            auto [plain, detected] = runTrack (base, 450.0, 0.3f, 1.0, false, true);
+            check (std::abs (detected - 450.0f) < 5.0f, "Afinador: detecta un tono de 450 Hz");
+            auto tuned = base;
+            tuned.tuneAmount = 1.0f;
+            auto [corrected, d2] = runTrack (tuned, 450.0, 0.3f, 1.5);
+            juce::ignoreUnused (d2);
+            check (std::abs (freqOf (corrected, 44100, 22050) - 440.0) < 6.0 && isFinite (corrected),
+                   "Autotune: 450 Hz se corrige a 440 Hz (La)");
+            auto inScale = tuned;
+            inScale.tuneScale = 1;   // Do mayor: Fa# (370 Hz) no está; va a Fa (349) o Sol (392)
+            auto [scaled, d3] = runTrack (inScale, 370.0, 0.3f, 1.5);
+            juce::ignoreUnused (d3);
+            const double fs = freqOf (scaled, 44100, 22050);
+            check (std::abs (fs - 349.2) < 6.0 || std::abs (fs - 392.0) < 6.0, "Autotune con escala: solo deja notas de la escala");
+
+            auto gated = base;
+            gated.gateThreshold = -30.0f;
+            auto [quiet, d4] = runTrack (gated, 200.0, 0.005f, 0.5);   // unos -46 dB: por debajo del umbral
+            auto [loud, d5] = runTrack (gated, 200.0, 0.3f, 0.5);
+            juce::ignoreUnused (d4, d5);
+            check (quiet.getRMSLevel (0, 11025, 11025) < 0.0005f && loud.getRMSLevel (0, 11025, 11025) > 0.15f,
+                   "Puerta de ruido: corta lo flojo y deja pasar lo fuerte");
+
+            auto boosted = base;
+            boosted.peqFreq[1] = 1000.0f;
+            boosted.peqGain[1] = 12.0f;
+            auto [flat, d6] = runTrack (base, 1000.0, 0.05f, 0.3);
+            auto [peak, d7] = runTrack (boosted, 1000.0, 0.05f, 0.3);
+            auto [away, d8] = runTrack (boosted, 100.0, 0.05f, 0.3);
+            juce::ignoreUnused (d6, d7, d8);
+            check (peak.getRMSLevel (0, 4410, 8820) > flat.getRMSLevel (0, 4410, 8820) * 3.0f
+                   && away.getRMSLevel (0, 4410, 8820) < flat.getRMSLevel (0, 4410, 8820) * 1.3f,
+                   "EQ paramétrico: +12 dB en 1 kHz sube esa frecuencia y no las demás");
+
+            auto halfTime = base;
+            halfTime.rhythmMode = 1;
+            auto [slow, d9] = runTrack (halfTime, 440.0, 0.3f, 1.0, true);
+            juce::ignoreUnused (d9);
+            check (std::abs (freqOf (slow, 4410, 8820) - 220.0) < 10.0, "Half-time: suena a mitad de velocidad (una octava más grave)");
+            auto trance = base;
+            trance.rhythmMode = 4;
+            auto [chopped, d10] = runTrack (trance, 440.0, 0.3f, 1.0, true);
+            juce::ignoreUnused (d10);
+            const float ratio = chopped.getRMSLevel (0, 0, 44100) / plain.getRMSLevel (0, 0, 44100);
+            check (ratio > 0.55f && ratio < 0.85f, "Puerta rítmica: el sonido se corta a ritmo");
+            for (int mode = 2; mode <= 6; ++mode)
+            {
+                auto m = base;
+                m.rhythmMode = mode;
+                auto [o, d] = runTrack (m, 300.0, 0.3f, 2.5, true);
+                juce::ignoreUnused (d);
+                if (! isFinite (o) || o.getMagnitude (0, 0, o.getNumSamples()) > 1.0f)
+                    check (false, ("Efecto de ritmo " + juce::String (mode) + " no da valores raros").toRawUTF8());
+            }
+
+            auto maxed = base;
+            maxed.maximize = 12.0f;
+            auto [hot, d11] = runTrack (maxed, 200.0, 0.3f, 0.5);
+            juce::ignoreUnused (d11);
+            check (hot.getRMSLevel (0, 11025, 11025) > plain.getRMSLevel (0, 11025, 11025) * 2.0f
+                   && hot.getMagnitude (0, 11025, 11025) < 0.95f, "Maximizador: más volumen sin pasar del máximo");
+        }
+
+        // Multisample: cada nota usa el sample más cercano
+        {
+            auto makeTone = [] (const juce::String& name, double hz)
+            {
+                auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (name);
+                juce::AudioBuffer<float> tone (1, 44100);
+                for (int i = 0; i < tone.getNumSamples(); ++i)
+                    tone.setSample (0, i, 0.5f * (float) std::sin (juce::MathConstants<double>::twoPi * hz * i / 44100.0));
+                f.deleteFile();
+                juce::WavAudioFormat fmt;
+                std::unique_ptr<juce::AudioFormatWriter> w (fmt.createWriterFor (new juce::FileOutputStream (f), 44100.0, 1, 16, {}, 0));
+                if (w != nullptr) w->writeFromAudioSampleBuffer (tone, 0, tone.getNumSamples());
+                return f;
+            };
+            auto low = makeTone ("studoo-zona-220.wav", 220.0), high = makeTone ("studoo-zona-880.wav", 880.0);
+            auto playNote = [&] (int note)
+            {
+                Project p;
+                auto ch = p.addChannel (ChannelType::sampler, "Multi", 7);
+                ch.setProperty (ids::sample, low.getFullPathName(), nullptr);
+                ch.setProperty (ids::oneShot, false, nullptr);
+                for (auto [file, root, lo, hi] : { std::make_tuple (low, 57, 0, 69), std::make_tuple (high, 81, 70, 127) })
+                {
+                    juce::ValueTree z (ids::ZONE);
+                    z.setProperty (ids::sample, file.getFullPathName(), nullptr);
+                    z.setProperty (ids::root, root, nullptr);
+                    z.setProperty (ids::lo, lo, nullptr);
+                    z.setProperty (ids::hi, hi, nullptr);
+                    ch.appendChild (z, nullptr);
+                }
+                for (auto c : p.channels()) if (c != ch) c.setProperty (ids::muted, true, nullptr);
+                p.addNote (p.getCurrentPattern(), ch[ids::uid], 0.0, 4.0, note);
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (p.getState(), cache);
+                e.play();
+                auto b = renderSeconds (e, 0.4);
+                int c = 0;
+                for (int i = 4410 + 1; i < 4410 + 8820; ++i)
+                    c += (b.getSample (0, i - 1) < 0.0f) != (b.getSample (0, i) < 0.0f) ? 1 : 0;
+                return c / 2.0 / 0.2;
+            };
+            const double f57 = playNote (57), f69 = playNote (69), f81 = playNote (81);
+            check (std::abs (f57 - 220.0) < 10.0 && std::abs (f81 - 880.0) < 30.0 && std::abs (f69 - 440.0) < 15.0,
+                   "Multisample: cada nota usa su sample (y los de en medio se afinan desde el más cercano)");
+            low.deleteFile();
+            high.deleteFile();
+        }
+
+        // Trocear por golpes y tomas silenciadas
+        {
+            juce::AudioBuffer<float> loop (1, 44100);
+            loop.clear();
+            for (int hit : { 0, 11025, 22050, 33075 })   // 4 golpes, uno cada cuarto de segundo
+                for (int i = 0; i < 3000; ++i)
+                    loop.setSample (0, hit + i, 0.8f * std::exp (-i / 600.0f) * (float) std::sin (i * 0.3));
+            auto points = onsets::detect (loop, 44100.0, 0.0f, 1.0f, 32);
+            bool near = points.size() == 4;
+            for (size_t i = 0; near && i < 4; ++i)
+                near = std::abs (points[i] - 0.25f * (float) i) < 0.02f;
+            check (near, "Trocear por golpes: encuentra los 4 golpes del loop");
+
+            Project p;
+            auto kick = p.findChannelByBuiltin ("builtin:kick");
+            kick.setProperty (ids::slices, 3, nullptr);
+            kick.setProperty (ids::slicePoints, "0,0.2,0.5", nullptr);
+            auto snap = Snapshot::build (p.getState());
+            check (snap->channels[(size_t) p.getChannelIndex (kick[ids::uid])].sampler.numSlicePoints == 3, "Los golpes detectados se usan como trozos");
+            kick.setProperty (ids::slicePoints, "0,0.7,0.5", nullptr);   // desordenados: no valen
+            snap = Snapshot::build (p.getState());
+            check (snap->channels[(size_t) p.getChannelIndex (kick[ids::uid])].sampler.numSlicePoints == 0, "Golpes en mal orden: se ignoran");
+
+            auto voice = p.addChannel (ChannelType::audio, "Voz", 7);
+            voice.setProperty (ids::sample, "builtin:kick", nullptr);
+            auto take1 = p.addClip ("audio", voice[ids::uid], 0, 0.0, 8.0);
+            auto take2 = p.addClip ("audio", voice[ids::uid], 1, 0.0, 8.0);
+            take2.setProperty (ids::clipMuted, true, nullptr);
+            juce::ignoreUnused (take1);
+            snap = Snapshot::build (p.getState());
+            int audioClips = 0;
+            for (auto& c : snap->clips) audioClips += c.isAudio ? 1 : 0;
+            check (audioClips == 1, "Tomas: el trozo silenciado no suena");
+        }
+
+        // Bloques de automatización en la Playlist: la curva se repite en cada bloque
+        {
+            Project p;
+            AutomationTarget t;
+            t.kind = AutomationTarget::Kind::mixer;
+            t.index = 1;
+            t.param = AutomationTarget::Param::volume;
+            auto lane = p.addAutomationLane (t);
+            lane.removeAllChildren (nullptr);
+            for (auto [time, value] : { std::make_pair (0.0, 0.0f), std::make_pair (16.0, 1.0f) })
+            {
+                juce::ValueTree pt (ids::POINT);
+                pt.setProperty (ids::time, time, nullptr);
+                pt.setProperty (ids::value, value, nullptr);
+                lane.appendChild (pt, nullptr);
+            }
+            p.addClip ("automation", lane[ids::uid], 0, 32.0, 16.0);
+            p.addClip ("automation", lane[ids::uid], 0, 64.0, 16.0);
+            auto snap = Snapshot::build (p.getState());
+            check (snap->lanes.size() == 1 && snap->lanes[0].blocks.size() == 2, "Bloques de automatización: se leen en el Snapshot");
+            const auto& l = snap->lanes[0];
+            check (std::abs (l.valueAt (0.0) - 0.0f) < 0.01f && std::abs (l.valueAt (40.0) - 0.5f) < 0.02f
+                   && std::abs (l.valueAt (50.0) - 1.0f) < 0.01f && std::abs (l.valueAt (72.0) - 0.5f) < 0.02f,
+                   "Bloques de automatización: la curva empieza en cada bloque y fuera se queda el último valor");
+            check (snap->songLength >= 80.0, "Los bloques de automatización cuentan en la duración de la canción");
+        }
+
+        // Compensación del retraso de los plugins: dos bombos iguales, uno con un plugin que
+        // retrasa 1000 muestras; el otro se espera y suenan a la vez (un solo golpe)
+        {
+            auto firstHit = [] (const juce::AudioBuffer<float>& b)
+            {
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    if (std::abs (b.getSample (0, i)) > 0.02f) return i;
+                return -1;
+            };
+            Project p;
+            auto kick = p.findChannelByBuiltin ("builtin:kick");
+            for (auto c : p.channels()) if (c != kick) c.setProperty (ids::muted, true, nullptr);
+            auto twin = p.addChannel (ChannelType::sampler, "Bombo 2", 12);
+            twin.setProperty (ids::sample, "builtin:kick", nullptr);
+            p.setStep (p.getCurrentPattern(), kick[ids::uid], 4, true);
+            p.setStep (p.getCurrentPattern(), twin[ids::uid], 4, true);
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
+            e.prepare (sampleRate, blockSize);
+            e.updateFromProject (p.getState(), cache);
+            e.setMixerPlugin ((int) kick[ids::mixer], std::make_unique<LatentDelayPlugin>(), 1);
+            e.play();
+            auto out = renderSeconds (e, 0.6);
+            const int expected = (int) (samplesPerStep * 4) + LatentDelayPlugin::latency;
+            const int hit = firstHit (out);
+            check (std::abs (hit - expected) < 64 && out.getMagnitude (0, 0, expected - 64) < 0.02f,
+                   "Compensación del retraso: la pista sin plugin espera y los dos bombos suenan a la vez");
+        }
+
+        // Zona en bucle (modo canción): la reproducción vuelve al principio de la zona
+        {
+            Project p;
+            p.getState().setProperty (ids::playMode, "song", nullptr);
+            p.addClip ("pattern", p.getCurrentPatternUid(), 0, 0.0, 64.0);
+            p.getState().setProperty (ids::loopOn, true, nullptr);
+            p.getState().setProperty (ids::loopStart, 16.0, nullptr);
+            p.getState().setProperty (ids::loopEnd, 32.0, nullptr);
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
+            e.prepare (sampleRate, blockSize);
+            e.updateFromProject (p.getState(), cache);
+            e.setPlayPosition (20.0);
+            e.play();
+            bool inside = true;
+            for (int k = 0; k < 40; ++k)
+            {
+                renderSeconds (e, 0.1);
+                const double pos = e.getPlayPosition();
+                inside = inside && pos >= 16.0 - 1.0e-6 && pos < 32.0;
+            }
+            check (inside, "Bucle: la canción se repite dentro de la zona elegida");
+        }
+
+        // Compás y cambios de tempo
+        {
+            Project p;
+            auto& st = p.getState();
+            check (p.getStepsPerBar() == 16, "Compás 4/4: 16 pasos por compás");
+            st.setProperty (ids::timeSigNum, 3, nullptr);
+            check (p.getStepsPerBar() == 12, "Compás 3/4: 12 pasos por compás");
+            st.setProperty (ids::timeSigNum, 6, nullptr);
+            st.setProperty (ids::timeSigDen, 8, nullptr);
+            check (p.getStepsPerBar() == 12, "Compás 6/8: 12 pasos por compás");
+            st.setProperty (ids::timeSigNum, 99, nullptr);
+            st.setProperty (ids::timeSigDen, 3, nullptr);
+            check (p.getStepsPerBar() == 28, "Un compás imposible se limita (7/4 como mucho)");
+
+            // Línea de tempo a 70 BPM (el proyecto está a 140): todo va a la mitad de velocidad
+            auto withTempo = [&] (bool lane)
+            {
+                Project q;
+                auto kick = q.findChannelByBuiltin ("builtin:kick");
+                for (auto ch : q.channels()) if (ch != kick) ch.setProperty (ids::muted, true, nullptr);
+                q.setStep (q.getCurrentPattern(), kick[ids::uid], 4, true);
+                q.getState().setProperty (ids::playMode, "song", nullptr);
+                if (lane)
+                {
+                    AutomationTarget t;
+                    t.kind = AutomationTarget::Kind::project;
+                    t.param = AutomationTarget::Param::bpm;
+                    auto l = q.addAutomationLane (t);
+                    for (auto point : l)
+                        point.setProperty (ids::value, AutomationTarget::toNormalised (t.param, 70.0f), nullptr);
+                }
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (q.getState(), cache);
+                e.play();
+                auto b = renderSeconds (e, 1.2);
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    if (std::abs (b.getSample (0, i)) > 0.01f) return i;
+                return -1;
+            };
+            const int normal = withTempo (false), slowed = withTempo (true);
+            check (std::abs (normal - samplesPerStep * 4) < 300 && std::abs (slowed - samplesPerStep * 8) < 600,
+                   "Automatización de tempo: a 70 BPM el paso 5 llega el doble de tarde");
+            check (AutomationTarget::parse ("project:0:bpm").isValid() && ! AutomationTarget::parse ("project:0:volume").isValid()
+                   && ! AutomationTarget::parse ("mixer:1:bpm").isValid(), "El tempo solo se automatiza en la canción");
+        }
+
+        // Controles MIDI conectados: se guardan con el proyecto y se limpia lo que no vale
+        {
+            Project p;
+            auto links = p.getState().getChildWithName (ids::MIDILINKS);
+            juce::ValueTree link (ids::LINK);
+            link.setProperty (ids::cc, 21, nullptr);
+            link.setProperty (ids::kind, "mixer", nullptr);
+            link.setProperty (ids::index, 3, nullptr);
+            link.setProperty (ids::param, "volume", nullptr);
+            links.appendChild (link, nullptr);
+            links.appendChild (juce::ValueTree ("TRAMPA"), nullptr);
+            juce::String error;
+            Project q;
+            const bool loaded = q.loadFromXmlString (p.toXmlString(), error);
+            auto back = q.getState().getChildWithName (ids::MIDILINKS);
+            check (loaded && back.getNumChildren() == 1 && (int) back.getChild (0)[ids::cc] == 21,
+                   "Los controles MIDI conectados se guardan (y se quita lo que no es un control)");
         }
 
         // MIDI: exportar un patrón y volver a importarlo
@@ -607,7 +1101,8 @@ int main (int argc, char* argv[])
                     point.setProperty (ids::value, value, nullptr);
                 for (auto ch : p.channels())
                     if (ch != bass) ch.setProperty (ids::muted, true, nullptr);
-                AudioEngine e;
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
                 e.prepare (sampleRate, blockSize);
                 e.updateFromProject (p.getState(), cache);
                 e.play();
@@ -673,7 +1168,8 @@ int main (int argc, char* argv[])
             Project p;
             auto ch = p.addChannel (ChannelType::plugin, types[0]->name, 0);
             p.addNote (p.getCurrentPattern(), ch[ids::uid], 0.0, 8.0, 69);
-            AudioEngine e;
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
             e.prepare (sampleRate, blockSize);
             e.setChannelPlugin (ch[ids::uid], std::move (instance));
             e.updateFromProject (p.getState(), cache);
@@ -692,7 +1188,8 @@ int main (int argc, char* argv[])
             auto kick = q.findChannelByBuiltin ("builtin:kick");
             for (int s : { 0, 4, 8, 12 }) q.setStep (q.getCurrentPattern(), kick[ids::uid], s, true);
             for (auto c : q.channels()) if (c != kick) c.setProperty (ids::muted, true, nullptr);
-            AudioEngine fx;
+            auto fxOwned = std::make_unique<AudioEngine>();
+            auto& fx = *fxOwned;
             fx.prepare (sampleRate, blockSize);
             fx.updateFromProject (q.getState(), cache);
             fx.setMixerPlugin ((int) kick[ids::mixer], formats.createPluginInstance (*types[0], sampleRate, blockSize, error), 2);

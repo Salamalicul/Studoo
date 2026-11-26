@@ -21,7 +21,9 @@ void MixerTrack::prepare (double sampleRate, int maxBlockSize)
     compressor.setAttack (10.0f);
     compressor.setRelease (120.0f);
 
-    delayLine.setSize (2, (int) (sampleRate * 4.0) + 1);
+    // El eco necesita 1,4 MB por pista: solo se reserva en las pistas que lo usan (ensureDelay)
+    if (delayLine.getNumSamples() > 0)
+        delayLine.setSize (2, (int) (sampleRate * 4.0) + 1);
     delayLine.clear();
     delayWrite = 0;
 
@@ -36,9 +38,23 @@ void MixerTrack::prepare (double sampleRate, int maxBlockSize)
     chorus.setDepth (0.35f);
     chorus.setCentreDelay (8.0f);
     chorus.setFeedback (0.0f);
+    gate.prepare (sampleRate);
+    pitch.prepare (sampleRate);
+    peq.prepare (sampleRate);
+    rhythm.prepare (sampleRate);
     limiter.prepare (spec);
     limiter.setThreshold (-1.0f);
     limiter.setRelease (120.0f);
+}
+
+void MixerTrack::ensureDelay()
+{
+    if (delayLine.getNumSamples() == 0)
+    {
+        delayLine.setSize (2, (int) (sr * 4.0) + 1);
+        delayLine.clear();
+        delayWrite = 0;
+    }
 }
 
 void MixerTrack::reset()
@@ -87,11 +103,16 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
     // Ahorra mucha CPU con 16 pistas, sobre todo en el móvil.
     constexpr float quiet = 1.0e-5f;
     const bool inputSilent = buffer.getMagnitude (0, 0, n) < quiet && buffer.getMagnitude (1, 0, n) < quiet;
-    if (inputSilent && ! hasPlugins() && silentSamples > delayLine.getNumSamples() + (juce::int64) sr)
+    if (inputSilent && ! hasPlugins() && p.rhythmMode == 0 && silentSamples > delayLine.getNumSamples() + (juce::int64) sr)
     {
         buffer.clear (0, n);
         return;
     }
+
+    // --- Puerta de ruido, autotune y EQ paramétrico -------------------------------
+    gate.process (buffer, n, p.gateThreshold);
+    pitch.process (buffer, n, p);
+    peq.process (buffer, n, p);
 
     // --- EQ ------------------------------------------------------------------
     updateEq (p);
@@ -165,8 +186,11 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         chorus.process (juce::dsp::ProcessContextReplacing<float> (sub));
     }
 
+    // --- Efecto de ritmo (half-time, tartamudeo, puerta, parada de cinta) -----------------
+    rhythm.process (buffer, n, p, transportPos, transportStep, transportPlaying);
+
     // --- Delay (eco sincronizado con el BPM) --------------------------------------
-    if (p.delayMix > 0.001f)
+    if (p.delayMix > 0.001f && delayLine.getNumSamples() > 1)
     {
         const int size = delayLine.getNumSamples();
         const int delaySamples = juce::jlimit (1, size - 1, (int) (p.delayTime * 60.0 / bpm * sr));
@@ -243,8 +267,10 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         buffer.applyGain (1, 0, n, gr);
     }
 
-    // --- Limitador: nada pasa de -1 dB (el Master lo trae encendido) ---------------------
-    if (p.limiter && ! silenced)
+    // --- Maximizador + limitador: nada pasa de -1 dB (el Master lo trae encendido) ---------
+    if (p.maximize > 0.05f && ! silenced)
+        buffer.applyGain (0, n, juce::Decibels::decibelsToGain (p.maximize));
+    if ((p.limiter || p.maximize > 0.05f) && ! silenced)
     {
         juce::dsp::AudioBlock<float> block (buffer);
         auto sub = block.getSubBlock (0, (size_t) n);

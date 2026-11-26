@@ -150,8 +150,9 @@ void Toolbar::timerCallback()
         recordButton.setToggleState (rec, juce::dontSendNotification);
 
     const double pos = ctx.engine.getPlayPosition();
-    const int bar = (int) (pos / stepsPerBar) + 1;
-    const int beat = (int) std::fmod (pos, (double) stepsPerBar) / stepsPerBeat + 1;
+    const int barSteps = ctx.project.getStepsPerBar();
+    const int bar = (int) (pos / barSteps) + 1;
+    const int beat = (int) std::fmod (pos, (double) barSteps) / (barSteps % 4 == 0 ? stepsPerBeat : 2) + 1;
     positionLabel.setText (juce::String (bar).paddedLeft ('0', 3) + " . " + juce::String (beat), juce::dontSendNotification);
 
     undoButton.setEnabled (ctx.project.getUndo().canUndo());

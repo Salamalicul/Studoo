@@ -546,6 +546,16 @@ namespace studoo::learn
       { "Con el bajo y los pads", "Con el bombo", "Con el metrónomo" }, 0,
       "Lo que choca con el bombo (bajo, pads) es lo que se agacha." },
 
+    { "Herramientas de estudio profesional", "¿Qué hace el autotune?",
+      { "Lleva la voz a la nota correcta de la escala", "Sube el volumen", "Quita los graves" }, 0,
+      "Poco autotune corrige sin notarse; mucho da el efecto robot del trap." },
+    { "Herramientas de estudio profesional", "¿Qué es el half-time?",
+      { "La pista suena a mitad de velocidad", "Un tipo de micrófono", "Exportar la mitad de la canción" }, 0,
+      "Muy usado en los drops: todo parece ir el doble de lento y más pesado." },
+    { "Herramientas de estudio profesional", "¿Para qué sirve exportar por pistas (stems)?",
+      { "Para mandar cada pista por separado a quien mezcla", "Para subirla a Spotify", "Para grabar la voz" }, 0,
+      "Cada pista en su archivo: el ingeniero de mezcla puede ajustar cada una." },
+
     { "Trucos del piano roll", "¿Qué hace el arpegiador?",
       { "Convierte cada acorde en notas sueltas una detrás de otra", "Sube el volumen", "Borra las notas" }, 0,
       "Es un clásico del trance, el pop y el trap: el acorde suena nota a nota." },
