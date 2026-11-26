@@ -874,10 +874,17 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         if (! song && juce::isPositiveAndBelow (snap->currentPatternIndex, (int) snap->patterns.size()))
             loopEnd = snap->patterns[(size_t) snap->currentPatternIndex].length;
         loopEnd = juce::jmax (1.0, loopEnd);
+        // Zona en bucle (modo canción): al llegar al final vuelve a su principio
+        double loopBegin = 0.0;
+        if (song && ! exportingSong.load() && snap->loopEnd > snap->loopStart)
+        {
+            loopBegin = snap->loopStart;
+            loopEnd = snap->loopEnd;
+        }
 
         double pos = chunkStartPos;
         if (pos >= loopEnd)
-            pos = std::fmod (pos, loopEnd);
+            pos = loopBegin + std::fmod (pos - loopBegin, loopEnd - loopBegin);
         chunkStartPos = pos;
 
         double remaining = n / samplesPerStep;
@@ -893,7 +900,7 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
             const double used = segEnd - pos;
             consumed += used;
             remaining -= used;
-            pos = (segEnd >= loopEnd - 1.0e-9) ? 0.0 : segEnd;
+            pos = (segEnd >= loopEnd - 1.0e-9) ? loopBegin : segEnd;
         }
         position.store (pos);
     }

@@ -219,6 +219,44 @@ namespace
                              {}, {} });
             c.room = 0.12;
         }
+        // --- Amapiano ------------------------------------------------------------------------------
+        {
+            auto& c = add ({ "amapiano", "Amapiano", "El sonido de Sudáfrica: bombo suave, shaker, bloques de madera y el famoso \"log drum\".",
+                             { { "kick", "Bombo" }, { "rim", "Rim" }, { "clap", "Palmada" }, { "shaker", "Shaker" },
+                               { "hihat", "Hi-hat" }, { "openhat", "Hi-hat abierto" }, { "woodblock", "Bloque de madera" },
+                               { "conga", "Conga" }, { "perc", "Log drum" }, { "tambourine", "Pandereta" } },
+                             { true, 1.2f, 0.12f, 0.2f }, {} });
+            c.kF0 = 140; c.kF1 = 50; c.kAmpDecay = 9; c.kClick = 0.2; c.kDrive = 1.5;
+            c.percF0 = 180; c.percF1 = 70; c.percDecay = 6;   // el log drum: un tom grave que baja
+            c.room = 0.1;
+        }
+        // --- UK Garage ------------------------------------------------------------------------------
+        {
+            auto& c = add ({ "ukgarage", "UK Garage", "Ritmo saltarín de Londres: bombo con golpe, caja seca y hi-hats rápidos.",
+                             { { "kick", "Bombo" }, { "snare", "Caja" }, { "clap", "Palmada" }, { "rim", "Rim" },
+                               { "hihat", "Hi-hat" }, { "openhat", "Hi-hat abierto" }, { "shaker", "Shaker" }, { "perc", "Perc" } },
+                             { true, 0.9f, 0.05f, 0.3f }, {} });
+            c.kF0 = 160; c.kF1 = 55; c.kAmpDecay = 10; c.kClick = 0.45;
+            c.sTone = 230; c.sNoiseDecay = 22; c.hDecay = 70;
+        }
+        // --- Grime ------------------------------------------------------------------------------------
+        {
+            auto& c = add ({ "grime", "Grime", "Oscuro y frío, a 140 BPM: bombo duro, caja metálica y percusiones raras.",
+                             { { "kick", "Bombo" }, { "snare", "Caja" }, { "clap", "Palmada" }, { "hihat", "Hi-hat" },
+                               { "openhat", "Hi-hat abierto" }, { "perc", "Perc metálico" }, { "rim", "Rim" }, { "crash", "Platillo" } },
+                             { true, 1.6f, 0.08f, 0.6f }, {} });
+            c.kF0 = 180; c.kF1 = 52; c.kClick = 0.55; c.kDrive = 3.0;
+            c.sTone = 280; c.sCentre = 5200; c.percF0 = 1600; c.percF1 = 1400; c.extraDrive = 0.3;
+        }
+        // --- Baile funk ---------------------------------------------------------------------------------
+        {
+            auto& c = add ({ "bailefunk", "Baile funk (Brasil)", "El funk carioca: bombo con mucho golpe, palmadas y el ritmo tamborzão.",
+                             { { "kick", "Bombo" }, { "kick2", "Bombo corto" }, { "snare", "Caja" }, { "clap", "Palmada" },
+                               { "hihat", "Hi-hat" }, { "conga", "Atabaque" }, { "tomlo", "Surdo" }, { "cowbell", "Cencerro" },
+                               { "tambourine", "Pandeiro" } },
+                             { true, 1.4f, 0.1f, 0.7f }, {} });
+            c.kF0 = 200; c.kF1 = 50; c.kClick = 0.6; c.kDrive = 3.5; c.extraDrive = 0.25;
+        }
         // --- Efectos (FX) ---------------------------------------------------------------------------------------------------
         {
             KitInfo fx { "fx", "Efectos (FX)", "Sonidos para transiciones y momentos especiales: subidas, impactos, caídas y más.",
@@ -302,6 +340,10 @@ const std::vector<Bass808Named>& bass808Presets()
         { "808 distorsionado",      "Fuerte y agresivo, se oye en el móvil",    2.0f, 0.08f, 0.8f },
         { "808 con mucho glide",    "Se desliza mucho entre notas (drill)",     2.2f, 0.25f, 0.4f },
         { "808 sub limpio",         "Muy grave y sin distorsión",               2.0f, 0.06f, 0.0f },
+        { "808 drill UK",           "Largo, con glide marcado y algo de suciedad", 2.6f, 0.18f, 0.5f },
+        { "808 reggaetón",          "Corto y redondo para el dembow",           0.9f, 0.04f, 0.2f },
+        { "808 phonk",              "Muy saturado, casi roto (phonk)",          1.8f, 0.10f, 1.0f },
+        { "808 trap melódico",      "Suave y musical para melodías tristes",    2.4f, 0.12f, 0.15f },
     };
     return list;
 }

@@ -12,10 +12,11 @@
 - 🔊 **Sinte con FM y tabla de ondas**, modo **Mono con glide** (notas que se deslizan) y **8 sonidos nuevos**.
 - 🥁 **Pads** para tocar la batería con los dedos y **editor de pasos** (fuerza y tono de cada golpe).
 - ✂️ **Trocear loops por golpes** automáticamente.
-- 🎙️ **Tomas** (quédate con la mejor), **editar el audio** (normalizar, al revés, quitar ruido, quitar silencios) y **bloques de automatización en la Playlist** (como los patrones: se colocan, se mueven, se alargan y se repiten).
+- 🎙️ **Grabar tomas en bucle** (botón **Bucle** de la Playlist: cada vuelta es una toma; quédate con la mejor), **editor de audio** (elige un trozo de la onda y silencia, recorta, borra, haz fundidos, normaliza, quita ruido...) y **bloques de automatización en la Playlist** (como los patrones: se colocan, se mueven, se alargan y se repiten).
 - 📂 **Navegador de sonidos** (F4): escucha y añade sonidos con doble clic.
 - 📤 **Exportar por pistas (stems)**.
-- ⚙️ **Compensación del retraso de los plugins** y versión para **Mac** (de prueba).
+- 🥁 **4 kits nuevos** (Amapiano, UK Garage, Grime y Baile funk) y **4 tipos de 808 nuevos**.
+- ⚙️ **Compensación del retraso de los plugins** (comprobada con un plugin de prueba) y versión para **Mac** (de prueba).
 - 🎓 **Aprende**: lección "Herramientas de estudio profesional", reto de autotune y más palabras en el diccionario.
 
 ### Novedades de la versión 2.0: más cerca de un estudio profesional

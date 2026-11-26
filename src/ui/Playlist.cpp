@@ -1,5 +1,6 @@
 #include "Playlist.h"
 #include "HelpTexts.h"
+#include "AudioEditor.h"
 
 namespace studoo
 {
@@ -110,6 +111,22 @@ void PlaylistGrid::paint (juce::Graphics& g)
     // Regla
     g.setGradientFill (juce::ColourGradient (Colours::panelLight, 0.0f, 0.0f, Colours::header, 0.0f, (float) rulerHeight, false));
     g.fillRect (0, 0, getWidth(), rulerHeight);
+    {
+        // Zona en bucle
+        const auto& st = ctx.project.getState();
+        const double a = st.getProperty (ids::loopStart, 0.0), b = st.getProperty (ids::loopEnd, 0.0);
+        if ((bool) st.getProperty (ids::loopOn, false) && b > a)
+        {
+            const float x0 = stepsToX (a), x1 = stepsToX (b);
+            g.setColour (Colours::green.withAlpha (0.35f));
+            g.fillRect (juce::Rectangle<float> (x0, 0.0f, x1 - x0, (float) rulerHeight));
+            g.setColour (Colours::green.withAlpha (0.06f));
+            g.fillRect (juce::Rectangle<float> (x0, (float) rulerHeight, x1 - x0, (float) getHeight()));
+            g.setColour (Colours::green);
+            g.drawVerticalLine ((int) x0, 0.0f, (float) getHeight());
+            g.drawVerticalLine ((int) x1, 0.0f, (float) getHeight());
+        }
+    }
     for (int b = 0; b < bars; ++b)
     {
         const float x = stepsToX (b * ctx.project.getStepsPerBar());
@@ -497,6 +514,8 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
     edit.addItem (803, txt ("Quitar los silencios del principio y del final"));
     edit.addItem (804, txt ("Más fuerte (+3 dB)"));
     edit.addItem (805, txt ("Más flojo (-3 dB)"));
+    edit.addSeparator();
+    edit.addItem (806, txt ("Abrir el editor de audio (elegir un trozo y editarlo)..."));
     menu.addSubMenu (txt ("Editar el audio (crea una copia)"), edit);
     const bool muted = clip.getProperty (ids::clipMuted, false);
     menu.addItem (900, muted ? txt ("Volver a activar este trozo") : txt ("Silenciar este trozo"));
@@ -553,6 +572,19 @@ void PlaylistGrid::showAudioClipMenu (juce::ValueTree clip, double atSteps)
         }
         else if (result >= 700 && result <= 724)
             clip.setProperty (ids::clipPitch, result - 700 - 12, um);
+        else if (result == 806)
+        {
+            auto channel = project.findChannel (clip[ids::ref]);
+            juce::DialogWindow::LaunchOptions options;
+            options.content.setOwned (new AudioEditorPanel (safe->ctx, channel));
+            options.dialogTitle = txt ("Editor de audio");
+            options.dialogBackgroundColour = Colours::panel;
+            options.componentToCentreAround = safe->getTopLevelComponent();
+            options.escapeKeyTriggersCloseButton = true;
+            options.useNativeTitleBar = false;
+            options.resizable = false;
+            options.launchAsync();
+        }
         else if (result >= 800 && result < 900)
             safe->editAudioFile (clip, result - 800);
         else if (result == 900)
@@ -631,6 +663,19 @@ void PlaylistGrid::mouseDown (const juce::MouseEvent& e)
 
     if (e.y < rulerHeight)
     {
+        auto& st = ctx.project.getState();
+        if ((bool) st.getProperty (ids::loopOn, false))
+        {
+            // Con el bucle encendido, arrastrar en la regla marca la zona que se repite
+            const double bar = ctx.project.getStepsPerBar();
+            loopAnchor = std::floor (steps / bar) * bar;
+            st.setProperty (ids::loopStart, loopAnchor, nullptr);
+            st.setProperty (ids::loopEnd, loopAnchor + bar, nullptr);
+            ctx.engine.setPlayPosition (loopAnchor);
+            dragMode = DragMode::loop;
+            repaint();
+            return;
+        }
         ctx.engine.setPlayPosition (snap (steps));
         dragMode = DragMode::ruler;
         repaint();
@@ -704,6 +749,17 @@ void PlaylistGrid::mouseDrag (const juce::MouseEvent& e)
     if (dragMode == DragMode::ruler)
     {
         ctx.engine.setPlayPosition (snap (steps));
+        repaint();
+        return;
+    }
+    if (dragMode == DragMode::loop)
+    {
+        const double bar = ctx.project.getStepsPerBar();
+        const double other = steps < loopAnchor ? std::floor (steps / bar) * bar : std::ceil (steps / bar) * bar;
+        auto& st = ctx.project.getState();
+        st.setProperty (ids::loopStart, juce::jmin (loopAnchor, other), nullptr);
+        st.setProperty (ids::loopEnd, juce::jmax (loopAnchor + bar, juce::jmax (loopAnchor, other)), nullptr);
+        ctx.engine.setPlayPosition (juce::jmin (loopAnchor, other));
         repaint();
         return;
     }
@@ -789,6 +845,28 @@ Playlist::Playlist (AppContext& c)
             ctx.project.setCurrentPattern (p[ids::uid]);
     };
     makeNonFocusing (patternBox);
+
+    addAndMakeVisible (loopButton);
+    loopButton.setButtonText (txt ("Bucle"));
+    loopButton.setClickingTogglesState (true);
+    loopButton.setTooltip (txt ("Repite una zona de la canción. Con el bucle encendido, arrastra sobre la regla (los números) "
+                                "para elegir la zona. Si grabas, cada vuelta se guarda como una toma distinta."));
+    loopButton.onClick = [this]
+    {
+        auto& st = ctx.project.getState();
+        const bool on = loopButton.getToggleState();
+        st.setProperty (ids::loopOn, on, nullptr);
+        if (on && (double) st.getProperty (ids::loopEnd, 0.0) <= (double) st.getProperty (ids::loopStart, 0.0))
+        {
+            // Zona inicial: 4 compases desde donde está el cursor
+            const double bar = ctx.project.getStepsPerBar();
+            const double from = std::floor (ctx.engine.getPlayPosition() / bar) * bar;
+            st.setProperty (ids::loopStart, from, nullptr);
+            st.setProperty (ids::loopEnd, from + 4.0 * bar, nullptr);
+        }
+        grid.repaint();
+    };
+    makeNonFocusing (loopButton);
 
     addAndMakeVisible (snapBox);
     snapBox.addItem (txt ("Ajuste: compás"), 1);
@@ -888,6 +966,7 @@ void Playlist::refresh()
                        juce::dontSendNotification);
     infoLabel.setColour (juce::Label::textColourId, song ? Colours::green : Colours::accent);
 
+    loopButton.setToggleState ((bool) ctx.project.getState().getProperty (ids::loopOn, false), juce::dontSendNotification);
     layoutGrid();
     grid.repaint();
 }
@@ -919,6 +998,7 @@ void Playlist::resized()
     h.removeFromLeft (170);
     patternBox.setBounds (h.removeFromLeft (220)); h.removeFromLeft (8);
     snapBox.setBounds (h.removeFromLeft (150)); h.removeFromLeft (8);
+    loopButton.setBounds (h.removeFromLeft (80)); h.removeFromLeft (8);
     zoomSlider.setBounds (h.removeFromRight (120));
     h.removeFromRight (8);
     infoLabel.setBounds (h);

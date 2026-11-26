@@ -1180,6 +1180,44 @@ void MainComponent::toggleRecording()
                     used = true;
             if (! used) { freeTrack = t; break; }
         }
+        // Con la zona en bucle, cada vuelta es una toma (una pista cada una; suena la última)
+        const auto& st = project.getState();
+        const double loopA = st.getProperty (ids::loopStart, 0.0), loopB = st.getProperty (ids::loopEnd, 0.0);
+        if ((bool) st.getProperty (ids::loopOn, false) && loopB > loopA + 1.0 && start >= loopA && start < loopB
+            && result.lengthSteps > loopB - start + 0.5)
+        {
+            std::vector<std::tuple<double, double, double>> takes;   // inicio, duración, desde dónde del archivo
+            double fileOffset = 0.0, takeStart = start;
+            while (fileOffset < result.lengthSteps - 0.25 && takes.size() < 32)
+            {
+                const double len = juce::jmin (loopB - takeStart, result.lengthSteps - fileOffset);
+                takes.emplace_back (takeStart, len, fileOffset);
+                fileOffset += len;
+                takeStart = loopA;
+            }
+            int track = 0;
+            for (size_t i = 0; i < takes.size(); ++i)
+            {
+                // Una pista libre en la zona para cada toma
+                for (; track < numPlaylistTracks; ++track)
+                {
+                    bool used = false;
+                    for (auto clip : project.playlist())
+                        if ((int) clip[ids::track] == track && (double) clip[ids::start] < loopB
+                            && (double) clip[ids::start] + (double) clip[ids::length] > loopA)
+                            used = true;
+                    if (! used) break;
+                }
+                auto [s, len, off] = takes[i];
+                auto clip = project.addClip ("audio", ch[ids::uid], juce::jmin (track, numPlaylistTracks - 1), s, juce::jmax (0.25, len), off);
+                if (i + 1 < takes.size())
+                    clip.setProperty (ids::clipMuted, true, project.um());
+                ++track;
+            }
+            setStatus (juce::String ((int) takes.size()) + txt (" tomas grabadas: suena la última. Clic derecho en otra > \"Quedarme con esta toma\"."));
+            showView (View::playlist);
+            return;
+        }
         project.addClip ("audio", ch[ids::uid], freeTrack, start, juce::jmax (1.0, result.lengthSteps));
         setStatus (txt ("Grabación añadida a la playlist."));
         showView (View::playlist);

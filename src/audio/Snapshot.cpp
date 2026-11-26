@@ -218,6 +218,13 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         snap->clips.push_back (cs);
     }
     snap->stepsPerBar = Project::stepsPerBarOf (state);
+    if ((bool) state.getProperty (ids::loopOn, false))
+    {
+        snap->loopStart = pos (state[ids::loopStart], 16000.0);
+        snap->loopEnd = pos (state[ids::loopEnd], 16000.0);
+        if (snap->loopEnd < snap->loopStart + 1.0)
+            snap->loopStart = snap->loopEnd = 0.0;
+    }
     snap->songLength = juce::jmax ((double) snap->stepsPerBar, std::ceil (songEnd / snap->stepsPerBar) * snap->stepsPerBar);
 
     // --- Mezclador ----------------------------------------------------------------

@@ -45,6 +45,50 @@ static juce::AudioBuffer<float> renderSeconds (AudioEngine& engine, double secon
     return out;
 }
 
+// Plugin de prueba que retrasa el sonido 1000 muestras (y lo dice, como los plugins de verdad)
+class LatentDelayPlugin : public juce::AudioPluginInstance
+{
+public:
+    LatentDelayPlugin() : AudioPluginInstance (BusesProperties().withInput ("In", juce::AudioChannelSet::stereo(), true)
+                                                             .withOutput ("Out", juce::AudioChannelSet::stereo(), true))
+    {
+        setLatencySamples (latency);
+    }
+    void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = "Retraso de prueba"; }
+    const juce::String getName() const override { return "Retraso de prueba"; }
+    void prepareToPlay (double, int) override { line.setSize (2, 4096); line.clear(); pos = 0; }
+    void releaseResources() override {}
+    void processBlock (juce::AudioBuffer<float>& b, juce::MidiBuffer&) override
+    {
+        for (int i = 0; i < b.getNumSamples(); ++i)
+        {
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                const float in = b.getSample (ch, i);
+                b.setSample (ch, i, line.getSample (ch, (pos - latency + 4096) % 4096));
+                line.setSample (ch, pos, in);
+            }
+            pos = (pos + 1) % 4096;
+        }
+    }
+    double getTailLengthSeconds() const override { return 0.0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override {}
+    void setStateInformation (const void*, int) override {}
+    static constexpr int latency = 1000;
+private:
+    juce::AudioBuffer<float> line;
+    int pos = 0;
+};
+
 static bool isFinite (const juce::AudioBuffer<float>& b)
 {
     for (int ch = 0; ch < b.getNumChannels(); ++ch)
@@ -871,6 +915,59 @@ int main (int argc, char* argv[])
                    && std::abs (l.valueAt (50.0) - 1.0f) < 0.01f && std::abs (l.valueAt (72.0) - 0.5f) < 0.02f,
                    "Bloques de automatización: la curva empieza en cada bloque y fuera se queda el último valor");
             check (snap->songLength >= 80.0, "Los bloques de automatización cuentan en la duración de la canción");
+        }
+
+        // Compensación del retraso de los plugins: dos bombos iguales, uno con un plugin que
+        // retrasa 1000 muestras; el otro se espera y suenan a la vez (un solo golpe)
+        {
+            auto firstHit = [] (const juce::AudioBuffer<float>& b)
+            {
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    if (std::abs (b.getSample (0, i)) > 0.02f) return i;
+                return -1;
+            };
+            Project p;
+            auto kick = p.findChannelByBuiltin ("builtin:kick");
+            for (auto c : p.channels()) if (c != kick) c.setProperty (ids::muted, true, nullptr);
+            auto twin = p.addChannel (ChannelType::sampler, "Bombo 2", 12);
+            twin.setProperty (ids::sample, "builtin:kick", nullptr);
+            p.setStep (p.getCurrentPattern(), kick[ids::uid], 4, true);
+            p.setStep (p.getCurrentPattern(), twin[ids::uid], 4, true);
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
+            e.prepare (sampleRate, blockSize);
+            e.updateFromProject (p.getState(), cache);
+            e.setMixerPlugin ((int) kick[ids::mixer], std::make_unique<LatentDelayPlugin>(), 1);
+            e.play();
+            auto out = renderSeconds (e, 0.6);
+            const int expected = (int) (samplesPerStep * 4) + LatentDelayPlugin::latency;
+            const int hit = firstHit (out);
+            check (std::abs (hit - expected) < 64 && out.getMagnitude (0, 0, expected - 64) < 0.02f,
+                   "Compensación del retraso: la pista sin plugin espera y los dos bombos suenan a la vez");
+        }
+
+        // Zona en bucle (modo canción): la reproducción vuelve al principio de la zona
+        {
+            Project p;
+            p.getState().setProperty (ids::playMode, "song", nullptr);
+            p.addClip ("pattern", p.getCurrentPatternUid(), 0, 0.0, 64.0);
+            p.getState().setProperty (ids::loopOn, true, nullptr);
+            p.getState().setProperty (ids::loopStart, 16.0, nullptr);
+            p.getState().setProperty (ids::loopEnd, 32.0, nullptr);
+            auto eOwned = std::make_unique<AudioEngine>();
+            auto& e = *eOwned;
+            e.prepare (sampleRate, blockSize);
+            e.updateFromProject (p.getState(), cache);
+            e.setPlayPosition (20.0);
+            e.play();
+            bool inside = true;
+            for (int k = 0; k < 40; ++k)
+            {
+                renderSeconds (e, 0.1);
+                const double pos = e.getPlayPosition();
+                inside = inside && pos >= 16.0 - 1.0e-6 && pos < 32.0;
+            }
+            check (inside, "Bucle: la canción se repite dentro de la zona elegida");
         }
 
         // Compás y cambios de tempo

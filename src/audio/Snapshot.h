@@ -170,6 +170,7 @@ namespace studoo
         int currentPatternIndex = 0;
         double songLength = 16.0;
         int stepsPerBar = 16;        // compás de la canción (16 = 4/4, 12 = 3/4 o 6/8...)
+        double loopStart = 0.0, loopEnd = 0.0;   // zona que se repite en modo canción (si loopEnd > loopStart)
         int tempoLane = -1;          // automatización del tempo (índice en 'lanes', -1 = no hay)
 
         // Tempo en una posición de la canción (con la automatización de tempo, si hay)

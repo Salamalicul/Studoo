@@ -52,7 +52,8 @@ namespace studoo
         AppContext& ctx;
         Playlist& playlist;
         juce::ValueTree dragClip;
-        enum class DragMode { none, move, resize, trimStart, ruler, automation } dragMode = DragMode::none;
+        enum class DragMode { none, move, resize, trimStart, ruler, loop, automation } dragMode = DragMode::none;
+        double loopAnchor = 0.0;
         juce::ValueTree dragPoint;
         juce::ValueTree selectedLane();
         juce::Rectangle<float> automationArea() const;
@@ -91,6 +92,7 @@ namespace studoo
         AppContext& ctx;
         HelpButton helpButton;
         juce::ComboBox patternBox, snapBox;
+        juce::TextButton loopButton;
         juce::Slider zoomSlider;
         juce::Label infoLabel;
         juce::Viewport viewport;
