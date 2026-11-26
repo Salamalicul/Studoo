@@ -1,6 +1,18 @@
 ## 🎶 Studoo: tu estudio para hacer música y beats, en español
 
-### 🆕 Novedades de la versión 2.1: todo lo de un estudio profesional
+### 🆕 Novedades de la versión 2.2: aún más como un estudio profesional
+- 🎛️ **Efectos nuevos** (botón **FX+** del mezclador): **flanger**, **phaser**, **ancho estéreo**, **transitorios** (golpe y cola), **compresor multibanda**, **vocoder** (la voz de robot) y **controlador de picos** (el volumen de una pista mueve un control de otra).
+- 🔌 **10 huecos de plugins VST3** por pista (antes 4).
+- 🎹 **Piano roll**: **notas fantasma** de colores (doble clic = ir a ese canal), **notas deslizantes (slide)**, **panorama, afinación fina y modulación de cada nota**, **generador de ideas** (melodía, bajo, acordes o arpegio en tu escala), **humanizar**, **unir** y **partir** notas.
+- 🗂️ **Playlist**: **marcadores** (Intro, Estribillo...), **grupos de pistas** que se pliegan, pistas con nombre, **hacer único**, **convertir a audio** y **fundido cruzado** entre trozos de audio.
+- 🎧 **Modo directo**: lanza tus patrones con botones mientras suena, como un DJ (siempre entran a tiempo).
+- 📄 **Plantillas**: empieza una canción ya montada (trap, reggaetón, house, lo-fi, drill, pop o grabar tu voz) con su estructura y una mezcla inicial.
+- 🧩 **Capas**: un canal hace sonar otros a la vez con las mismas notas.
+- ⏪ **Recuperar lo que tocaste**: Studoo se acuerda de lo que tocaste en el teclado aunque no le dieras a grabar.
+- 📺 **Visualizador**: animaciones que se mueven con tu música y **exportar un vídeo** (horizontal, vertical o cuadrado) para subirlo a redes.
+- 🎓 **Aprende**: 2 lecciones nuevas y 11 palabras nuevas en el diccionario.
+
+### Novedades de la versión 2.1: todo lo de un estudio profesional
 - 🎤 **Autotune con afinador** en cada pista (botón **FX+** del mezclador): cantidad, nota base y escala. Al 100%, el efecto "robot" del trap.
 - 🥁 **Efectos de ritmo** (tipo Gross Beat): half-time, tartamudeo, puerta rítmica y parada de cinta.
 - 🎛️ **EQ paramétrico de 4 bandas** con su curva, **puerta de ruido**, **maximizador** y **analizador de frecuencias** del Master.

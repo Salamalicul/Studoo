@@ -9,6 +9,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "audio/AudioEngine.h"
 #include "model/GenreBeats.h"
+#include "model/Templates.h"
 #include "model/Project.h"
 #include "model/MidiIO.h"
 
@@ -72,6 +73,8 @@ namespace
             genres::load (p, p.getCurrentPattern(), genreList[(size_t) rng.nextInt ((int) genreList.size())].id);
         if (rng.nextBool())
             p.loadExampleBeat (p.getCurrentPattern());
+        if (rng.nextInt (4) == 0)
+            templates::apply (p, templates::all()[(size_t) rng.nextInt ((int) templates::all().size())].id);
         if (rng.nextBool())
         {
             AutomationTarget t;
@@ -105,7 +108,11 @@ namespace
             juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3"), ids::stepVel, ids::stepPitch, ids::mono,
             ids::gateThreshold, ids::tuneAmount, ids::tuneRoot, ids::tuneScale, ids::rhythmMode, ids::rhythmMix, ids::maximize,
             juce::Identifier ("sendTo2"), juce::Identifier ("sendLevel3"), juce::Identifier ("peqFreq2"),
-            juce::Identifier ("peqGain1"), juce::Identifier ("peqQ4"), ids::timeSigNum, ids::timeSigDen, ids::slicePoints, ids::clipMuted, ids::lo, ids::hi, ids::timbre, ids::fmRatio, ids::loopOn, ids::loopStart, ids::loopEnd };
+            juce::Identifier ("peqGain1"), juce::Identifier ("peqQ4"), ids::timeSigNum, ids::timeSigDen, ids::slicePoints, ids::clipMuted, ids::lo, ids::hi, ids::timbre, ids::fmRatio, ids::loopOn, ids::loopStart, ids::loopEnd,
+            ids::flangerMix, ids::phaserMix, ids::modRate, ids::stereoWidth, ids::transAttack, ids::transSustain, ids::multiband,
+            ids::vocoderMix, ids::vocoderSource, ids::peakTarget, ids::peakParam, ids::peakAmount, ids::notePan, ids::noteFine,
+            ids::noteMod, ids::slide, ids::ghostNotes, ids::layers, juce::Identifier ("pluginDesc9"), juce::Identifier ("tgroup3"),
+            juce::Identifier ("tfold2"), juce::Identifier ("tname1") };
 
         // Recorre todo el árbol y cambia, borra o duplica cosas al azar
         std::function<void (juce::ValueTree)> mutate = [&] (juce::ValueTree t)
@@ -132,7 +139,8 @@ namespace
         if (rng.nextInt (4) == 0)
         {
             static const juce::Identifier types[] = { ids::CHANNEL, ids::PATTERN, ids::NOTE, ids::STEPSET, ids::CLIP,
-                                                      ids::TRACK, ids::LANE, ids::POINT, ids::CHANNELS, ids::MIXER, ids::ZONE };
+                                                      ids::TRACK, ids::LANE, ids::POINT, ids::CHANNELS, ids::MIXER, ids::ZONE,
+                                                      ids::MARKERS, ids::MARKER };
             for (int i = 0; i < 5; ++i)
             {
                 juce::ValueTree n (types[rng.nextInt ((int) std::size (types))]);

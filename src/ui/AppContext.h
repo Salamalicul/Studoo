@@ -26,5 +26,6 @@ namespace studoo
         std::function<void (int track)> showMixerPluginMenu;
         std::function<void (const juce::String& reason)> showPro;  // pantalla de Studoo Pro
         std::function<void (const juce::File&)> shareFile;         // compartir (móvil) o mostrar en la carpeta
+        std::function<void (int style, juce::Colour, int width, int height)> exportVideo;   // visualizador -> vídeo
     };
 }

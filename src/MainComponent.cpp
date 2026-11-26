@@ -2,6 +2,9 @@
 #include "MainComponent.h"
 #include "ui/HelpTexts.h"
 #include "model/GenreBeats.h"
+#include "model/Templates.h"
+#include "model/MidiIO.h"
+#include "ui/Visualizer.h"
 
 namespace studoo
 {
@@ -120,6 +123,59 @@ namespace
 
 namespace
 {
+    // Exportar un vídeo del visualizador: primero el audio de la canción y luego los fotogramas
+    class VideoJob : public juce::ThreadWithProgressWindow
+    {
+    public:
+        VideoJob (AudioEngine& e, juce::AudioDeviceManager& dm, juce::File targetFile, juce::String songTitle, int visualStyle,
+                  juce::Colour c, int w, int h, double maxSecondsToExport, std::function<void (bool, const juce::String&)> onDone)
+            : ThreadWithProgressWindow (txt ("Creando el vídeo..."), true, true), engine (e), deviceManager (dm),
+              target (std::move (targetFile)), title (std::move (songTitle)), style (visualStyle), colour (c), width (w), height (h),
+              maxSeconds (maxSecondsToExport), done (std::move (onDone))
+        {
+            deviceManager.removeAudioCallback (&engine);
+        }
+
+        void run() override
+        {
+            const auto folder = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory).getChildFile ("Studoo");
+            folder.createDirectory();
+            const auto wav = folder.getNonexistentChildFile ("video-audio", ".wav");
+            setStatusMessage (txt ("Generando el audio..."));
+            ok = engine.renderSongToFile (wav, 44100.0, [this] (float p) { setProgress (p * 0.3); return ! threadShouldExit(); },
+                                          error, maxSeconds);
+            if (ok)
+            {
+                setStatusMessage (txt ("Dibujando los fotogramas..."));
+                ok = visual::writeVideo (wav, target, title, style, colour, width, height, 24,
+                                         [this] (float p) { setProgress (0.3 + p * 0.7); return ! threadShouldExit(); }, error);
+            }
+            wav.deleteFile();
+            if (! ok)
+                target.deleteFile();
+        }
+
+        void threadComplete (bool userPressedCancel) override
+        {
+            deviceManager.addAudioCallback (&engine);
+            done (ok && ! userPressedCancel, userPressedCancel ? txt ("Exportación cancelada.") : error);
+            delete this;
+        }
+
+    private:
+        AudioEngine& engine;
+        juce::AudioDeviceManager& deviceManager;
+        juce::File target;
+        juce::String title;
+        int style;
+        juce::Colour colour;
+        int width, height;
+        double maxSeconds;
+        std::function<void (bool, const juce::String&)> done;
+        bool ok = false;
+        juce::String error;
+    };
+
     // Exportar por pistas: un WAV por cada pista del mezclador que suena
     class StemJob : public juce::ThreadWithProgressWindow
     {
@@ -271,6 +327,7 @@ MainComponent::MainComponent()
     ctx->showView = [this] (View v) { showView (v); };
     ctx->showMixerPluginMenu = [this] (int track) { showMixerPluginMenu (track); };
     ctx->showPro = [this] (const juce::String& reason) { proScreen.show (reason); };
+    ctx->exportVideo = [this] (int style, juce::Colour colour, int w, int h) { exportVideo (style, colour, w, h); };
 
     // --- Pantallas ----------------------------------------------------------------
     toolbar = std::make_unique<Toolbar> (*ctx);
@@ -729,6 +786,13 @@ void MainComponent::showFileMenu()
 {
     juce::PopupMenu menu;
     menu.addItem (1, txt ("Nuevo proyecto"), true, false);
+    {
+        juce::PopupMenu tpl;
+        int k = 0;
+        for (auto& t : templates::all())
+            tpl.addItem (60 + k++, txt (t.name) + "  -  " + txt (t.description));
+        menu.addSubMenu (txt ("Nuevo desde una plantilla"), tpl);
+    }
     menu.addItem (2, txt ("Abrir proyecto..."));
     menu.addItem (3, txt ("Guardar"));
     menu.addItem (4, txt ("Guardar como..."));
@@ -739,6 +803,8 @@ void MainComponent::showFileMenu()
     menu.addItem (13, txt ("Compartir este proyecto..."));
     menu.addItem (14, txt ("Importar un proyecto..."));
     menu.addItem (17, txt ("Navegador de sonidos"), true, browserOpen);
+    menu.addItem (51, txt ("Recuperar lo que tocaste (aunque no estuvieras grabando)"));
+    menu.addItem (50, txt ("Visualizador y vídeo para redes..."));
     menu.addSeparator();
     menu.addItem (7, txt ("Tutorial: tu primer beat"));
    #else
@@ -749,6 +815,8 @@ void MainComponent::showFileMenu()
     menu.addItem (7, txt ("Tutorial: tu primer beat"));
     menu.addItem (8, txt ("Atajos de teclado"));
     menu.addItem (15, txt ("Tocar con el teclado del ordenador (como un piano)"), true, typingPiano);
+    menu.addItem (51, txt ("Recuperar lo que tocaste (aunque no estuvieras grabando)"));
+    menu.addItem (50, txt ("Visualizador y vídeo para redes..."));
     menu.addItem (17, txt ("Navegador de sonidos (F4)"), true, browserOpen);
     menu.addItem (9, txt ("Abrir la carpeta de proyectos"));
    #endif
@@ -836,13 +904,123 @@ void MainComponent::showFileMenu()
                                        : txt ("Teclado como piano desactivado."));
                 break;
             case 30: proScreen.show ({}); break;
+            case 50: showVisualizer(); break;
+            case 51: recoverPlayed(); break;
             case 12:
                 settings->setValue ("autoUpdate", ! settings->getBoolValue ("autoUpdate", true));
                 settings->saveIfNeeded();
                 break;
-            default: break;
+            default:
+                if (r >= 60 && r - 60 < (int) templates::all().size())
+                    newFromTemplate (templates::all()[(size_t) (r - 60)].id);
+                break;
         }
     });
+}
+
+void MainComponent::newFromTemplate (const juce::String& id)
+{
+    checkUnsavedThen ([this, id]
+    {
+        engine.stop();
+        engine.clearAllPlugins();
+        PluginWindows::closeAll();
+        templates::apply (project, id);
+        project.setFile ({});
+        updateTitle();
+        showView (project.getState()[ids::playMode].toString() == "song" ? View::playlist : View::channelRack);
+        setStatus (txt ("Plantilla cargada. Los marcadores amarillos de la playlist te dicen dónde va cada parte."));
+    });
+}
+
+void MainComponent::recoverPlayed()
+{
+    // Todo lo que has tocado en el teclado MIDI (o el teclado del ordenador) se apunta, aunque no grabes
+    const auto& log = engine.getScoreLog();
+    std::vector<midiio::PlayedEvent> events;
+    events.reserve (log.size());
+    for (auto& e : log)
+        events.push_back ({ e.seconds, e.note, e.velocity, e.on });
+    const int uid = project.getSelectedChannel();
+    auto ch = project.findChannel (uid);
+    if (events.empty() || ! ch.isValid())
+    {
+        showMessage (txt ("Recuperar lo que tocaste"),
+                     txt ("Todavía no has tocado nada. Toca con un teclado MIDI o con el teclado del ordenador "
+                          "(menú > Tocar con el teclado del ordenador) y luego vuelve aquí: Studoo se acuerda "
+                          "de lo que tocaste en los últimos minutos, aunque no estuvieras grabando."));
+        return;
+    }
+    project.beginTransaction();
+    auto pattern = midiio::patternFromPlayed (project, uid, events, project.getState().getProperty (ids::bpm, 140.0));
+    if (! pattern.isValid())
+        return;
+    project.setCurrentPattern (pattern[ids::uid]);
+    showView (View::pianoRoll);
+    setStatus (txt ("Lo último que tocaste está en el patrón \"Lo que tocaste\" (canal ") + ch[ids::name].toString()
+               + txt ("). Usa Cuantizar si quieres que quede justo a tiempo."));
+}
+
+void MainComponent::showVisualizer()
+{
+    auto panel = std::make_unique<VisualizerPanel> (*ctx);
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned (panel.release());
+    options.dialogTitle = txt ("Visualizador");
+    options.dialogBackgroundColour = Colours::panel;
+    options.componentToCentreAround = this;
+    options.escapeKeyTriggersCloseButton = true;
+    options.useNativeTitleBar = false;
+    options.resizable = true;
+    options.launchAsync();
+}
+
+void MainComponent::exportVideo (int style, juce::Colour colour, int width, int height)
+{
+    if (project.playlist().getNumChildren() == 0)
+    {
+        showMessage (txt ("La playlist está vacía"),
+                     txt ("El vídeo lleva la canción de la PLAYLIST. Coloca primero tus patrones en la playlist (F5)."));
+        return;
+    }
+    const double maxSeconds = pro::isUnlocked() ? 0.0 : pro::freeExportSeconds;
+    auto start = [this, style, colour, width, height, maxSeconds] (juce::File f)
+    {
+        engine.stop();
+        juce::Component::SafePointer<MainComponent> safe (this);
+        auto* job = new VideoJob (engine, deviceManager, f, project.getDisplayName(), style, colour, width, height, maxSeconds,
+                                  [safe, f] (bool ok, const juce::String& error)
+        {
+            if (! ok)
+            {
+                showMessage (txt ("No se pudo crear el vídeo"), error);
+                return;
+            }
+            if (safe != nullptr) safe->setStatus (txt ("Vídeo creado: ") + f.getFileName());
+           #if JUCE_ANDROID
+            if (safe != nullptr) safe->shareFile (f);
+           #else
+            showMessage (txt ("¡Vídeo creado!"), txt ("Tu vídeo se ha guardado en:\n") + f.getFullPathName()
+                                                     + txt ("\n\nSe abre con VLC y la mayoría de reproductores. Para subirlo a redes, "
+                                                            "algunas webs lo aceptan tal cual; si no, conviértelo a MP4 con cualquier conversor."));
+           #endif
+        });
+        job->launchThread();
+    };
+   #if JUCE_ANDROID
+    start (getStudooFolder ("Exportados").getNonexistentChildFile (juce::File::createLegalFileName (project.getDisplayName()), ".avi"));
+   #else
+    chooser = std::make_unique<juce::FileChooser> (txt ("Guardar el vídeo"),
+                                                   getStudooFolder ("Exportados").getChildFile (project.getDisplayName() + ".avi"), "*.avi");
+    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                              | juce::FileBrowserComponent::warnAboutOverwriting,
+                          [start] (const juce::FileChooser& fc)
+    {
+        auto f = fc.getResult();
+        if (f != juce::File())
+            start (f.withFileExtension (".avi"));
+    });
+   #endif
 }
 
 void MainComponent::checkUnsavedThen (std::function<void()> action)
@@ -1808,6 +1986,7 @@ void MainComponent::requestQuit (std::function<void()> quit)
 void MainComponent::timerCallback()
 {
     pro::poll();
+    engine.drainScoreLog();
 
     if (++autosaveCounter >= 60)
     {

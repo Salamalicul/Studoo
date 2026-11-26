@@ -1543,5 +1543,81 @@ R"TXT(Los mejores productores aprendieron **copiando para aprender**: escuchando
 ! Recrear canciones para aprender está genial. Publicar una copia como si fuera tuya, no: haz siempre tu propia versión.
 
 ? Analiza una canción con este método y monta su estructura en la Playlist de Studoo con patrones vacíos (uno por parte).)TXT" },
+
+    // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Más efectos: flanger, phaser, vocoder y compañía", "8 min",
+      "que es flanger phaser vocoder transient shaper multiband",
+R"TXT(En el **Mezclador**, el botón **FX+** de cada pista tiene a la derecha una columna con más efectos. Aquí tienes qué hace cada uno y cuándo usarlo.
+
+[anim:volumenes|Cada pista del mezclador tiene su FX+ con todos estos efectos]
+
+## Flanger y phaser
+- **Flanger**: un eco cortísimo que se mueve. Suena "a avión" o a chorro. Queda genial en hi-hats, guitarras y en las subidas antes de un drop.
+- **Phaser**: el sonido "gira", como si pasara por un tubo. Muy usado en pads, pianos eléctricos y guitarras.
+- **Velocidad**: lo rápido que se mueven los dos. Despacio (0,2 Hz) = suave; rápido (3 Hz) = nervioso.
+
+## Ancho estéreo
+- A la **izquierda** el sonido se junta en el centro (mono). Úsalo en el **bajo** y el **bombo**: así suenan firmes en cualquier altavoz.
+- A la **derecha** se abre hacia los lados. Para pads, coros y efectos.
+
+## Transitorios (Golpe y Cola)
+- **Golpe**: el principio de cada sonido. Súbelo y la batería "pega" más; bájalo y suena más suave.
+- **Cola**: lo que suena después del golpe. Bájala para una batería seca y apretada; súbela para que suene más grande.
+
+## Compresor multibanda
+Aprieta por separado los **graves**, los **medios** y los **agudos**. En el **Master**, un 20-40% hace que la canción suene más igualada y fuerte.
+
+## Vocoder: la voz de robot
+1. Graba tu voz en una pista del mezclador (por ejemplo, la 7).
+2. Pon un **sinte** tocando acordes largos en otra pista.
+3. En el FX+ de la pista del **sinte**, en VOCODER, elige la pista de la **voz**.
+4. Baja el volumen de la pista de la voz: ¡el sinte "habla" con tus palabras!
+
+## Controlador de picos
+Hace que el volumen de una pista mueva un control de otra. Ejemplos:
+- El **bombo** baja el **volumen** del bajo (como un sidechain).
+- La **caja** abre el **filtro** de un pad a ritmo.
+- La **voz** sube la **reverb** de los acordes cuando cantas.
+
+> Además, cada pista tiene ahora **10 huecos** para plugins VST3.
+
+[ir:mezclador|Ir al Mezclador]
+
+? Pon flanger a tus hi-hats y ancho al 0% en el 808. Luego prueba el vocoder con tu voz y unos acordes.)TXT" },
+
+    // =========================================================================
+    { "Nivel 9 · Producción avanzada", "Trabajar rápido como los profesionales", "9 min",
+      "trucos para producir mas rapido flujo de trabajo",
+R"TXT(Studoo tiene muchas herramientas para que pases menos tiempo con el ratón y más haciendo música.
+
+[anim:estructura|Los marcadores te dicen dónde va cada parte de la canción]
+
+## Empezar con una plantilla
+**Archivo → Nuevo desde una plantilla**: eliges un estilo (trap, reggaetón, house, lo-fi...) y la canción ya viene montada con su base, la estructura (intro, verso, estribillo...), las pistas con nombre y una mezcla inicial. Solo te queda cambiarla a tu gusto.
+
+## Playlist
+- **Marcadores**: clic derecho en la regla (los números) → Añadir marcador. Clic en un marcador = ir allí.
+- **Grupos**: clic en el nombre de una pista → Crear un grupo. Pulsa el triángulo del grupo para **plegarlo** y tener más sitio.
+- **Hacer único**: clic derecho en un bloque. Crea una copia del patrón para cambiarlo sin tocar los otros bloques.
+- **Convertir a audio**: clic derecho en un bloque. Lo graba como un trozo de audio (para cortarlo, darle la vuelta...).
+- **Fundido cruzado**: clic derecho en un trozo de audio. Une dos trozos sin cortes bruscos.
+- **Directo**: botón de arriba. Lanzas tus patrones con botones mientras suena, como un DJ.
+
+## Piano roll
+- **Notas fantasma**: ves en color las notas de los otros canales. Doble clic en una = editar ese canal.
+- **Slide**: activa el botón y las notas nuevas se **deslizan** desde la anterior (el 808 del trap).
+- **Carril de abajo**: pulsa su nombre para cambiar la **fuerza**, el **panorama**, la **afinación fina** o la **modulación** de cada nota.
+- **Herramientas → Generar una idea**: Studoo crea una melodía, un bajo, acordes o un arpegio en tu escala. ¿No te gusta? Ctrl+Z y otra vez.
+- **Humanizar**: mueve un poquito cada nota para que suene menos "a máquina".
+- **Unir** y **partir** notas.
+
+## Más trucos
+- **Capas**: clic derecho en un canal → Capas. Ese canal hace sonar otros a la vez (un piano + unas cuerdas con las mismas notas).
+- **Recuperar lo que tocaste**: Studoo se acuerda de lo que tocaste en el teclado aunque no le dieras a grabar. Menú → Recuperar lo que tocaste.
+- **Visualizador**: menú → Visualizador. Crea un **vídeo** con animaciones y tu canción para subirlo a redes.
+
+[ir:playlist|Ir a la Playlist]
+
+? Empieza una canción con la plantilla de tu estilo favorito, añade un marcador "Drop" y genera una melodía con Herramientas → Generar una idea.)TXT" },
     };
 }

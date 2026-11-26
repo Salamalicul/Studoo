@@ -684,6 +684,19 @@ void AudioEngine::collectPatternEvents (const Snapshot& snap, const PatternSnap&
 // ============================================================================
 //  Modo directo
 // ============================================================================
+void AudioEngine::drainScoreLog()
+{
+    const auto scope = scoreFifo.read (scoreFifo.getNumReady());
+    scope.forEach ([this] (int index) { scoreLog.push_back (scoreFifoData[(size_t) index]); });
+    // Solo los últimos 10 minutos
+    const double now = clockSeconds.load();
+    size_t old = 0;
+    while (old < scoreLog.size() && scoreLog[old].seconds < now - 600.0)
+        ++old;
+    if (old > 0)
+        scoreLog.erase (scoreLog.begin(), scoreLog.begin() + (std::ptrdiff_t) old);
+}
+
 void AudioEngine::toggleLivePattern (int patternUid)
 {
     if (patternUid <= 0)
@@ -971,8 +984,21 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
     // --- Teclado MIDI en directo ---------------------------------------------------------
     liveMidi.clear();
     midiCollector.removeNextBlockOfMessages (liveMidi, n);
+    clockSeconds.store ((double) (sampleClock + n) / sampleRate);
     if (! liveMidi.isEmpty())
     {
+        // Apunta lo que tocas (para "Recuperar lo que tocaste")
+        for (const auto meta : liveMidi)
+        {
+            const auto m = meta.getMessage();
+            if (! m.isNoteOnOrOff())
+                continue;
+            const ScoreEvent ev { (double) (sampleClock + meta.samplePosition) / sampleRate, m.getNoteNumber(),
+                                  m.getFloatVelocity(), m.isNoteOn() };
+            const auto scope = scoreFifo.write (1);
+            if (scope.blockSize1 > 0)      scoreFifoData[(size_t) scope.startIndex1] = ev;
+            else if (scope.blockSize2 > 0) scoreFifoData[(size_t) scope.startIndex2] = ev;
+        }
         const int liveUid = liveChannelUid.load();
         for (auto& rt : runtimes)
             if (rt->uid == liveUid)

@@ -10,6 +10,9 @@
 #include "model/GenreBeats.h"
 #include "ui/Challenges.h"
 #include "ui/AudioEditor.h"
+#include "ui/Visualizer.h"
+#include "model/Templates.h"
+#include "model/MidiIO.h"
 #include "ui/EarGames.h"
 #include "ui/LearnProgress.h"
 #include "Pro.h"
@@ -173,6 +176,92 @@ int main()
         b = make();
         for (int k = 0; k < 10; ++k) AudioEditorPanel::apply (b, Op::louder, 0, 1000);
         check (b.getMagnitude (0, 0, 1000) <= 1.0f, u ("Subir mucho el volumen nunca pasa del máximo"));
+
+        // Visualizador: un vídeo AVI de 2 segundos con su sonido
+        {
+            auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("StudooVideo");
+            dir.createDirectory();
+            auto wav = dir.getChildFile ("tono.wav"), avi = dir.getChildFile ("prueba.avi");
+            {
+                juce::AudioBuffer<float> tone (2, 88200);
+                for (int i = 0; i < tone.getNumSamples(); ++i)
+                {
+                    const float v = 0.4f * (float) std::sin (i * 0.05) * (i % 22050 < 4000 ? 1.0f : 0.2f);
+                    tone.setSample (0, i, v); tone.setSample (1, i, v);
+                }
+                wav.deleteFile();
+                juce::WavAudioFormat fmt;
+                std::unique_ptr<juce::AudioFormatWriter> w (fmt.createWriterFor (new juce::FileOutputStream (wav), 44100.0, 2, 16, {}, 0));
+                if (w != nullptr) w->writeFromAudioSampleBuffer (tone, 0, tone.getNumSamples());
+            }
+            juce::String error;
+            const bool ok = visual::writeVideo (wav, avi, "Prueba", 1, juce::Colour (0xffff8a1f), 320, 180, 24, nullptr, error);
+            check (ok && avi.getSize() > 10000, u ("Visualizador: se crea el vídeo"));
+            juce::FileInputStream in (avi);
+            char head[12] {};
+            in.read (head, 12);
+            check (juce::String (head, 4) == "RIFF" && juce::String (head + 8, 4) == "AVI "
+                   && (juce::int64) juce::ByteOrder::littleEndianInt (head + 4) + 8 == avi.getSize(),
+                   u ("Visualizador: el archivo es un AVI correcto"));
+            std::cout << "    Vídeo de prueba: " << avi.getFullPathName() << "\n";
+        }
+
+        // Plantillas: todas se cargan, ponen marcadores y (las que tienen base) llenan la playlist
+        {
+            int good = 0;
+            for (auto& t : templates::all())
+            {
+                Project p;
+                const bool ok = templates::apply (p, t.id);
+                const auto markers = p.getState().getChildWithName (ids::MARKERS);
+                const bool hasBeat = juce::String (t.genre).isNotEmpty();
+                if (ok && markers.getNumChildren() >= 4 && (! hasBeat || p.playlist().getNumChildren() >= 4)
+                    && ! p.getUndo().canUndo())
+                    ++good;
+                else
+                    std::cout << "    Plantilla con problemas: " << t.id << "\n";
+            }
+            check (good == (int) templates::all().size(), u ("Todas las plantillas se cargan con su estructura"));
+            Project p;
+            templates::apply (p, "trap");
+            check (std::abs ((double) p.getState()[ids::bpm] - 140.0) < 0.5 && p.getSongLengthSteps() >= 36 * 16,
+                   u ("Plantilla de trap: 140 BPM y la canción entera montada"));
+            bool namesOk = true, voiceFree = false;
+            for (auto ch : p.channels())
+                namesOk = namesOk && p.getMixerTrack ((int) ch[ids::mixer])[ids::name].toString() == ch[ids::name].toString();
+            for (int t = 1; t < numMixerTracks; ++t)
+                if (p.getMixerTrack (t)[ids::name].toString() == "Voz")
+                {
+                    voiceFree = true;
+                    for (auto ch : p.channels())
+                        voiceFree = voiceFree && (int) ch[ids::mixer] != t;
+                }
+            bool sidechained = false;
+            for (auto ch : p.channels())
+                if (channelTypeFromString (ch[ids::type].toString()) == ChannelType::bass808)
+                    sidechained = (float) p.getMixerTrack ((int) ch[ids::mixer]).getProperty (ids::sidechain, 0.0f) > 0.1f;
+            check (sidechained, u ("Plantilla de trap: el 808 se agacha con el bombo (sidechain)"));
+            check (namesOk && voiceFree, u ("Plantilla: cada pista del mezclador se llama como su instrumento y la voz va en una libre"));
+        }
+
+        // Recuperar lo que tocaste: la última frase va a un patrón nuevo
+        {
+            Project p;
+            const int uid = p.channels().getChild (0)[ids::uid];
+            std::vector<midiio::PlayedEvent> ev;
+            ev.push_back ({ 1.0, 50, 0.8f, true });  ev.push_back ({ 1.2, 50, 0.0f, false });   // frase vieja
+            for (int k = 0; k < 4; ++k)   // frase nueva, 20 s después: negras a 120 BPM
+            {
+                ev.push_back ({ 21.0 + k * 0.5, 60 + k, 0.9f, true });
+                ev.push_back ({ 21.0 + k * 0.5 + 0.25, 60 + k, 0.0f, false });
+            }
+            auto pat = midiio::patternFromPlayed (p, uid, ev, 120.0);
+            int notes = 0; double second = -1.0;
+            for (auto n : pat)
+                if (n.hasType (ids::NOTE)) { ++notes; if ((int) n[ids::pitch] == 61) second = n[ids::start]; }
+            check (pat.isValid() && notes == 4 && std::abs (second - 4.0) < 0.01,
+                   u ("Recuperar lo que tocaste: la última frase, en su sitio"));
+        }
         b = make();
         AudioEditorPanel::apply (b, Op::remove, -50, 5000);   // fuera de los límites
         check (b.getNumSamples() == 1000, u ("Un trozo imposible no rompe nada"));

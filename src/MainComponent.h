@@ -88,6 +88,10 @@ namespace studoo
         void checkUnsavedThen (std::function<void()> action);
         // maxSeconds: < 0 = decidir (versión gratis: 1 minuto), 0 = sin límite
         void exportSong (bool mp3, double maxSeconds = -1.0);
+        void exportVideo (int style, juce::Colour colour, int width, int height);
+        void showVisualizer();
+        void recoverPlayed();                 // "Recuperar lo que tocaste"
+        void newFromTemplate (const juce::String& id);
         static juce::File findLame();
         void afterProjectLoaded();
         void storePluginStates();

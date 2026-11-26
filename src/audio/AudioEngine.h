@@ -78,6 +78,13 @@ namespace studoo
         std::vector<RecordedMidi> takeRecordedMidi();
         juce::MidiMessageCollector& getMidiCollector() { return midiCollector; }
 
+        // --- Lo que tocaste: el motor apunta todo lo que tocas en el teclado (aunque no grabes) ---
+        struct ScoreEvent { double seconds = 0.0; int note = 60; float velocity = 0.8f; bool on = true; };
+        void drainScoreLog();                                   // hilo principal (cada segundo o antes de leerlo)
+        const std::vector<ScoreEvent>& getScoreLog()            { drainScoreLog(); return scoreLog; }
+        void clearScoreLog()                                    { drainScoreLog(); scoreLog.clear(); }
+        double getClockSeconds() const                          { return clockSeconds.load(); }
+
         // --- Escuchar un sonido ya preparado (juegos de oído de Aprende) ----------------
         // Suena por encima de todo lo demás, una vez. Otro sonido corta al anterior.
         using SharedBuffer = std::shared_ptr<const juce::AudioBuffer<float>>;
@@ -212,6 +219,10 @@ namespace studoo
 
         juce::MidiMessageCollector midiCollector;
         juce::MidiBuffer liveMidi;
+        juce::AbstractFifo scoreFifo { 8192 };
+        std::vector<ScoreEvent> scoreFifoData = std::vector<ScoreEvent> (8192);
+        std::vector<ScoreEvent> scoreLog;                       // solo el hilo principal
+        std::atomic<double> clockSeconds { 0.0 };
 
         // Grabación
         juce::TimeSliceThread writerThread { "Studoo grabacion" };

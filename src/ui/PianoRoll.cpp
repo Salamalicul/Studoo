@@ -169,13 +169,16 @@ void PianoRollGrid::paint (juce::Graphics& g)
             g.drawRoundedRectangle (r.expanded (0.5f), 3.5f, 2.0f);
         }
         // Nota deslizante: una flecha al principio
-        if ((bool) n.getProperty (ids::slide, false))
+        const bool slideNote = (bool) n.getProperty (ids::slide, false);
+        if (slideNote)
         {
             juce::Path arrow;
-            const float ax = r.getX() + 2.0f, ay = r.getBottom() - 2.0f;
-            arrow.addTriangle (ax, ay, ax + 8.0f, ay, ax + 8.0f, r.getY() + 2.0f);
-            g.setColour (juce::Colours::white.withAlpha (0.85f));
+            const float ax = r.getX() + 2.0f, ay = r.getBottom() - 1.5f;
+            arrow.addTriangle (ax, ay, ax + 10.0f, ay, ax + 10.0f, r.getY() + 1.5f);
+            g.setColour (juce::Colours::white.withAlpha (0.95f));
             g.fillPath (arrow);
+            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            g.strokePath (arrow, juce::PathStrokeType (0.8f));
         }
         // Panorama distinto del centro: una rayita arriba (izquierda o derecha)
         if (std::abs ((float) n.getProperty (ids::notePan, 0.0f)) > 0.02f)
@@ -191,7 +194,8 @@ void PianoRollGrid::paint (juce::Graphics& g)
         {
             g.setColour (colour.darker (0.9f).withMultipliedSaturation (0.6f).darker (0.6f));
             g.setFont (Fonts::bold (10.0f));
-            g.drawText (noteName (n[ids::pitch]), r.reduced (4.0f, 0.0f), juce::Justification::centredLeft);
+            g.drawText (noteName (n[ids::pitch]), r.reduced (4.0f, 0.0f).withTrimmedLeft (slideNote ? 10.0f : 0.0f),
+                        juce::Justification::centredLeft);
         }
     }
 

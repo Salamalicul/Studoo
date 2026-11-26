@@ -99,7 +99,7 @@ namespace
             makeNonFocusing (stopAll);
             const int cols = juce::jlimit (1, 4, uids.size());
             const int rows = (uids.size() + cols - 1) / juce::jmax (1, cols);
-            setSize (juce::jmax (360, cols * 150 + 24), 96 + juce::jmax (1, rows) * 74);
+            setSize (juce::jmax (380, cols * 150 + 24), 140 + juce::jmax (1, rows) * 74);
             startTimerHz (15);
         }
         ~LivePanel() override { ctx.engine.setLiveMode (false); }
@@ -143,8 +143,8 @@ namespace
             for (int k = 0; k < pads.size(); ++k)
             {
                 const int st = ctx.engine.getLiveState (uids[k]);
-                pads[k]->setColour (juce::TextButton::buttonColourId, st == 1 ? colours[k].withAlpha (0.85f)
-                                                                     : colours[k].withAlpha (st == 0 ? 0.18f : 0.45f));
+                pads[k]->setColour (juce::TextButton::buttonColourId, st == 1 ? colours[k]
+                                                                     : colours[k].withAlpha (st == 0 ? 0.35f : 0.6f));
                 pads[k]->setColour (juce::TextButton::textColourOffId, st == 1 ? juce::Colours::black : Colours::text);
             }
             repaint();
