@@ -51,6 +51,10 @@ namespace studoo
 
         // Cambia el sample y devuelve el anterior (para liberarlo fuera del hilo de audio)
         SamplePtr setSample (SamplePtr newSample);
+        // Multisample: cambia los samples de cada zona y devuelve los anteriores (para liberarlos fuera)
+        struct Zone { SamplePtr sample; int root = 60, lo = 0, hi = 127; };
+        std::vector<Zone> setZones (std::vector<Zone> newZones, const juce::String& key);
+        const juce::String& getZonesKey() const { return zonesKey; }
         const juce::String& getSamplePath() const { return samplePath; }
         void setSamplePath (const juce::String& p) { samplePath = p; }
 
@@ -66,6 +70,7 @@ namespace studoo
             int note = 0;
             double position = 0.0, increment = 1.0;
             double regionStart = 0.0, regionEnd = 0.0;   // parte del sample que toca (en muestras)
+            const SampleData* data = nullptr;             // el sample que suena (el normal o el de su zona)
             float gain = 1.0f, env = 1.0f;
             bool releasing = false;
             juce::uint32 age = 0;
@@ -74,6 +79,8 @@ namespace studoo
         std::array<Voice, 16> voices;
         SamplePtr sample;
         juce::String samplePath;
+        std::vector<Zone> zones;
+        juce::String zonesKey;
         double sr = 44100.0;
         int root = 60;
         bool oneShot = true;

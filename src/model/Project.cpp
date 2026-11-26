@@ -276,7 +276,7 @@ void Project::ensureStructure()
             }
         }
     };
-    keepOnly (channels(), ids::CHANNEL, true, {});
+    keepOnly (channels(), ids::CHANNEL, true, { ids::ZONE });
     keepOnly (patterns(), ids::PATTERN, true, { ids::STEPSET, ids::NOTE });
     keepOnly (playlist(), ids::CLIP, false, {});
     keepOnly (automation(), ids::LANE, false, { ids::POINT });

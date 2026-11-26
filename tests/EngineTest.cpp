@@ -761,6 +761,56 @@ int main (int argc, char* argv[])
                    && hot.getMagnitude (0, 11025, 11025) < 0.95f, "Maximizador: más volumen sin pasar del máximo");
         }
 
+        // Multisample: cada nota usa el sample más cercano
+        {
+            auto makeTone = [] (const juce::String& name, double hz)
+            {
+                auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (name);
+                juce::AudioBuffer<float> tone (1, 44100);
+                for (int i = 0; i < tone.getNumSamples(); ++i)
+                    tone.setSample (0, i, 0.5f * (float) std::sin (juce::MathConstants<double>::twoPi * hz * i / 44100.0));
+                f.deleteFile();
+                juce::WavAudioFormat fmt;
+                std::unique_ptr<juce::AudioFormatWriter> w (fmt.createWriterFor (new juce::FileOutputStream (f), 44100.0, 1, 16, {}, 0));
+                if (w != nullptr) w->writeFromAudioSampleBuffer (tone, 0, tone.getNumSamples());
+                return f;
+            };
+            auto low = makeTone ("studoo-zona-220.wav", 220.0), high = makeTone ("studoo-zona-880.wav", 880.0);
+            auto playNote = [&] (int note)
+            {
+                Project p;
+                auto ch = p.addChannel (ChannelType::sampler, "Multi", 7);
+                ch.setProperty (ids::sample, low.getFullPathName(), nullptr);
+                ch.setProperty (ids::oneShot, false, nullptr);
+                for (auto [file, root, lo, hi] : { std::make_tuple (low, 57, 0, 69), std::make_tuple (high, 81, 70, 127) })
+                {
+                    juce::ValueTree z (ids::ZONE);
+                    z.setProperty (ids::sample, file.getFullPathName(), nullptr);
+                    z.setProperty (ids::root, root, nullptr);
+                    z.setProperty (ids::lo, lo, nullptr);
+                    z.setProperty (ids::hi, hi, nullptr);
+                    ch.appendChild (z, nullptr);
+                }
+                for (auto c : p.channels()) if (c != ch) c.setProperty (ids::muted, true, nullptr);
+                p.addNote (p.getCurrentPattern(), ch[ids::uid], 0.0, 4.0, note);
+                auto eOwned = std::make_unique<AudioEngine>();
+                auto& e = *eOwned;
+                e.prepare (sampleRate, blockSize);
+                e.updateFromProject (p.getState(), cache);
+                e.play();
+                auto b = renderSeconds (e, 0.4);
+                int c = 0;
+                for (int i = 4410 + 1; i < 4410 + 8820; ++i)
+                    c += (b.getSample (0, i - 1) < 0.0f) != (b.getSample (0, i) < 0.0f) ? 1 : 0;
+                return c / 2.0 / 0.2;
+            };
+            const double f57 = playNote (57), f69 = playNote (69), f81 = playNote (81);
+            check (std::abs (f57 - 220.0) < 10.0 && std::abs (f81 - 880.0) < 30.0 && std::abs (f69 - 440.0) < 15.0,
+                   "Multisample: cada nota usa su sample (y los de en medio se afinan desde el más cercano)");
+            low.deleteFile();
+            high.deleteFile();
+        }
+
         // Trocear por golpes y tomas silenciadas
         {
             juce::AudioBuffer<float> loop (1, 44100);

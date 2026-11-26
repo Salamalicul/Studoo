@@ -8,6 +8,7 @@
 - 📏 **Patrones de hasta 16 compases**, **zoom** en el piano roll y **compases** 3/4, 6/8...
 - ⏱️ **Cambios de tempo** dentro de la canción (Automatización > Canción > Tempo).
 - 🎹 **Toca con el teclado del ordenador** (Z X C V... y Q W E R...) y **conecta las ruedas** a los controles de tu teclado MIDI (clic derecho en una rueda).
+- 🎹 **Sampler multisample**: un instrumento con varios samples (por ejemplo, un piano grabado nota a nota). Studoo lee la nota del nombre del archivo ("Piano C4", "Do4"...) y cada tecla usa el sample más cercano.
 - 🔊 **Sinte con FM y tabla de ondas**, modo **Mono con glide** (notas que se deslizan) y **8 sonidos nuevos**.
 - 🥁 **Pads** para tocar la batería con los dedos y **editor de pasos** (fuerza y tono de cada golpe).
 - ✂️ **Trocear loops por golpes** automáticamente.

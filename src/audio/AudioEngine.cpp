@@ -123,12 +123,22 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
 
     // Cargamos los samples ANTES de bloquear (leer un archivo puede tardar)
     std::vector<SamplePtr> samples (newSnap->channels.size());
+    std::vector<std::vector<SamplerInstrument::Zone>> zones (newSnap->channels.size());
+    std::vector<juce::String> zoneKeys (newSnap->channels.size());
     for (size_t i = 0; i < newSnap->channels.size(); ++i)
     {
         const auto& ch = newSnap->channels[i];
         if (ch.type == ChannelType::sampler || ch.type == ChannelType::audio)
             samples[i] = cache.get (ch.samplePath);
+        // Multisample: un sample por zona (la "clave" dice si ha cambiado algo)
+        for (auto& z : ch.zones)
+        {
+            zoneKeys[i] << z.path << "|" << z.root << "|" << z.lo << "|" << z.hi << ";";
+            if (auto s = cache.get (z.path))
+                zones[i].push_back ({ s, z.root, z.lo, z.hi });
+        }
     }
+    std::vector<std::vector<SamplerInstrument::Zone>> oldZones;
 
     // Cosas que se liberan después de soltar el candado
     std::vector<std::unique_ptr<ChannelRuntime>> oldRuntimes;
@@ -177,6 +187,8 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
                     oldSamples.push_back (sampler->setSample (samples[i]));
                     sampler->setSamplePath (ch.samplePath);
                 }
+                if (sampler->getZonesKey() != zoneKeys[i])
+                    oldZones.push_back (sampler->setZones (std::move (zones[i]), zoneKeys[i]));
             }
             else if (ch.type == ChannelType::audio && rt->audioSamplePath != ch.samplePath)
             {

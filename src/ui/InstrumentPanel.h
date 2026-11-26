@@ -50,6 +50,10 @@ namespace studoo
         Knob* addKnob (const juce::String& label, const juce::String& tooltip, const juce::Identifier& id,
                        double min, double max, double def, double skewMid = 0.0);
 
+        void showMultisampleMenu (juce::Component& from);
+        void loadMultisample (const juce::Array<juce::File>&);
+        std::unique_ptr<juce::FileChooser> chooser;
+
         AppContext& ctx;
         juce::ValueTree channel;
         HelpButton helpButton;

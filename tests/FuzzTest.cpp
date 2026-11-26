@@ -105,7 +105,7 @@ namespace
             juce::Identifier ("pluginDesc1"), juce::Identifier ("pluginState3"), ids::stepVel, ids::stepPitch, ids::mono,
             ids::gateThreshold, ids::tuneAmount, ids::tuneRoot, ids::tuneScale, ids::rhythmMode, ids::rhythmMix, ids::maximize,
             juce::Identifier ("sendTo2"), juce::Identifier ("sendLevel3"), juce::Identifier ("peqFreq2"),
-            juce::Identifier ("peqGain1"), juce::Identifier ("peqQ4"), ids::timeSigNum, ids::timeSigDen, ids::slicePoints, ids::clipMuted };
+            juce::Identifier ("peqGain1"), juce::Identifier ("peqQ4"), ids::timeSigNum, ids::timeSigDen, ids::slicePoints, ids::clipMuted, ids::lo, ids::hi, ids::timbre, ids::fmRatio };
 
         // Recorre todo el árbol y cambia, borra o duplica cosas al azar
         std::function<void (juce::ValueTree)> mutate = [&] (juce::ValueTree t)
@@ -132,7 +132,7 @@ namespace
         if (rng.nextInt (4) == 0)
         {
             static const juce::Identifier types[] = { ids::CHANNEL, ids::PATTERN, ids::NOTE, ids::STEPSET, ids::CLIP,
-                                                      ids::TRACK, ids::LANE, ids::POINT, ids::CHANNELS, ids::MIXER };
+                                                      ids::TRACK, ids::LANE, ids::POINT, ids::CHANNELS, ids::MIXER, ids::ZONE };
             for (int i = 0; i < 5; ++i)
             {
                 juce::ValueTree n (types[rng.nextInt ((int) std::size (types))]);

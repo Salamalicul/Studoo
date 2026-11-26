@@ -20,6 +20,9 @@ namespace studoo::ids
     STUDOO_ID (NOTE)
     STUDOO_ID (PLAYLIST)
     STUDOO_ID (CLIP)
+    STUDOO_ID (ZONE)              // multisample: un sample del instrumento (sample, root, lo, hi)
+    STUDOO_ID (lo)                // multisample: nota más grave que usa este sample
+    STUDOO_ID (hi)                // multisample: nota más aguda
     STUDOO_ID (MIDILINKS)         // controles MIDI conectados a ruedas de Studoo
     STUDOO_ID (LINK)
     STUDOO_ID (cc)                // número de control MIDI (0..127)

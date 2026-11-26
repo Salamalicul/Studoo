@@ -49,6 +49,18 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         c.root = juce::jlimit (0, 127, (int) ch.getProperty (ids::root, 60));
         c.oneShot = ch.getProperty (ids::oneShot, true);
         c.samplePath = ch[ids::sample].toString();
+        for (auto z : ch)
+        {
+            if (! z.hasType (ids::ZONE) || c.zones.size() >= 128)
+                continue;
+            ChannelSnap::Zone zone;
+            zone.path = z[ids::sample].toString();
+            zone.root = juce::jlimit (0, 127, (int) z.getProperty (ids::root, 60));
+            zone.lo = juce::jlimit (0, 127, (int) z.getProperty (ids::lo, 0));
+            zone.hi = juce::jlimit (zone.lo, 127, (int) z.getProperty (ids::hi, 127));
+            if (zone.path.isNotEmpty())
+                c.zones.push_back (zone);
+        }
 
         c.synth.wave = juce::jlimit (0, 5, (int) ch.getProperty (ids::wave, 0));
         c.synth.timbre = num (ch, ids::timbre, 0.0f, 1.0f, 0.5f);

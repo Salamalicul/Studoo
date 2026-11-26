@@ -253,6 +253,14 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
             slices->getSlider().setRange (1.0, 64.0, 1.0);
             slices->setDisplayFunction ([] (double v) { const int n = (int) std::round (v); return n <= 1 ? txt ("Entero") : juce::String (n) + " trozos"; });
 
+            auto* multi = new juce::TextButton ("Multisample");
+            multi->setTooltip (txt ("Un instrumento con varios samples (por ejemplo, un piano grabado nota a nota): "
+                                    "cada tecla usa el sample más cercano y suena mucho más real."));
+            multi->onClick = [this, multi] { showMultisampleMenu (*multi); };
+            makeNonFocusing (*multi);
+            controls.add (multi);
+            addAndMakeVisible (multi);
+
             auto* detect = new juce::TextButton (txt ("Trocear por golpes"));
             detect->setTooltip (txt ("Studoo busca cada golpe del sample (bombo, caja...) y lo pone en un trozo: "
                                      "la nota base toca el golpe 1, la siguiente el 2... Ideal para loops de batería."));
@@ -384,6 +392,114 @@ void InstrumentPanel::setChannel (juce::ValueTree ch)
     resized();
 }
 
+namespace
+{
+    // La nota que dice el nombre de un archivo: "Piano C4.wav", "piano_Do4", "cuerda-F#2", "nota_60"...
+    int noteFromFileName (const juce::String& fileName)
+    {
+        static const std::pair<const char*, int> names[] = {
+            { "do#", 1 }, { "reb", 1 }, { "re#", 3 }, { "mib", 3 }, { "fa#", 6 }, { "solb", 6 }, { "sol#", 8 }, { "lab", 8 },
+            { "la#", 10 }, { "sib", 10 }, { "do", 0 }, { "re", 2 }, { "mi", 4 }, { "fa", 5 }, { "sol", 7 }, { "la", 9 }, { "si", 11 },
+            { "c#", 1 }, { "db", 1 }, { "d#", 3 }, { "eb", 3 }, { "f#", 6 }, { "gb", 6 }, { "g#", 8 }, { "ab", 8 },
+            { "a#", 10 }, { "bb", 10 }, { "c", 0 }, { "d", 2 }, { "e", 4 }, { "f", 5 }, { "g", 7 }, { "a", 9 }, { "b", 11 } };
+        auto tokens = juce::StringArray::fromTokens (fileName.toLowerCase(), " _-.()[]", "");
+        for (int t = tokens.size(); --t >= 0;)
+        {
+            const auto& tok = tokens[t];
+            if (tok.containsOnly ("0123456789") && tok.length() <= 3)
+            {
+                const int n = tok.getIntValue();
+                if (n >= 12 && n <= 120) return n;   // número MIDI
+            }
+            for (auto& [name, semitone] : names)
+            {
+                const juce::String nm (name);
+                if (! tok.startsWith (nm) || tok.length() <= nm.length())
+                    continue;
+                const auto rest = tok.substring (nm.length());
+                if (rest.containsOnly ("-0123456789") && rest.length() <= 2)
+                    return juce::jlimit (0, 127, (rest.getIntValue() + 1) * 12 + semitone);   // Do4 = 60
+            }
+        }
+        return -1;
+    }
+}
+
+void InstrumentPanel::showMultisampleMenu (juce::Component& from)
+{
+    int count = 0;
+    for (auto z : channel)
+        count += z.hasType (ids::ZONE) ? 1 : 0;
+    juce::PopupMenu menu;
+    menu.addSectionHeader (count > 0 ? juce::String (count) + txt (" samples en este instrumento") : txt ("Instrumento con varios samples"));
+    menu.addItem (1, txt ("Elegir varios samples (uno por nota)..."));
+    menu.addItem (2, txt ("Quitar el multisample (volver a un solo sample)"), count > 0);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&from), [this] (int r)
+    {
+        if (r == 2)
+        {
+            ctx.project.beginTransaction();
+            for (int i = channel.getNumChildren(); --i >= 0;)
+                if (channel.getChild (i).hasType (ids::ZONE))
+                    channel.removeChild (i, ctx.project.um());
+            refresh();
+        }
+        else if (r == 1)
+        {
+            chooser = std::make_unique<juce::FileChooser> (txt ("Elige varios samples (por ejemplo, Piano C3, Piano C4...)"),
+                                                           juce::File(), ctx.samples.getSupportedWildcard());
+            chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+                                      | juce::FileBrowserComponent::canSelectMultipleItems,
+                                  [this] (const juce::FileChooser& fc)
+            {
+                loadMultisample (chosenFiles (fc, juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                                                      .getChildFile ("Studoo").getChildFile ("Importados")));
+            });
+        }
+    });
+}
+
+void InstrumentPanel::loadMultisample (const juce::Array<juce::File>& files)
+{
+    // Cada archivo va a su nota (por el nombre); si no tiene nota, se reparten desde Do4 hacia arriba
+    std::vector<std::pair<int, juce::File>> zones;
+    int next = 60;
+    for (auto& f : files)
+    {
+        if (! SampleCache::isAudioFile (f) || zones.size() >= 128)
+            continue;
+        int note = noteFromFileName (f.getFileNameWithoutExtension());
+        if (note < 0) note = next++;
+        zones.push_back ({ note, f });
+    }
+    if (zones.empty())
+        return;
+    std::sort (zones.begin(), zones.end(), [] (auto& a, auto& b) { return a.first < b.first; });
+
+    ctx.project.beginTransaction();
+    auto* um = ctx.project.um();
+    for (int i = channel.getNumChildren(); --i >= 0;)
+        if (channel.getChild (i).hasType (ids::ZONE))
+            channel.removeChild (i, um);
+    for (size_t i = 0; i < zones.size(); ++i)
+    {
+        // Cada sample cubre desde la mitad hasta la nota anterior hasta la mitad hasta la siguiente
+        const int lo = i == 0 ? 0 : (zones[i - 1].first + zones[i].first) / 2 + 1;
+        const int hi = i + 1 == zones.size() ? 127 : (zones[i].first + zones[i + 1].first) / 2;
+        juce::ValueTree z (ids::ZONE);
+        z.setProperty (ids::sample, zones[i].second.getFullPathName(), nullptr);
+        z.setProperty (ids::root, zones[i].first, nullptr);
+        z.setProperty (ids::lo, lo, nullptr);
+        z.setProperty (ids::hi, juce::jmax (lo, hi), nullptr);
+        channel.appendChild (z, um);
+    }
+    // El sample principal (para la forma de onda) es el del medio, y el canal ya no suena "a golpes"
+    channel.setProperty (ids::sample, zones[zones.size() / 2].second.getFullPathName(), um);
+    channel.setProperty (ids::oneShot, false, um);
+    channel.setProperty (ids::slices, 1, um);
+    refresh();
+}
+
 void InstrumentPanel::refresh()
 {
     if (! channel.isValid())
@@ -402,6 +518,16 @@ void InstrumentPanel::refresh()
                                                           : juce::File (path).getFileName();
         if (type == ChannelType::audio)
             text = txt ("Grabación: ") + juce::File (path).getFileName();
+        int zones = 0, lo = 127, hi = 0;
+        for (auto z : channel)
+            if (z.hasType (ids::ZONE))
+            {
+                ++zones;
+                lo = juce::jmin (lo, (int) z[ids::root]);
+                hi = juce::jmax (hi, (int) z[ids::root]);
+            }
+        if (zones > 0)
+            text = "Multisample: " + juce::String (zones) + " samples (" + noteName (lo) + " a " + noteName (hi) + ")";
         infoLabel.setText (text, juce::dontSendNotification);
     }
     else if (type == ChannelType::plugin)

@@ -59,6 +59,9 @@ namespace studoo
         int root = 60;
         bool oneShot = true;
         juce::String samplePath;
+        // Multisample: varios samples, cada uno para un grupo de notas
+        struct Zone { juce::String path; int root = 60, lo = 0, hi = 127; };
+        std::vector<Zone> zones;
         SynthParams synth;
         Bass808Params bass;
         SamplerParams sampler;

@@ -56,6 +56,15 @@ void SamplerInstrument::setParameters (const ChannelSnap& c)
     params = c.sampler;
 }
 
+std::vector<SamplerInstrument::Zone> SamplerInstrument::setZones (std::vector<Zone> newZones, const juce::String& key)
+{
+    for (auto& v : voices)
+        v.active = false;   // ninguna voz puede seguir leyendo los samples viejos
+    std::swap (zones, newZones);
+    zonesKey = key;
+    return newZones;
+}
+
 SamplePtr SamplerInstrument::setSample (SamplePtr newSample)
 {
     for (auto& v : voices)
@@ -73,7 +82,25 @@ void SamplerInstrument::allNotesOff()
 
 void SamplerInstrument::noteOn (int note, float velocity)
 {
-    if (sample == nullptr || sample->buffer.getNumSamples() == 0)
+    // Qué sample suena: el de la zona de esta nota (multisample) o el sample del canal
+    const SampleData* data = sample.get();
+    int baseNote = root;
+    if (! zones.empty())
+    {
+        const Zone* best = nullptr;
+        for (auto& z : zones)
+            if (z.sample != nullptr && (best == nullptr
+                    || (note >= z.lo && note <= z.hi && ! (note >= best->lo && note <= best->hi))
+                    || ((note >= z.lo && note <= z.hi) == (note >= best->lo && note <= best->hi)
+                        && std::abs (z.root - note) < std::abs (best->root - note))))
+                best = &z;
+        if (best != nullptr)
+        {
+            data = best->sample.get();
+            baseNote = best->root;
+        }
+    }
+    if (data == nullptr || data->buffer.getNumSamples() == 0)
         return;
 
     // Buscamos una voz libre; si no hay, usamos la más antigua
@@ -90,11 +117,15 @@ void SamplerInstrument::noteOn (int note, float velocity)
     }
 
     // Parte del sample que suena: inicio/final y, si está troceado, el trozo de esta nota
-    const double length = (double) sample->buffer.getNumSamples();
+    const double length = (double) data->buffer.getNumSamples();
     double from = juce::jlimit (0.0, length - 1.0, (double) params.start * length);
     double to = juce::jlimit (from + 1.0, length, (double) params.end * length);
     double semitones = params.tune;
-    if (params.numSlicePoints > 1)
+    if (! zones.empty())
+    {
+        semitones += (double) (note - baseNote);   // multisample: sin trozos
+    }
+    else if (params.numSlicePoints > 1)
     {
         // Trozos en los golpes detectados
         const int n = params.numSlicePoints;
@@ -120,7 +151,8 @@ void SamplerInstrument::noteOn (int note, float velocity)
     voice->note = note;
     voice->regionStart = from;
     voice->regionEnd = to;
-    voice->increment = sample->sampleRate / sr * std::pow (2.0, semitones / 12.0);
+    voice->data = data;
+    voice->increment = data->sampleRate / sr * std::pow (2.0, semitones / 12.0);
     voice->position = params.reverse ? to - 1.0 - 1.0e-6 : from;
     if (params.reverse)
         voice->increment = -voice->increment;
@@ -142,21 +174,18 @@ void SamplerInstrument::noteOff (int note)
 
 void SamplerInstrument::renderVoices (juce::AudioBuffer<float>& out, int start, int num)
 {
-    if (sample == nullptr)
-        return;
-
-    const auto& src = sample->buffer;
-    const int length = src.getNumSamples();
-    const float* srcL = src.getReadPointer (0);
-    const float* srcR = src.getNumChannels() > 1 ? src.getReadPointer (1) : srcL;
     float* outL = out.getWritePointer (0, start);
     float* outR = out.getWritePointer (1, start);
     const float releaseStep = (float) (1.0 / (0.03 * sr));
 
     for (auto& v : voices)
     {
-        if (! v.active)
+        if (! v.active || v.data == nullptr)
             continue;
+        const auto& src = v.data->buffer;
+        const int length = src.getNumSamples();
+        const float* srcL = src.getReadPointer (0);
+        const float* srcR = src.getNumChannels() > 1 ? src.getReadPointer (1) : srcL;
 
         for (int i = 0; i < num; ++i)
         {
