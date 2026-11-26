@@ -184,6 +184,7 @@ namespace studoo
         juce::AbstractFifo recordFifo { recordFifoSize };
         std::array<RecordedMidi, recordFifoSize> recordBuffer {};
         std::array<std::atomic<float>, 256> channelActivity {};
+        std::array<float, numMixerTracks> peakEnv {};        // controlador de picos: nivel de cada pista
         std::array<float, numMixerTracks> sidechainEnv {};   // seguidor del sidechain de cada pista
 
         SharedBuffer audition;            // sonido de los juegos de oído

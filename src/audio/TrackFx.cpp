@@ -315,4 +315,255 @@ void RhythmFx::process (juce::AudioBuffer<float>& b, int n, const TrackParams& p
         if (++writePos >= size) writePos = 0;
     }
 }
+
+// ============================================================================
+//  Flanger y phaser
+// ============================================================================
+void ModulationFx::prepare (double sampleRate, int maxBlock)
+{
+    sr = sampleRate;
+    juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) juce::jmax (1, maxBlock), 2 };
+    phaser.prepare (spec);
+    phaser.setDepth (0.7f);
+    phaser.setCentreFrequency (900.0f);
+    phaser.setFeedback (0.5f);
+    lastRate = lastPhaserMix = -1.0f;
+    reset();
+}
+
+void ModulationFx::reset()
+{
+    for (auto& b : flangerBuf) b.fill (0.0f);
+    flangerFb = {};
+    flangerWrite = 0;
+    phaser.reset();
+}
+
+void ModulationFx::process (juce::AudioBuffer<float>& b, int n, const TrackParams& p)
+{
+    if (p.flangerMix > 0.01f)
+    {
+        // Un eco cortísimo (1-7 ms) que se mueve: el sonido "de avión"
+        const double inc = p.modRate / sr;
+        const float mix = p.flangerMix * 0.7f;
+        for (int i = 0; i < n; ++i)
+        {
+            const double lfo = 0.5 - 0.5 * std::cos (flangerPhase * juce::MathConstants<double>::twoPi);
+            flangerPhase += inc;
+            if (flangerPhase >= 1.0) flangerPhase -= 1.0;
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                float* d = b.getWritePointer (ch);
+                // el canal derecho va un poco desfasado: más ancho
+                const double l2 = ch == 0 ? lfo : 0.5 - 0.5 * std::cos ((flangerPhase + 0.25) * juce::MathConstants<double>::twoPi);
+                const double delay = (0.001 + 0.006 * l2) * sr;
+                double readPos = flangerWrite - delay;
+                while (readPos < 0) readPos += flangerSize;
+                const int i0 = (int) readPos;
+                const float frac = (float) (readPos - i0);
+                auto& buf = flangerBuf[(size_t) ch];
+                const float delayed = buf[(size_t) i0] + (buf[(size_t) ((i0 + 1) % flangerSize)] - buf[(size_t) i0]) * frac;
+                buf[(size_t) flangerWrite] = d[i] + delayed * 0.6f;
+                d[i] = d[i] * (1.0f - mix * 0.5f) + delayed * mix;
+            }
+            flangerWrite = (flangerWrite + 1) % flangerSize;
+        }
+    }
+
+    if (p.phaserMix > 0.01f)
+    {
+        if (! juce::approximatelyEqual (p.modRate, lastRate))
+        {
+            lastRate = p.modRate;
+            phaser.setRate (p.modRate);
+        }
+        if (! juce::approximatelyEqual (p.phaserMix, lastPhaserMix))
+        {
+            lastPhaserMix = p.phaserMix;
+            phaser.setMix (p.phaserMix * 0.8f);
+        }
+        juce::dsp::AudioBlock<float> block (b);
+        auto sub = block.getSubBlock (0, (size_t) n);
+        phaser.process (juce::dsp::ProcessContextReplacing<float> (sub));
+    }
+}
+
+// ============================================================================
+//  Procesador de transitorios
+// ============================================================================
+void TransientShaper::process (juce::AudioBuffer<float>& b, int n, float attack, float sustain)
+{
+    if (std::abs (attack) < 0.01f && std::abs (sustain) < 0.01f)
+        return;
+    auto coef = [this] (double seconds) { return (float) std::exp (-1.0 / (seconds * sr)); };
+    const float upFast = coef (0.0005), upSlow = coef (0.015), down = coef (0.08);
+    const float up = coef (0.001), downFast = coef (0.04), downSlow = coef (0.3);
+    auto follow = [] (float& env, float level, float a, float r) { env = level + (env - level) * (level > env ? a : r); };
+    float* l = b.getWritePointer (0);
+    float* r = b.getWritePointer (1);
+    for (int i = 0; i < n; ++i)
+    {
+        const float level = juce::jmax (std::abs (l[i]), std::abs (r[i]));
+        follow (attFast, level, upFast, down);
+        follow (attSlow, level, upSlow, down);
+        follow (relFast, level, up, downFast);
+        follow (relSlow, level, up, downSlow);
+        // Golpe: el seguidor rápido va por delante del lento. Cola: el lento tarda más en bajar.
+        const float hit = juce::jlimit (0.0f, 1.0f, ((attFast - attSlow) / (attFast + 1.0e-4f) - 0.3f) / 0.7f);
+        const float tail = juce::jlimit (0.0f, 1.0f, ((relSlow - relFast) / (relSlow + 1.0e-4f) - 0.1f) / 0.9f);
+        const float gainDb = attack * 12.0f * hit + sustain * 9.0f * tail;
+        const float g = juce::Decibels::decibelsToGain (juce::jlimit (-18.0f, 12.0f, gainDb));
+        l[i] *= g;
+        r[i] *= g;
+    }
+}
+
+// ============================================================================
+//  Compresor multibanda
+// ============================================================================
+void MultibandComp::prepare (double sampleRate, int maxBlock)
+{
+    sr = sampleRate;
+    const int size = juce::jmax (1, maxBlock);
+    low.setSize (2, size);
+    mid.setSize (2, size);
+    high.setSize (2, size);
+    juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) size, 2 };
+    for (auto* f : { &lowCut, &midSplitHigh })
+    {
+        f->prepare (spec);
+        f->setType (juce::dsp::LinkwitzRileyFilterType::lowpass);
+    }
+    lowCut.setCutoffFrequency (200.0f);
+    midSplitHigh.setCutoffFrequency (3000.0f);
+    for (auto& c : comps)
+    {
+        c.prepare (spec);
+        c.setRatio (3.0f);
+    }
+    comps[0].setAttack (20.0f); comps[0].setRelease (200.0f);
+    comps[1].setAttack (8.0f);  comps[1].setRelease (120.0f);
+    comps[2].setAttack (2.0f);  comps[2].setRelease (60.0f);
+    lastAmount = -1.0f;
+}
+
+void MultibandComp::reset()
+{
+    lowCut.reset(); midSplitHigh.reset();
+    for (auto& c : comps) c.reset();
+}
+
+void MultibandComp::process (juce::AudioBuffer<float>& b, int n, float amount)
+{
+    if (amount < 0.01f || n > low.getNumSamples())
+        return;
+    if (! juce::approximatelyEqual (amount, lastAmount))
+    {
+        lastAmount = amount;
+        for (auto& c : comps)
+            c.setThreshold (-amount * 30.0f);
+    }
+    // Separa en 3 bandas: graves (< 200 Hz), medios y agudos (> 3 kHz)
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const float* in = b.getReadPointer (ch);
+        float* lo = low.getWritePointer (ch);
+        float* mi = mid.getWritePointer (ch);
+        float* hi = high.getWritePointer (ch);
+        for (int i = 0; i < n; ++i)
+        {
+            float lp = 0.0f, hp = 0.0f;
+            lowCut.processSample (ch, in[i], lp, hp);
+            lo[i] = lp;
+            float mlp = 0.0f, mhp = 0.0f;
+            midSplitHigh.processSample (ch, hp, mlp, mhp);
+            mi[i] = mlp;
+            hi[i] = mhp;
+        }
+    }
+    const std::array<juce::AudioBuffer<float>*, 3> bands { &low, &mid, &high };
+    const float makeup = juce::Decibels::decibelsToGain (amount * 8.0f);
+    b.clear (0, n);
+    for (size_t k = 0; k < 3; ++k)
+    {
+        juce::dsp::AudioBlock<float> block (*bands[k]);
+        auto sub = block.getSubBlock (0, (size_t) n);
+        comps[k].process (juce::dsp::ProcessContextReplacing<float> (sub));
+        b.addFrom (0, 0, *bands[k], 0, 0, n, makeup);
+        b.addFrom (1, 0, *bands[k], 1, 0, n, makeup);
+    }
+}
+
+// ============================================================================
+//  Vocoder
+// ============================================================================
+void Vocoder::prepare (double sampleRate)
+{
+    sr = sampleRate;
+    for (int k = 0; k < numBands; ++k)
+    {
+        // Bandas repartidas de 120 Hz a 7 kHz (como las teclas de un piano: más juntas en los graves)
+        const double f = 120.0 * std::pow (7000.0 / 120.0, (double) k / (numBands - 1));
+        const auto c = juce::dsp::IIR::Coefficients<float>::makeBandPass (sampleRate, juce::jmin (f, sampleRate * 0.45), 6.0);
+        modFilters[(size_t) k].coefficients = c;
+        carFilters[(size_t) k].coefficients = new juce::dsp::IIR::Coefficients<float> (*c);
+        // las bandas agudas se oyen menos: un poco más de volumen
+        bandGain[(size_t) k] = 1.0f + 1.5f * (float) k / (numBands - 1);
+    }
+    reset();
+}
+
+void Vocoder::reset()
+{
+    for (auto& f : modFilters) f.reset();
+    for (auto& f : carFilters) f.reset();
+    env.fill (0.0f);
+}
+
+void Vocoder::process (juce::AudioBuffer<float>& carrier, const juce::AudioBuffer<float>& modulator, int n, float mix)
+{
+    if (mix < 0.01f)
+        return;
+    const float att = (float) std::exp (-1.0 / (0.004 * sr));
+    const float rel = (float) std::exp (-1.0 / (0.03 * sr));
+    float* l = carrier.getWritePointer (0);
+    float* r = carrier.getWritePointer (1);
+    const float* ml = modulator.getReadPointer (0);
+    const float* mr = modulator.getReadPointer (1);
+    for (int i = 0; i < n; ++i)
+    {
+        const float m = 0.5f * (ml[i] + mr[i]);
+        const float c = 0.5f * (l[i] + r[i]);
+        float out = 0.0f;
+        for (size_t k = 0; k < (size_t) numBands; ++k)
+        {
+            const float level = std::abs (modFilters[k].processSample (m));
+            env[k] = level + (env[k] - level) * (level > env[k] ? att : rel);
+            out += carFilters[k].processSample (c) * env[k] * bandGain[k];
+        }
+        out = std::tanh (out * 6.0f);
+        l[i] = l[i] * (1.0f - mix) + out * mix;
+        r[i] = r[i] * (1.0f - mix) + out * mix;
+    }
+}
+
+// ============================================================================
+//  Ancho estéreo
+// ============================================================================
+void widenStereo (juce::AudioBuffer<float>& b, int n, float width)
+{
+    if (std::abs (width - 1.0f) < 0.01f)
+        return;
+    float* l = b.getWritePointer (0);
+    float* r = b.getWritePointer (1);
+    const float w = juce::jlimit (0.0f, 2.0f, width);
+    const float norm = 1.0f / juce::jmax (1.0f, 0.5f + 0.5f * w);   // que no suba de volumen al ensanchar
+    for (int i = 0; i < n; ++i)
+    {
+        const float mid = 0.5f * (l[i] + r[i]);
+        const float side = 0.5f * (l[i] - r[i]) * w;
+        l[i] = (mid + side) * norm;
+        r[i] = (mid - side) * norm;
+    }
+}
 }

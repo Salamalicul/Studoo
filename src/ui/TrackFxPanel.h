@@ -2,7 +2,8 @@
 // ============================================================================
 //  TrackFxPanel: los "Más efectos" de una pista del mezclador (se abre en una
 //  ventanita): envíos 2 y 3, autotune con afinador, puerta de ruido,
-//  maximizador, efecto de ritmo y EQ paramétrico de 4 bandas.
+//  maximizador, efecto de ritmo, EQ paramétrico de 4 bandas, flanger, phaser,
+//  ancho estéreo, transitorios, multibanda, vocoder y controlador de picos.
 // ============================================================================
 #include "AppContext.h"
 #include "Widgets.h"
@@ -35,6 +36,12 @@ namespace studoo
         Knob *tuneAmount = nullptr, *gate = nullptr, *maximize = nullptr, *rhythmMix = nullptr;
         juce::ComboBox *tuneRoot = nullptr, *tuneScale = nullptr, *rhythmMode = nullptr;
         std::array<std::array<Knob*, 3>, numEqBands> eqKnobs {};
+        // Studoo 2.2: modulación, dinámica, vocoder y controlador de picos
+        Knob *flanger = nullptr, *phaser = nullptr, *modRate = nullptr, *width = nullptr;
+        Knob *transAttack = nullptr, *transSustain = nullptr, *multiband = nullptr;
+        Knob *vocoderMix = nullptr, *peakAmount = nullptr;
+        juce::ComboBox *vocoderSource = nullptr, *peakTarget = nullptr, *peakParam = nullptr;
+        juce::ComboBox* trackCombo (const juce::String& tip, const juce::Identifier& id, const juce::String& none);
         juce::String tunerText = "-";
         float tunerCents = 0.0f;
         bool tunerActive = false;

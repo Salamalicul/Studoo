@@ -273,6 +273,22 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
         m.rhythmMode = juce::jlimit (0, 6, (int) t.getProperty (ids::rhythmMode, 0));
         m.rhythmMix = num (t, ids::rhythmMix, 0.0f, 1.0f, 1.0f);
         m.maximize = num (t, ids::maximize, 0.0f, 12.0f, 0.0f);
+        m.flangerMix = num (t, ids::flangerMix, 0.0f, 1.0f, 0.0f);
+        m.phaserMix = num (t, ids::phaserMix, 0.0f, 1.0f, 0.0f);
+        m.modRate = num (t, ids::modRate, 0.05f, 5.0f, 0.5f);
+        m.stereoWidth = num (t, ids::stereoWidth, 0.0f, 2.0f, 1.0f);
+        m.transAttack = num (t, ids::transAttack, -1.0f, 1.0f, 0.0f);
+        m.transSustain = num (t, ids::transSustain, -1.0f, 1.0f, 0.0f);
+        m.multiband = num (t, ids::multiband, 0.0f, 1.0f, 0.0f);
+        {
+            const int src = (int) t.getProperty (ids::vocoderSource, 0);
+            m.vocoderSource = (i > 0 && src > 0 && src < numMixerTracks && src != i) ? src : 0;
+            m.vocoderMix = m.vocoderSource > 0 ? num (t, ids::vocoderMix, 0.0f, 1.0f, 0.0f) : 0.0f;
+            const int pt = (int) t.getProperty (ids::peakTarget, 0);
+            m.peakTarget = (i > 0 && pt > 0 && pt < numMixerTracks && pt != i) ? pt : 0;
+            m.peakParam = juce::jlimit (0, 5, (int) t.getProperty (ids::peakParam, 0));
+            m.peakAmount = m.peakTarget > 0 ? num (t, ids::peakAmount, -1.0f, 1.0f, 0.0f) : 0.0f;
+        }
         for (int s = 1; s < numSends; ++s)
         {
             const int to = t.getProperty (sendToId (s), 0);

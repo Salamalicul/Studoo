@@ -153,5 +153,32 @@ namespace studoo::ids
     STUDOO_ID (sendOnly)          // pista: true = solo suena a través del envío (no va directa al Master)
     STUDOO_ID (limiter)           // pista: limitador encendido
 
+    // Studoo 2.2
+    STUDOO_ID (flangerMix)        // pista: flanger 0..1
+    STUDOO_ID (phaserMix)         // pista: phaser 0..1
+    STUDOO_ID (modRate)           // pista: velocidad del flanger/phaser (Hz)
+    STUDOO_ID (stereoWidth)       // pista: 0 = mono, 1 = normal, 2 = muy ancho
+    STUDOO_ID (transAttack)       // pista: golpes -1 (suaves) .. 1 (fuertes)
+    STUDOO_ID (transSustain)      // pista: cola -1 (corta) .. 1 (larga)
+    STUDOO_ID (multiband)         // pista: compresor multibanda 0..1
+    STUDOO_ID (vocoderMix)        // pista: vocoder 0..1 (esta pista = sonido; la fuente = la voz)
+    STUDOO_ID (vocoderSource)     // pista: de qué pista sale la voz del vocoder
+    STUDOO_ID (peakTarget)        // pista: controlador de picos, a qué pista mueve (0 = ninguna)
+    STUDOO_ID (peakParam)         // pista: qué control mueve (0 volumen, 1 filtro, 2 panorama, 3 reverb, 4 eco, 5 distorsión)
+    STUDOO_ID (peakAmount)        // pista: cuánto y hacia dónde (-1..1)
+    STUDOO_ID (MARKERS)           // marcadores de la canción
+    STUDOO_ID (MARKER)
+    STUDOO_ID (notePan)           // nota: panorama -1..1
+    STUDOO_ID (noteFine)          // nota: afinación fina en cents (-100..100)
+    STUDOO_ID (noteMod)           // nota: modulación 0..1 (abre el filtro del sinte)
+    STUDOO_ID (slide)             // nota: se desliza desde la nota anterior
+    STUDOO_ID (ghostNotes)        // proyecto: ver las notas de otros canales en el piano roll
+    STUDOO_ID (group)             // pista de la playlist: nombre del grupo
+    STUDOO_ID (TRACKS)            // ajustes de las pistas de la playlist
+    STUDOO_ID (collapsed)         // grupo plegado
+    STUDOO_ID (layerOf)           // canal: lista de uids que suenan juntos ("4,7,9")
+    STUDOO_ID (crossfade)         // clip de audio: fundido cruzado automático con el clip anterior
+    STUDOO_ID (launchQuant)       // modo directo: los clips empiezan en el siguiente compás
+
 #undef STUDOO_ID
 }

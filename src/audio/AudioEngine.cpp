@@ -155,6 +155,8 @@ void AudioEngine::updateFromProject (const juce::ValueTree& state, SampleCache& 
             for (const auto& lane : newSnap->lanes)
                 needsDelay = needsDelay || (lane.target.kind == AutomationTarget::Kind::mixer && lane.target.index == t
                                             && lane.target.param == AutomationTarget::Param::delayMix);
+            for (const auto& src : newSnap->mixer)   // un controlador de picos que mueve el eco
+                needsDelay = needsDelay || (src.peakTarget == t && src.peakParam == 4 && src.peakAmount > 0.0f);
             if (needsDelay)
                 mixer[(size_t) t].ensureDelay();
             if (newSnap->mixer[(size_t) t].rhythmMode > 0)
@@ -1013,6 +1015,43 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         auto& dest = mixer[(size_t) ch.mixer].getBuffer();
         dest.addFrom (0, 0, rt.buffer, 0, 0, n, gl);
         dest.addFrom (1, 0, rt.buffer, 1, 0, n, gr);
+    }
+
+    // --- Controlador de picos: el volumen de una pista mueve un control de otra ------------------
+    {
+        const float release = (float) std::exp (-(double) n / (0.12 * sampleRate));
+        for (int t = 1; t < numMixerTracks; ++t)
+        {
+            const auto& src = trackParams[(size_t) t];
+            if (src.peakTarget <= 0 || std::abs (src.peakAmount) < 0.01f)
+            {
+                peakEnv[(size_t) t] = 0.0f;
+                continue;
+            }
+            const auto& b = mixer[(size_t) t].getBuffer();
+            const float level = juce::jmin (1.0f, juce::jmax (b.getMagnitude (0, 0, n), b.getMagnitude (1, 0, n)) * 2.0f);
+            float& env = peakEnv[(size_t) t];
+            env = level > env ? level : env * release;
+            const float a = src.peakAmount, e = env;
+            auto& tp = trackParams[(size_t) src.peakTarget];
+            switch (src.peakParam)
+            {
+                case 0:  tp.volume *= a >= 0.0f ? (1.0f - a + a * e) : (1.0f + a * e); break;
+                case 1:  tp.filter = juce::jlimit (-1.0f, 1.0f, tp.filter + a * e); break;
+                case 2:  tp.pan = juce::jlimit (-1.0f, 1.0f, tp.pan + a * e); break;
+                case 3:  tp.reverbMix = juce::jlimit (0.0f, 1.0f, tp.reverbMix + a * e); break;
+                case 4:  tp.delayMix = juce::jlimit (0.0f, 1.0f, tp.delayMix + a * e); break;
+                default: tp.distortion = juce::jlimit (0.0f, 1.0f, tp.distortion + a * e); break;
+            }
+        }
+    }
+
+    // --- Vocoder: una pista (la voz) le da forma al sonido de otra (un sinte) -------------------
+    for (int t = 1; t < numMixerTracks; ++t)
+    {
+        const auto& tp = trackParams[(size_t) t];
+        if (tp.vocoderSource > 0 && tp.vocoderMix > 0.01f)
+            mixer[(size_t) t].applyVocoder (mixer[(size_t) tp.vocoderSource].getBuffer(), n, tp.vocoderMix);
     }
 
     // --- Sidechain: cada pista puede "agacharse" cuando suena otra (normalmente el bombo) -------

@@ -5,7 +5,7 @@ namespace studoo
 {
 namespace
 {
-    constexpr int knobW = 62, knobH = 58, rowGap = 26, pad = 14;
+    constexpr int knobW = 62, knobH = 58, rowGap = 26, pad = 14, rightW = 400;
     const char* noteNames[] = { "Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si" };
 }
 
@@ -89,9 +89,58 @@ TrackFxPanel::TrackFxPanel (AppContext& c, int trackIndex) : ctx (c), index (tra
     }
     juce::ignoreUnused (um);
 
+    // --- Modulación y estéreo -------------------------------------------------------------------
+    auto percent = [] (double v) { return v < 0.005 ? txt ("Apagado") : juce::String ((int) (v * 100.0)) + "%"; };
+    flanger = knob ("Flanger", txt ("Un eco cortísimo que se mueve: el sonido \"de avión\" o de chorro."), ids::flangerMix, 0.0, 1.0, 0.0);
+    flanger->setDisplayFunction (percent);
+    phaser = knob ("Phaser", txt ("El sonido \"que gira\", como si pasara por un tubo. Muy usado en guitarras y pads."), ids::phaserMix, 0.0, 1.0, 0.0);
+    phaser->setDisplayFunction (percent);
+    modRate = knob (txt ("Velocidad"), txt ("Lo rápido que se mueven el flanger y el phaser."), ids::modRate, 0.05, 5.0, 0.5, 0.8);
+    modRate->setDisplayFunction ([] (double v) { return juce::String (v, 2) + " Hz"; });
+    width = knob (txt ("Ancho"), txt ("Ancho estéreo: a la izquierda el sonido se junta en el centro (mono); "
+                                     "a la derecha se abre hacia los lados."), ids::stereoWidth, 0.0, 2.0, 1.0);
+    width->setDisplayFunction ([] (double v) { return v < 0.02 ? juce::String ("Mono") : juce::String ((int) (v * 100.0)) + "%"; });
+
+    // --- Dinámica ---------------------------------------------------------------------------------
+    auto signedPct = [] (double v) { return std::abs (v) < 0.01 ? juce::String ("0") : (v > 0 ? "+" : "") + juce::String ((int) (v * 100.0)) + "%"; };
+    transAttack = knob (txt ("Golpe"), txt ("Procesador de transitorios: a la derecha los golpes (el principio de cada sonido) "
+                                           "suenan más fuertes; a la izquierda, más suaves."), ids::transAttack, -1.0, 1.0, 0.0);
+    transAttack->setDisplayFunction (signedPct);
+    transSustain = knob (txt ("Cola"), txt ("A la derecha la cola de cada sonido dura más; a la izquierda, se corta antes (más seco)."),
+                         ids::transSustain, -1.0, 1.0, 0.0);
+    transSustain->setDisplayFunction (signedPct);
+    multiband = knob ("Multibanda", txt ("Compresor de 3 bandas: aprieta por separado los graves, los medios y los agudos. "
+                                         "Hace que la mezcla suene más igualada y fuerte."), ids::multiband, 0.0, 1.0, 0.0);
+    multiband->setDisplayFunction (percent);
+
+    // --- Vocoder ----------------------------------------------------------------------------------
+    vocoderSource = trackCombo (txt ("Vocoder: elige la pista de la VOZ. Esta pista (pon aquí un sinte tocando acordes) "
+                                     "sonará con la forma de esa voz: la voz de robot. Baja el volumen de la pista de la voz."),
+                                ids::vocoderSource, txt ("Sin vocoder"));
+    vocoderMix = knob (txt ("Vocoder"), txt ("Cuánto se oye el vocoder."), ids::vocoderMix, 0.0, 1.0, 0.0);
+    vocoderMix->setDisplayFunction (percent);
+
+    // --- Controlador de picos -----------------------------------------------------------------------
+    peakTarget = trackCombo (txt ("Controlador de picos: el volumen de ESTA pista mueve un control de otra pista "
+                                  "(por ejemplo: el bombo baja el volumen del bajo, o abre el filtro de un pad)."),
+                             ids::peakTarget, txt ("No mueve nada"));
+    peakParam = combo (txt ("Qué control de la otra pista se mueve."));
+    const juce::StringArray params { txt ("Volumen"), txt ("Filtro"), txt ("Panorama"), "Reverb", txt ("Eco"), txt ("Distorsión") };
+    for (int i = 0; i < params.size(); ++i)
+        peakParam->addItem (params[i], i + 1);
+    peakParam->setSelectedId ((int) track.getProperty (ids::peakParam, 0) + 1, juce::dontSendNotification);
+    peakParam->onChange = [this] { ctx.project.beginTransaction(); track.setProperty (ids::peakParam, peakParam->getSelectedId() - 1, ctx.project.um()); };
+    peakAmount = knob (txt ("Cantidad"), txt ("Cuánto lo mueve. A la izquierda lo baja cuando suena fuerte; a la derecha lo sube."),
+                       ids::peakAmount, -1.0, 1.0, 0.0);
+    peakAmount->setDisplayFunction (signedPct);
+    if (index == 0)
+        for (juce::Component* c : { (juce::Component*) vocoderSource, (juce::Component*) vocoderMix, (juce::Component*) peakTarget,
+                                    (juce::Component*) peakParam, (juce::Component*) peakAmount })
+            c->setEnabled (false);
+
     ctx.engine.setPitchAnalysis (index, true);
     startTimerHz (12);
-    setSize (pad * 2 + 8 * knobW, 470);
+    setSize (pad * 3 + 8 * knobW + rightW, 470);
 }
 
 TrackFxPanel::~TrackFxPanel()
@@ -107,6 +156,28 @@ Knob* TrackFxPanel::knob (const juce::String& label, const juce::String& tip, co
     owned.add (k);
     addAndMakeVisible (k);
     return k;
+}
+
+juce::ComboBox* TrackFxPanel::trackCombo (const juce::String& tip, const juce::Identifier& id, const juce::String& none)
+{
+    auto* box = combo (tip);
+    box->addItem (none, 1);
+    for (int t = 1; t < numMixerTracks; ++t)
+        if (t != index)
+            box->addItem (juce::String (t) + ". " + ctx.project.getMixerTrack (t)[ids::name].toString(), t + 1);
+    const int current = track.getProperty (id, 0);
+    box->setSelectedId (current > 0 && current != index ? current + 1 : 1, juce::dontSendNotification);
+    box->onChange = [this, box, id]
+    {
+        ctx.project.beginTransaction();
+        const int target = juce::jmax (0, box->getSelectedId() - 1);
+        track.setProperty (id, target, ctx.project.um());
+        if (target > 0 && id == ids::vocoderSource && (float) track.getProperty (ids::vocoderMix, 0.0f) < 0.01f)
+            track.setProperty (ids::vocoderMix, 1.0f, ctx.project.um());
+        if (target > 0 && id == ids::peakTarget && std::abs ((float) track.getProperty (ids::peakAmount, 0.0f)) < 0.01f)
+            track.setProperty (ids::peakAmount, -0.6f, ctx.project.um());
+    };
+    return box;
 }
 
 juce::ComboBox* TrackFxPanel::combo (const juce::String& tip)
@@ -142,6 +213,28 @@ void TrackFxPanel::resized()
 {
     auto area = getLocalBounds().reduced (pad);
     area.removeFromTop (rowGap);   // título
+    // Columna derecha: modulación, dinámica, vocoder, controlador de picos
+    {
+        auto right = area.removeFromRight (rightW);
+        area.removeFromRight (pad);
+        auto row = right.removeFromTop (knobH);
+        for (auto* k : { flanger, phaser, modRate, width })
+            k->setBounds (row.removeFromLeft (knobW + 6));
+        right.removeFromTop (rowGap);
+        row = right.removeFromTop (knobH);
+        for (auto* k : { transAttack, transSustain, multiband })
+            k->setBounds (row.removeFromLeft (knobW + 6));
+        right.removeFromTop (rowGap);
+        row = right.removeFromTop (knobH);
+        vocoderSource->setBounds (row.removeFromLeft (200).withSizeKeepingCentre (196, 26));
+        vocoderMix->setBounds (row.removeFromLeft (knobW + 6));
+        right.removeFromTop (rowGap);
+        row = right.removeFromTop (knobH);
+        auto combos = row.removeFromLeft (200);
+        peakTarget->setBounds (combos.removeFromTop (knobH / 2).reduced (2, 2));
+        peakParam->setBounds (combos.reduced (2, 2));
+        peakAmount->setBounds (row.removeFromLeft (knobW + 6));
+    }
     // Fila 1: envíos
     {
         auto row = area.removeFromTop (knobH);
@@ -205,6 +298,12 @@ void TrackFxPanel::paint (juce::Graphics& g)
     title (gate->getX(), gate->getY() - 16, txt ("PUERTA · MAXIMIZAR"));
     title (pad, rhythmMode->getY() - 16, txt ("RITMO (TIPO GROSS BEAT)"));
     title (pad, eqCurveArea.getY() - 16, txt ("EQ PARAMÉTRICO (4 BANDAS)"));
+    title (flanger->getX(), flanger->getY() - 16, txt ("FLANGER · PHASER · ANCHO ESTÉREO"));
+    title (transAttack->getX(), transAttack->getY() - 16, txt ("TRANSITORIOS · COMPRESOR MULTIBANDA"));
+    title (vocoderSource->getX(), vocoderMix->getY() - 16, txt ("VOCODER (VOZ DE ROBOT)"));
+    title (peakTarget->getX(), peakAmount->getY() - 16, txt ("CONTROLADOR DE PICOS"));
+    g.setColour (Colours::outline);
+    g.drawVerticalLine (flanger->getX() - pad / 2 - 1, 30.0f, (float) getHeight() - pad);
 
     // Afinador
     auto tuner = juce::Rectangle<int> (tuneScale->getRight() + 8, tuneAmount->getY(), 120, knobH);

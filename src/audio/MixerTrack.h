@@ -2,9 +2,10 @@
 // ============================================================================
 //  MixerTrack: una pista del mezclador con su cadena de efectos:
 //
-//     EQ (graves/medios/agudos) -> Filtro -> Distorsión -> Compresor
-//        -> Chorus -> Delay -> Reverb -> Plugin VST3 (opcional)
-//        -> Volumen y panorama -> Limitador -> Medidor
+//     Puerta -> Autotune -> EQ paramétrico -> EQ (graves/medios/agudos) -> Filtro
+//        -> Distorsión -> Compresor -> Transitorios -> Multibanda -> Chorus
+//        -> Flanger/Phaser -> Ritmo -> Delay -> Reverb -> Plugins (hasta 10)
+//        -> Ancho estéreo -> Volumen y panorama -> Limitador -> Medidor
 // ============================================================================
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
@@ -27,6 +28,8 @@ namespace studoo
         void setPlugin (juce::AudioPluginInstance* p, int slot = 0) { if (juce::isPositiveAndBelow (slot, numFxSlots)) plugins[(size_t) slot] = p; }
         void ensureDelay();   // reserva la memoria del eco (hilo principal, con el candado del motor)
         void ensureRhythm() { rhythm.ensureMemory(); }
+        // Vocoder: el motor le pasa la pista de la voz antes de process()
+        void applyVocoder (const juce::AudioBuffer<float>& voice, int n, float mix) { vocoder.process (buffer, voice, n, mix); }
         // Dónde va la canción (para el efecto de ritmo), antes de process()
         void setTransport (double positionSteps, double samplesPerStep, bool playing)
         { transportPos = positionSteps; transportStep = samplesPerStep; transportPlaying = playing; }
@@ -75,6 +78,10 @@ namespace studoo
         PitchCorrector pitch;
         ParametricEq peq;
         RhythmFx rhythm;
+        ModulationFx modFx;
+        TransientShaper transient;
+        MultibandComp multiband;
+        Vocoder vocoder;
         double transportPos = 0.0, transportStep = 0.0;
         bool transportPlaying = false;   // cuánto lleva la pista en silencio (para no gastar CPU)
         std::array<std::atomic<float>, 2> peak { 0.0f, 0.0f };

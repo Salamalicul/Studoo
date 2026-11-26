@@ -25,7 +25,7 @@ namespace studoo
     ChannelType  channelTypeFromString (const juce::String&);
 
     constexpr int numMixerTracks    = 33; // 0 = Master, 1..32 = pistas
-    constexpr int numFxSlots        = 4;  // huecos de plugins de efecto en cada pista
+    constexpr int numFxSlots        = 10; // huecos de plugins de efecto en cada pista
     constexpr int numSends          = 3;  // envíos de cada pista
 
     // Dónde se guarda cada envío (el envío 0 usa los nombres de siempre)

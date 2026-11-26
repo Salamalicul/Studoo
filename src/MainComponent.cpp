@@ -648,7 +648,7 @@ void MainComponent::showMixerPluginMenu (int track)
     if (firstFree >= 0)
         menu.addSubMenu (txt ("Añadir efecto VST3"), effectList (10000 + firstFree * 1000));
     else
-        menu.addItem (-1, txt ("Los 4 huecos están llenos"), false);
+        menu.addItem (-1, txt ("Los 10 huecos están llenos"), false);
 
     juce::Component::SafePointer<MainComponent> safe (this);
     auto install = [safe, track] (int slot, const juce::PluginDescription& desc)

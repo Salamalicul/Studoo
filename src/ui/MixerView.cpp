@@ -110,7 +110,8 @@ MixerStrip::MixerStrip (AppContext& c, int trackIndex) : ctx (c), index (trackIn
     addAndMakeVisible (fxButton);
     fxButton.setButtonText ("FX+");
     fxButton.setTooltip (txt ("Más efectos: autotune y afinador, puerta de ruido, maximizador, efectos de ritmo "
-                              "(half-time, tartamudeo...), EQ paramétrico y envíos 2 y 3."));
+                              "(half-time, tartamudeo...), EQ paramétrico, envíos 2 y 3, flanger, phaser, ancho estéreo, "
+                              "transitorios, compresor multibanda, vocoder y controlador de picos."));
     fxButton.onClick = [this]
     {
         auto panel = std::make_unique<TrackFxPanel> (ctx, index);
@@ -186,7 +187,7 @@ void MixerStrip::bind()
     pluginButton.setButtonText (names.isEmpty() ? txt ("+ Plugin")
                                 : names.size() == 1 ? names[0].substring (0, 14)
                                                     : juce::String (names.size()) + " plugins");
-    pluginButton.setTooltip (names.isEmpty() ? txt ("Añade hasta 4 efectos VST3 a esta pista.")
+    pluginButton.setTooltip (names.isEmpty() ? txt ("Añade hasta 10 efectos VST3 a esta pista.")
                                              : txt ("Efectos (en orden): ") + names.joinIntoString (", "));
     repaint();
 }

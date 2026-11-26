@@ -42,6 +42,10 @@ void MixerTrack::prepare (double sampleRate, int maxBlockSize)
     pitch.prepare (sampleRate);
     peq.prepare (sampleRate);
     rhythm.prepare (sampleRate);
+    modFx.prepare (sampleRate, maxBlockSize);
+    transient.prepare (sampleRate);
+    multiband.prepare (sampleRate, maxBlockSize);
+    vocoder.prepare (sampleRate);
     limiter.prepare (spec);
     limiter.setThreshold (-1.0f);
     limiter.setRelease (120.0f);
@@ -68,6 +72,9 @@ void MixerTrack::reset()
     filter.reset();
     chorus.reset();
     limiter.reset();
+    modFx.reset();
+    multiband.reset();
+    vocoder.reset();
 }
 
 void MixerTrack::updateEq (const TrackParams& p)
@@ -177,6 +184,10 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         buffer.applyGain (0, n, makeup);
     }
 
+    // --- Transitorios y compresor multibanda -----------------------------------------------
+    transient.process (buffer, n, p.transAttack, p.transSustain);
+    multiband.process (buffer, n, p.multiband);
+
     // --- Chorus (sonido más ancho y "doble") -------------------------------------------
     if (p.chorusMix > 0.01f)
     {
@@ -185,6 +196,9 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         auto sub = block.getSubBlock (0, (size_t) n);
         chorus.process (juce::dsp::ProcessContextReplacing<float> (sub));
     }
+
+    // --- Flanger y phaser --------------------------------------------------------------------
+    modFx.process (buffer, n, p);
 
     // --- Efecto de ritmo (half-time, tartamudeo, puerta, parada de cinta) -----------------
     rhythm.process (buffer, n, p, transportPos, transportStep, transportPlaying);
@@ -230,7 +244,7 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
         reverb.processStereo (l, r, n);
     }
 
-    // --- Plugins de efecto (hasta 4, en orden) -------------------------------------------
+    // --- Plugins de efecto (hasta 10, en orden) -------------------------------------------
     for (auto* plugin : plugins)
     {
         if (plugin == nullptr)
@@ -252,6 +266,9 @@ void MixerTrack::process (int n, const TrackParams& p, double bpm, bool silenced
             }
         }
     }
+
+    // --- Ancho estéreo --------------------------------------------------------------------
+    widenStereo (buffer, n, p.stereoWidth);
 
     // --- Volumen y panorama -------------------------------------------------------------
     if (silenced)

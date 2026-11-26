@@ -803,6 +803,79 @@ int main (int argc, char* argv[])
             juce::ignoreUnused (d11);
             check (hot.getRMSLevel (0, 11025, 11025) > plain.getRMSLevel (0, 11025, 11025) * 2.0f
                    && hot.getMagnitude (0, 11025, 11025) < 0.95f, "Maximizador: más volumen sin pasar del máximo");
+
+            // Tanda D: flanger, phaser, transitorios, multibanda
+            auto diff = [] (const juce::AudioBuffer<float>& a, const juce::AudioBuffer<float>& b)
+            {
+                double d = 0.0;
+                for (int i = 0; i < juce::jmin (a.getNumSamples(), b.getNumSamples()); ++i)
+                    d += std::abs (a.getSample (0, i) - b.getSample (0, i));
+                return d / a.getNumSamples();
+            };
+            {
+                auto [ref, r0] = runTrack (base, 300.0, 0.3f, 0.5);
+                juce::ignoreUnused (r0);
+                const char* names[] = { "Flanger", "Phaser", "Multibanda", "Transitorios" };
+                for (int k = 0; k < 4; ++k)
+                {
+                    auto m = base;
+                    if (k == 0) m.flangerMix = 1.0f;
+                    if (k == 1) m.phaserMix = 1.0f;
+                    if (k == 2) m.multiband = 1.0f;
+                    if (k == 3) { m.transAttack = 1.0f; m.transSustain = -1.0f; }
+                    auto [o, dd] = runTrack (m, 300.0, 0.3f, 0.5);
+                    juce::ignoreUnused (dd);
+                    check (isFinite (o) && o.getMagnitude (0, 0, o.getNumSamples()) < 2.0f && diff (o, ref) > 0.002,
+                           (juce::String (names[k]) + ": cambia el sonido sin romperlo").toRawUTF8());
+                }
+            }
+            {
+                // Transitorios: un golpe seco con "Golpe" al máximo tiene el principio más fuerte que la cola
+                TransientShaper ts;
+                ts.prepare (sampleRate);
+                juce::AudioBuffer<float> hit (2, 8820);
+                for (int i = 0; i < hit.getNumSamples(); ++i)
+                {
+                    const float v = (i < 4410 ? 0.0f : 0.5f) * (float) std::sin (i * 0.05);
+                    hit.setSample (0, i, v); hit.setSample (1, i, v);
+                }
+                auto shaped = hit;
+                ts.process (shaped, shaped.getNumSamples(), 1.0f, 0.0f);
+                check (shaped.getMagnitude (0, 4410, 400) > hit.getMagnitude (0, 4410, 400) * 1.3f
+                       && shaped.getMagnitude (0, 8000, 800) < hit.getMagnitude (0, 8000, 800) * 1.15f,
+                       "Transitorios: sube el golpe y deja igual lo que sigue");
+            }
+            {
+                juce::AudioBuffer<float> st (2, 1000);
+                for (int i = 0; i < 1000; ++i) { st.setSample (0, i, 0.5f); st.setSample (1, i, -0.1f); }
+                auto mono = st;
+                widenStereo (mono, 1000, 0.0f);
+                auto wide = st;
+                widenStereo (wide, 1000, 2.0f);
+                check (std::abs (mono.getSample (0, 10) - mono.getSample (1, 10)) < 1.0e-5f
+                       && std::abs (wide.getSample (0, 10) - wide.getSample (1, 10)) > 0.6f,
+                       "Ancho estéreo: a 0 es mono, a 200% más separado");
+            }
+            {
+                // Vocoder: sin voz no suena; con voz, el sinte suena
+                Vocoder v;
+                v.prepare (sampleRate);
+                juce::AudioBuffer<float> synth (2, 22050), voice (2, 22050), silent (2, 22050);
+                silent.clear();
+                for (int i = 0; i < 22050; ++i)
+                {
+                    const float saw = (float) (2.0 * std::fmod (i * 110.0 / sampleRate, 1.0) - 1.0) * 0.3f;
+                    synth.setSample (0, i, saw); synth.setSample (1, i, saw);
+                    const float vo = 0.3f * (float) (std::sin (i * 0.06) * std::sin (i * 0.0007));
+                    voice.setSample (0, i, vo); voice.setSample (1, i, vo);
+                }
+                auto a = synth, b = synth;
+                v.process (a, silent, 22050, 1.0f);
+                v.reset();
+                v.process (b, voice, 22050, 1.0f);
+                check (a.getRMSLevel (0, 11025, 11025) < 0.002f && b.getRMSLevel (0, 11025, 11025) > 0.02f && isFinite (b),
+                       "Vocoder: el sinte solo suena cuando habla la voz");
+            }
         }
 
         // Multisample: cada nota usa el sample más cercano

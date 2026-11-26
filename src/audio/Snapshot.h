@@ -114,6 +114,16 @@ namespace studoo
         std::array<float, numSends - 1> moreSendLevel {};
         bool sendOnly = false;      // solo suena por el envío (agrupar pistas en un "bus")
         bool limiter = false;
+        // Studoo 2.2
+        float flangerMix = 0.0f, phaserMix = 0.0f, modRate = 0.5f;
+        float stereoWidth = 1.0f;
+        float transAttack = 0.0f, transSustain = 0.0f;
+        float multiband = 0.0f;
+        float vocoderMix = 0.0f;
+        int vocoderSource = 0;      // 0 = sin vocoder
+        int peakTarget = 0;         // 0 = sin controlador de picos
+        int peakParam = 0;
+        float peakAmount = 0.0f;
     };
 
     struct LaneSnap
