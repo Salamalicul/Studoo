@@ -176,7 +176,7 @@ namespace studoo::ids
     STUDOO_ID (group)             // pista de la playlist: nombre del grupo
     STUDOO_ID (TRACKS)            // ajustes de las pistas de la playlist
     STUDOO_ID (collapsed)         // grupo plegado
-    STUDOO_ID (layerOf)           // canal: lista de uids que suenan juntos ("4,7,9")
+    STUDOO_ID (layers)            // canal: otros canales que suenan a la vez con sus notas ("4,7,9")
     STUDOO_ID (crossfade)         // clip de audio: fundido cruzado automático con el clip anterior
     STUDOO_ID (launchQuant)       // modo directo: los clips empiezan en el siguiente compás
 

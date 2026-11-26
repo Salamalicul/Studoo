@@ -137,7 +137,8 @@ namespace studoo
 
         void renderChunk (const float* const* inputs, int numInputs, float* const* outputs, int numOutputs,
                           int outputOffset, int n);
-        void scheduleNote (ChannelRuntime&, int note, float velocity, int sampleOffset, juce::int64 lengthSamples);
+        void scheduleNote (ChannelRuntime&, int note, float velocity, int sampleOffset, juce::int64 lengthSamples,
+                           const NoteEvent* extras = nullptr);
         void collectEvents (const Snapshot&, double from, double to, int sampleOffset, double samplesPerStep);
         void collectPatternEvents (const Snapshot&, const PatternSnap&, double localFrom, double localTo,
                                    double localEnd, double globalShift, double segmentStart,

@@ -1278,11 +1278,44 @@ void ChannelRack::showChannelMenu (int uid)
         menu.addItem (4, txt ("Abrir plugin"));
     menu.addItem (5, txt ("Mover arriba"));
     menu.addItem (6, txt ("Mover abajo"));
+
+    // Capas: este canal hace sonar también otros canales con sus mismas notas
+    const auto layers = juce::StringArray::fromTokens (ch[ids::layers].toString(), ",", "");
+    juce::PopupMenu layerMenu;
+    int item = 0;
+    for (auto other : ctx.project.channels())
+    {
+        const int otherUid = other[ids::uid];
+        ++item;
+        if (otherUid == uid || channelTypeFromString (other[ids::type].toString()) == ChannelType::audio)
+            continue;
+        layerMenu.addItem (500 + item, other[ids::name].toString(), true, layers.contains (juce::String (otherUid)));
+    }
+    if (type != ChannelType::audio)
+    {
+        menu.addSeparator();
+        menu.addSubMenu (txt ("Capas: sonar junto con...") + (layers.isEmpty() ? juce::String() : "  (" + juce::String (layers.size()) + ")"),
+                         layerMenu);
+    }
     menu.addSeparator();
     menu.addItem (7, txt ("Eliminar canal"));
 
     menu.showMenuAsync (juce::PopupMenu::Options(), [this, uid, ch] (int result) mutable
     {
+        if (result > 500)
+        {
+            auto other = ctx.project.channels().getChild (result - 501);
+            if (! other.isValid())
+                return;
+            auto list = juce::StringArray::fromTokens (ch[ids::layers].toString(), ",", "");
+            const auto key = other[ids::uid].toString();
+            if (list.contains (key)) list.removeString (key);
+            else                     list.add (key);
+            ctx.project.beginTransaction();
+            if (list.isEmpty()) ch.removeProperty (ids::layers, ctx.project.um());
+            else                ch.setProperty (ids::layers, list.joinIntoString (","), ctx.project.um());
+            return;
+        }
         auto channels = ctx.project.channels();
         const int index = channels.indexOf (ch);
         switch (result)

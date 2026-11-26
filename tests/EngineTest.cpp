@@ -697,6 +697,67 @@ int main (int argc, char* argv[])
                 check (fNo > 380.0 && fGlide < fNo * 0.8, "Sinte mono: con glide la nota se desliza (empieza más grave)");
                 check (crossings (withGlide, (int) (sampleRate * 1.0), 4410) > 400.0, "Sinte mono: al final llega a la nota nueva");
             }
+
+            // Tanda D: notas con panorama, afinación y deslizamiento; capas
+            {
+                auto crossings = [] (const juce::AudioBuffer<float>& b, int from, int len)
+                {
+                    int c = 0;
+                    for (int i = from + 1; i < from + len; ++i)
+                        c += (b.getSample (0, i - 1) < 0.0f) != (b.getSample (0, i) < 0.0f) ? 1 : 0;
+                    return c / 2.0 / (len / sampleRate);
+                };
+                auto renderNotes = [&] (std::function<void (Project&, juce::ValueTree)> setup, double seconds)
+                {
+                    Project p;
+                    auto synth = p.findChannelByType (ChannelType::synth);
+                    synth.setProperty (ids::wave, 2, nullptr);
+                    synth.setProperty (ids::sustain, 1.0f, nullptr);
+                    synth.setProperty (ids::cutoff, 18000.0f, nullptr);
+                    for (auto ch : p.channels()) if (ch != synth) ch.setProperty (ids::muted, true, nullptr);
+                    setup (p, synth);
+                    auto eOwned = std::make_unique<AudioEngine>();
+                    auto& e = *eOwned;
+                    e.prepare (sampleRate, blockSize);
+                    e.updateFromProject (p.getState(), cache);
+                    e.play();
+                    return renderSeconds (e, seconds);
+                };
+                auto left = renderNotes ([] (Project& p, juce::ValueTree s)
+                {
+                    auto n = p.addNote (p.getCurrentPattern(), s[ids::uid], 0.0, 4.0, 69);
+                    n.setProperty (ids::notePan, -1.0f, nullptr);
+                }, 0.3);
+                check (left.getRMSLevel (0, 0, 8000) > 0.01f && left.getRMSLevel (1, 0, 8000) < left.getRMSLevel (0, 0, 8000) * 0.05f,
+                       "Panorama por nota: la nota a la izquierda solo suena por la izquierda");
+                auto fine = renderNotes ([] (Project& p, juce::ValueTree s)
+                {
+                    auto n = p.addNote (p.getCurrentPattern(), s[ids::uid], 0.0, 8.0, 69);
+                    n.setProperty (ids::noteFine, 100.0f, nullptr);   // +1 semitono
+                }, 0.6);
+                check (std::abs (crossings (fine, 4410, 17640) - 466.2) < 8.0, "Afinación fina: +100 cents sube un semitono");
+                auto slid = renderNotes ([] (Project& p, juce::ValueTree s)
+                {
+                    p.addNote (p.getCurrentPattern(), s[ids::uid], 0.0, 4.0, 57);
+                    auto n = p.addNote (p.getCurrentPattern(), s[ids::uid], 4.0, 8.0, 69);
+                    n.setProperty (ids::slide, true, nullptr);
+                }, 1.2);
+                const int second = (int) (samplesPerStep * 4);
+                check (crossings (slid, second + 300, 1500) < 380.0 && crossings (slid, (int) (sampleRate * 1.0), 4410) > 420.0,
+                       "Nota deslizante: empieza en el tono de la anterior y llega a la suya");
+                auto layered = renderNotes ([] (Project& p, juce::ValueTree s)
+                {
+                    // El sinte está en mute, pero el 808 (que suena) es una capa de otro canal con notas
+                    auto bass = p.findChannelByType (ChannelType::bass808);
+                    bass.setProperty (ids::muted, false, nullptr);
+                    auto lead = p.addChannel (ChannelType::synth, "Capa", 9);
+                    lead.setProperty (ids::volume, 0.0f, nullptr);
+                    lead.setProperty (ids::layers, bass[ids::uid].toString(), nullptr);
+                    s.setProperty (ids::muted, true, nullptr);
+                    p.addNote (p.getCurrentPattern(), lead[ids::uid], 0.0, 4.0, 45);
+                }, 0.4);
+                check (layered.getRMSLevel (0, 0, 8000) > 0.02f, "Capas: las notas de un canal hacen sonar también sus capas");
+            }
         }
 
         // Tanda B: efectos avanzados de pista (autotune, puerta, EQ paramétrico, ritmo, maximizador)

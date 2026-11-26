@@ -119,14 +119,24 @@ void PianoRollGrid::paint (juce::Graphics& g)
         g.drawVerticalLine ((int) x, 0.0f, (float) getHeight());
     }
 
-    // Notas de otros canales (fantasma) para orientarte
-    for (auto n : pattern)
-        if (n.hasType (ids::NOTE) && (int) n[ids::channel] != uid)
-        {
-            g.setColour (juce::Colours::white.withAlpha (0.07f));
-            g.fillRoundedRectangle (stepsToX (n[ids::start]), (float) yForNote (n[ids::pitch]) + 1.0f,
-                                    (float) ((double) n[ids::length] * sw), (float) rowHeight - 2.0f, 3.0f);
-        }
+    // Notas fantasma: las de los otros canales, con su color, para orientarte (doble clic = ir a ese canal)
+    if (roll.showGhosts())
+    {
+        std::map<int, juce::Colour> ghostColour;
+        for (auto n : pattern)
+            if (n.hasType (ids::NOTE) && (int) n[ids::channel] != uid)
+            {
+                const int other = n[ids::channel];
+                if (ghostColour.find (other) == ghostColour.end())
+                    ghostColour[other] = Colours::forChannelType (ctx.project.findChannel (other)[ids::type].toString());
+                auto r = juce::Rectangle<float> (stepsToX (n[ids::start]), (float) yForNote (n[ids::pitch]) + 1.0f,
+                                                 (float) ((double) n[ids::length] * sw), (float) rowHeight - 2.0f);
+                g.setColour (ghostColour[other].withAlpha (0.16f));
+                g.fillRoundedRectangle (r, 3.0f);
+                g.setColour (ghostColour[other].withAlpha (0.35f));
+                g.drawRoundedRectangle (r, 3.0f, 1.0f);
+            }
+    }
 
     // Notas del canal (con el color de su tipo: naranja, azul, morado...)
     const auto channelType = roll.getChannelType();
@@ -157,6 +167,22 @@ void PianoRollGrid::paint (juce::Graphics& g)
         {
             g.setColour (juce::Colours::white);
             g.drawRoundedRectangle (r.expanded (0.5f), 3.5f, 2.0f);
+        }
+        // Nota deslizante: una flecha al principio
+        if ((bool) n.getProperty (ids::slide, false))
+        {
+            juce::Path arrow;
+            const float ax = r.getX() + 2.0f, ay = r.getBottom() - 2.0f;
+            arrow.addTriangle (ax, ay, ax + 8.0f, ay, ax + 8.0f, r.getY() + 2.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.85f));
+            g.fillPath (arrow);
+        }
+        // Panorama distinto del centro: una rayita arriba (izquierda o derecha)
+        if (std::abs ((float) n.getProperty (ids::notePan, 0.0f)) > 0.02f)
+        {
+            const float pan = (float) n.getProperty (ids::notePan, 0.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.7f));
+            g.fillRect (juce::Rectangle<float> (r.getCentreX() + pan * r.getWidth() * 0.4f - 1.5f, r.getY() + 1.0f, 3.0f, 3.0f));
         }
         // Asa para alargar
         g.setColour (juce::Colours::black.withAlpha (0.3f));
@@ -310,6 +336,30 @@ void PianoRollGrid::mouseDown (const juce::MouseEvent& e)
     const double steps = xToSteps (e.position.x);
     const bool selecting = roll.selectMode || e.mods.isCommandDown() || e.mods.isCtrlDown();
 
+    // Doble clic en una nota fantasma: pasar a editar ese canal
+    if (e.getNumberOfClicks() >= 2 && roll.showGhosts())
+    {
+        const int pitch = yToNote (e.position.y);
+        for (auto n : roll.getPattern())
+            if (n.hasType (ids::NOTE) && (int) n[ids::channel] != uid && (int) n[ids::pitch] == pitch
+                && steps >= (double) n[ids::start] && steps < (double) n[ids::start] + (double) n[ids::length])
+            {
+                // quita la nota que puso el primer clic
+                for (int i = roll.getPattern().getNumChildren(); --i >= 0;)
+                {
+                    auto c = roll.getPattern().getChild (i);
+                    if (c.hasType (ids::NOTE) && (int) c[ids::channel] == uid && (int) c[ids::pitch] == pitch
+                        && std::abs ((double) c[ids::start] - snap (steps)) < 1.0e-6)
+                    {
+                        roll.getPattern().removeChild (i, ctx.project.um());
+                        break;
+                    }
+                }
+                ctx.project.setSelectedChannel (n[ids::channel]);
+                return;
+            }
+    }
+
     // Ctrl (o modo Seleccionar): clic en una nota la añade/quita de la selección; en un hueco, rectángulo
     if (selecting && ! edge)
     {
@@ -364,6 +414,8 @@ void PianoRollGrid::mouseDown (const juce::MouseEvent& e)
         {
             const int p = interval == 0 ? pitch : roll.snapToScale (pitch + interval);
             auto added = ctx.project.addNote (roll.getPattern(), uid, start, len, p);
+            if (roll.slideMode)
+                added.setProperty (ids::slide, true, ctx.project.um());
             if (interval == 0)
                 note = added;
             ctx.engine.previewNote (uid, p, 0.8f, 0.3);
@@ -476,26 +528,61 @@ void PianoRollGrid::mouseUp (const juce::MouseEvent&)
 // ============================================================================
 VelocityLane::VelocityLane (AppContext& c, PianoRoll& r) : ctx (c), roll (r)
 {
-    setTooltip (txt ("Velocity: lo fuerte que suena cada nota. Arrastra las barras hacia arriba (más fuerte) "
-                     "o hacia abajo (más suave). Si arrastras de lado, cambias varias notas seguidas."));
+    setTooltip (txt ("Carril de notas: lo fuerte que suena cada nota (o su panorama, afinación fina o modulación: "
+                     "pulsa el nombre de la izquierda para cambiar). Arrastra las barras hacia arriba o abajo; "
+                     "si arrastras de lado, cambias varias notas seguidas. Doble clic: valor normal."));
     makeNonFocusing (*this);
+}
+
+namespace
+{
+    struct LaneInfo { const juce::Identifier* id; float lo, hi, def; bool bipolar; const char* label; };
+    LaneInfo laneInfo (int mode)
+    {
+        switch (mode)
+        {
+            case 1:  return { &ids::notePan, -1.0f, 1.0f, 0.0f, true, "PANORAMA" };
+            case 2:  return { &ids::noteFine, -100.0f, 100.0f, 0.0f, true, "AFINAR" };
+            case 3:  return { &ids::noteMod, 0.0f, 1.0f, 0.0f, false, "MODULAR" };
+            default: return { &ids::velocity, 0.05f, 1.0f, 0.8f, false, "VELOCITY" };
+        }
+    }
+}
+
+void VelocityLane::showModeMenu()
+{
+    juce::PopupMenu m;
+    m.addSectionHeader (txt ("Qué quieres cambiar de cada nota"));
+    m.addItem (1, txt ("Fuerza (velocity)"), true, mode == 0);
+    m.addItem (2, txt ("Panorama (izquierda / derecha)"), true, mode == 1);
+    m.addItem (3, txt ("Afinación fina (cents)"), true, mode == 2);
+    m.addItem (4, txt ("Modulación (abre el filtro del sinte)"), true, mode == 3);
+    juce::Component::SafePointer<VelocityLane> safe (this);
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [safe] (int r)
+    {
+        if (safe != nullptr && r > 0) { safe->mode = r - 1; safe->repaint(); }
+    });
 }
 
 void VelocityLane::paint (juce::Graphics& g)
 {
+    const auto info = laneInfo (mode);
     g.fillAll (juce::Colour (0xff15181c));
     auto area = getLocalBounds().toFloat().reduced (0.0f, 4.0f);
     g.setColour (Colours::outline.withAlpha (0.4f));
     for (float f : { 0.25f, 0.5f, 0.75f })
         g.drawHorizontalLine ((int) (area.getBottom() - f * area.getHeight()), 0.0f, (float) getWidth());
 
-    g.setColour (Colours::textDim);
-    g.setFont (Fonts::bold (11.0f));
-    g.drawFittedText ("VELOCITY", juce::Rectangle<int> (0, 0, PianoRollGrid::keyboardWidth, getHeight() - 22),
-                      juce::Justification::centred, 2);
+    auto label = juce::Rectangle<int> (2, 2, PianoRollGrid::keyboardWidth - 4, getHeight() - 26);
+    g.setColour (Colours::outline.withAlpha (0.5f));
+    g.fillRoundedRectangle (label.toFloat(), 4.0f);
+    g.setColour (mode == 0 ? Colours::textDim : Colours::accent);
+    g.setFont (Fonts::bold (10.0f));
+    g.drawFittedText (juce::String (info.label) + juce::String::fromUTF8 (" \xe2\x96\xbe"), label, juce::Justification::centred, 2);
 
     const int uid = roll.getChannelUid();
     const auto colour = Colours::forChannelType (roll.getChannelType());
+    const float zeroY = info.bipolar ? area.getCentreY() : area.getBottom();
     for (auto n : roll.getPattern())
     {
         if (! n.hasType (ids::NOTE) || (int) n[ids::channel] != uid)
@@ -503,26 +590,50 @@ void VelocityLane::paint (juce::Graphics& g)
         const float x = roll.gridStepsToX (n[ids::start]) - (float) roll.viewX();
         if (x < (float) PianoRollGrid::keyboardWidth - 2.0f || x > (float) getWidth())
             continue;
-        const float vel = juce::jlimit (0.0f, 1.0f, (float) n.getProperty (ids::velocity, 0.8f));
-        const float top = area.getBottom() - vel * area.getHeight();
-        g.setColour (colour.withAlpha (0.35f + 0.65f * vel));
-        g.fillRect (juce::Rectangle<float> (x, top, 3.0f, area.getBottom() - top));
+        const float v = juce::jlimit (info.lo, info.hi, (float) n.getProperty (*info.id, info.def));
+        const float norm = (v - info.lo) / (info.hi - info.lo);
+        const float top = area.getBottom() - norm * area.getHeight();
+        g.setColour (colour.withAlpha (0.35f + 0.65f * (info.bipolar ? std::abs (norm - 0.5f) * 2.0f : norm)));
+        g.fillRect (juce::Rectangle<float> (x, juce::jmin (top, zeroY), 3.0f, std::abs (zeroY - top)));
         g.fillEllipse (x - 3.0f, top - 4.5f, 9.0f, 9.0f);
     }
 }
 
 void VelocityLane::mouseDown (const juce::MouseEvent& e)
 {
+    if (e.position.x < PianoRollGrid::keyboardWidth && e.position.y < getHeight() - 24)
+    {
+        showModeMenu();
+        return;
+    }
     ctx.project.beginTransaction();
+    if (e.getNumberOfClicks() >= 2)
+    {
+        const auto info = laneInfo (mode);
+        auto area = getLocalBounds().toFloat().reduced (0.0f, 4.0f);
+        const float norm = (info.def - info.lo) / (info.hi - info.lo);
+        setVelocityAt ({ e.position.x, area.getBottom() - norm * area.getHeight() });
+        return;
+    }
     setVelocityAt (e.position);
 }
 
-void VelocityLane::mouseDrag (const juce::MouseEvent& e) { setVelocityAt (e.position); }
+void VelocityLane::mouseDrag (const juce::MouseEvent& e)
+{
+    if (e.mouseDownPosition.x >= PianoRollGrid::keyboardWidth)
+        setVelocityAt (e.position);
+}
 
 void VelocityLane::setVelocityAt (juce::Point<float> p)
 {
+    const auto info = laneInfo (mode);
     auto area = getLocalBounds().toFloat().reduced (0.0f, 4.0f);
-    const float vel = juce::jlimit (0.05f, 1.0f, (area.getBottom() - p.y) / juce::jmax (1.0f, area.getHeight()));
+    const float norm = juce::jlimit (0.0f, 1.0f, (area.getBottom() - p.y) / juce::jmax (1.0f, area.getHeight()));
+    float value = info.lo + norm * (info.hi - info.lo);
+    if (info.bipolar && std::abs (norm - 0.5f) < 0.04f)
+        value = 0.0f;   // se "pega" al centro
+    if (mode == 2)
+        value = (float) juce::roundToInt (value);
     const int uid = roll.getChannelUid();
 
     // La nota (o acorde) cuyo inicio está más cerca del ratón, a menos de 10 píxeles
@@ -539,8 +650,14 @@ void VelocityLane::setVelocityAt (juce::Point<float> p)
     for (auto n : roll.getPattern())
         if (n.hasType (ids::NOTE) && (int) n[ids::channel] == uid
             && juce::approximatelyEqual ((double) n[ids::start], bestStart))
-            n.setProperty (ids::velocity, vel, ctx.project.um());
+        {
+            if (mode != 0 && juce::approximatelyEqual (value, info.def))
+                n.removeProperty (*info.id, ctx.project.um());
+            else
+                n.setProperty (*info.id, value, ctx.project.um());
+        }
     repaint();
+    roll.getGridComponent().repaint();
 }
 
 // ============================================================================
@@ -608,7 +725,8 @@ PianoRoll::PianoRoll (AppContext& c)
 
     addAndMakeVisible (toolsButton);
     toolsButton.setButtonText (txt ("Herramientas"));
-    toolsButton.setTooltip (txt ("Copiar, pegar, duplicar, transponer, arpegiador y escalas."));
+    toolsButton.setTooltip (txt ("Copiar, pegar, duplicar, transponer, arpegiador, generador de ideas, humanizar, "
+                                 "unir y partir notas, deslizar, notas fantasma y escalas."));
     toolsButton.onClick = [this] { showToolsMenu(); };
     makeNonFocusing (toolsButton);
 
@@ -619,6 +737,14 @@ PianoRoll::PianoRoll (AppContext& c)
                                   "juntas, cópialas o bórralas."));
     selectButton.onClick = [this] { selectMode = selectButton.getToggleState(); };
     makeNonFocusing (selectButton);
+
+    addAndMakeVisible (slideButton);
+    slideButton.setButtonText ("Slide");
+    slideButton.setClickingTogglesState (true);
+    slideButton.setTooltip (txt ("Activado: las notas que pongas se deslizan desde la nota anterior (como el 808 del trap). "
+                                 "Las notas deslizantes llevan una flecha. Para cambiar notas que ya están: Herramientas > Deslizar."));
+    slideButton.onClick = [this] { slideMode = slideButton.getToggleState(); };
+    makeNonFocusing (slideButton);
 
     addAndMakeVisible (quantizeButton);
     quantizeButton.setButtonText ("Cuantizar");
@@ -795,7 +921,15 @@ bool PianoRollGrid::isSelected (const juce::ValueTree& n) const { return roll.se
 // ----------------------------------------------------------------------------
 namespace
 {
-    struct ClipNote { double start, length; int pitch; float velocity; };
+    struct ClipNote { double start, length; int pitch; float velocity; juce::NamedValueSet extras; };
+
+    // Copia los ajustes de una nota (panorama, afinación, modulación, deslizar) a otra
+    void copyNoteExtras (const juce::ValueTree& from, juce::ValueTree to, juce::UndoManager* um)
+    {
+        for (auto* id : { &ids::notePan, &ids::noteFine, &ids::noteMod, &ids::slide })
+            if (from.hasProperty (*id))
+                to.setProperty (*id, from[*id], um);
+    }
     std::vector<ClipNote>& clipboard() { static std::vector<ClipNote> c; return c; }
 
 }
@@ -875,8 +1009,14 @@ void PianoRoll::copySelection()
         return;
     clipboard().clear();
     for (auto& n : selection)
+    {
+        juce::NamedValueSet extras;
+        for (auto* id : { &ids::notePan, &ids::noteFine, &ids::noteMod, &ids::slide })
+            if (n.hasProperty (*id))
+                extras.set (*id, n[*id]);
         clipboard().push_back ({ (double) n[ids::start], (double) n[ids::length], (int) n[ids::pitch],
-                                 (float) n.getProperty (ids::velocity, 0.8f) });
+                                 (float) n.getProperty (ids::velocity, 0.8f), extras });
+    }
 }
 
 void PianoRoll::cutSelection()
@@ -894,8 +1034,13 @@ void PianoRoll::paste()
     selection.clear();
     for (auto& c : clipboard())
         if (c.start < length)
-            selection.add (ctx.project.addNote (getPattern(), getChannelUid(), c.start, juce::jmin (c.length, length - c.start),
-                                                c.pitch, c.velocity));
+        {
+            auto added = ctx.project.addNote (getPattern(), getChannelUid(), c.start, juce::jmin (c.length, length - c.start),
+                                              c.pitch, c.velocity);
+            for (int k = 0; k < c.extras.size(); ++k)
+                added.setProperty (c.extras.getName (k), c.extras.getValueAt (k), ctx.project.um());
+            selection.add (added);
+        }
     grid.repaint();
 }
 
@@ -918,9 +1063,13 @@ void PianoRoll::duplicateSelection()
     {
         const double start = (double) n[ids::start] + span;
         if (start < length)
-            added.add (ctx.project.addNote (getPattern(), getChannelUid(), start,
-                                            juce::jmin ((double) n[ids::length], length - start), n[ids::pitch],
-                                            (float) n.getProperty (ids::velocity, 0.8f)));
+        {
+            auto copy = ctx.project.addNote (getPattern(), getChannelUid(), start,
+                                             juce::jmin ((double) n[ids::length], length - start), n[ids::pitch],
+                                             (float) n.getProperty (ids::velocity, 0.8f));
+            copyNoteExtras (n, copy, ctx.project.um());
+            added.add (copy);
+        }
     }
     selection = added;
     grid.repaint();
@@ -1001,6 +1150,206 @@ void PianoRoll::arpeggiate (int style)
     grid.repaint();
 }
 
+bool PianoRoll::showGhosts() const
+{
+    return (bool) ctx.project.getState().getProperty (ids::ghostNotes, true);
+}
+
+void PianoRoll::toggleSlide()
+{
+    auto notes = selectedOrAll();
+    if (notes.isEmpty())
+        return;
+    bool allSlide = true;
+    for (auto& n : notes)
+        allSlide = allSlide && (bool) n.getProperty (ids::slide, false);
+    ctx.project.beginTransaction();
+    for (auto& n : notes)
+    {
+        if (allSlide) n.removeProperty (ids::slide, ctx.project.um());
+        else          n.setProperty (ids::slide, true, ctx.project.um());
+    }
+    grid.repaint();
+}
+
+void PianoRoll::humanize (bool timing, bool velocity)
+{
+    // Mueve un poquito cada nota (tiempo y fuerza) para que no suene "a máquina"
+    auto notes = selectedOrAll();
+    if (notes.isEmpty())
+        return;
+    const int length = Project::getPatternLength (getPattern());
+    juce::Random rnd;
+    ctx.project.beginTransaction();
+    for (auto& n : notes)
+    {
+        if (timing)
+        {
+            const double start = juce::jlimit (0.0, length - 0.05, (double) n[ids::start] + (rnd.nextDouble() - 0.5) * 0.16);
+            n.setProperty (ids::start, start, ctx.project.um());
+        }
+        if (velocity)
+        {
+            const float v = juce::jlimit (0.1f, 1.0f, (float) n.getProperty (ids::velocity, 0.8f) + (rnd.nextFloat() - 0.5f) * 0.24f);
+            n.setProperty (ids::velocity, v, ctx.project.um());
+        }
+    }
+    grid.repaint();
+}
+
+void PianoRoll::glueNotes()
+{
+    // Une las notas de la misma altura que van seguidas (la una empieza donde acaba la otra)
+    auto notes = selectedOrAll();
+    std::map<int, std::vector<juce::ValueTree>> byPitch;
+    for (auto& n : notes)
+        byPitch[(int) n[ids::pitch]].push_back (n);
+    ctx.project.beginTransaction();
+    selection.clear();
+    for (auto& [pitch, list] : byPitch)
+    {
+        std::sort (list.begin(), list.end(), [] (const juce::ValueTree& a, const juce::ValueTree& b)
+                   { return (double) a[ids::start] < (double) b[ids::start]; });
+        juce::ValueTree current;
+        for (auto& n : list)
+        {
+            if (current.isValid())
+            {
+                const double end = (double) current[ids::start] + (double) current[ids::length];
+                if ((double) n[ids::start] <= end + 0.01)
+                {
+                    const double newEnd = juce::jmax (end, (double) n[ids::start] + (double) n[ids::length]);
+                    current.setProperty (ids::length, newEnd - (double) current[ids::start], ctx.project.um());
+                    getPattern().removeChild (n, ctx.project.um());
+                    continue;
+                }
+            }
+            current = n;
+            selection.add (n);
+        }
+    }
+    grid.repaint();
+}
+
+void PianoRoll::splitNotes (int parts)
+{
+    // Parte cada nota en 'parts' trozos iguales (0 = en trozos del tamaño del ajuste)
+    auto notes = selectedOrAll();
+    if (notes.isEmpty())
+        return;
+    const int uid = getChannelUid();
+    ctx.project.beginTransaction();
+    selection.clear();
+    for (auto& n : notes)
+    {
+        const double start = n[ids::start], len = n[ids::length];
+        const double piece = parts > 0 ? len / parts : getSnap();
+        if (piece < 0.05 || len <= piece + 1.0e-6)
+        {
+            selection.add (n);
+            continue;
+        }
+        const int count = juce::jmin (64, (int) std::ceil (len / piece - 1.0e-6));
+        n.setProperty (ids::length, piece, ctx.project.um());
+        selection.add (n);
+        for (int k = 1; k < count; ++k)
+        {
+            const double t = start + piece * k;
+            auto copy = ctx.project.addNote (getPattern(), uid, t, juce::jmin (piece, start + len - t), n[ids::pitch],
+                                             (float) n.getProperty (ids::velocity, 0.8f));
+            copyNoteExtras (n, copy, ctx.project.um());
+            copy.removeProperty (ids::slide, ctx.project.um());
+            selection.add (copy);
+        }
+    }
+    grid.repaint();
+}
+
+void PianoRoll::generateIdea (int kind)
+{
+    // Generador de ideas: crea una melodía, un bajo, acordes o un arpegio con las notas de la escala.
+    // Cada vez sale distinto; Ctrl+Z para volver atrás y probar otra.
+    const int uid = getChannelUid();
+    if (uid == 0)
+        return;
+    const int scaleType = getScaleType() > 0 ? getScaleType() : 2;   // sin escala: menor
+    const int root = getScaleRoot();
+    const auto& iv = scales::intervals (scaleType);
+    const int degrees = (int) iv.size();
+    auto pitchOf = [&] (int degree, int baseOctave)
+    {
+        const int oct = (int) std::floor ((double) degree / degrees);
+        const int d = ((degree % degrees) + degrees) % degrees;
+        return juce::jlimit (PianoRollGrid::lowestNote, PianoRollGrid::highestNote, 12 * baseOctave + root + iv[(size_t) d] + 12 * oct);
+    };
+    const int length = juce::jmin (Project::getPatternLength (getPattern()), 64);
+    const int barSteps = ctx.project.getStepsPerBar();
+    juce::Random rnd;
+    ctx.project.beginTransaction();
+    auto p = getPattern();
+    for (int i = p.getNumChildren(); --i >= 0;)
+        if (p.getChild (i).hasType (ids::NOTE) && (int) p.getChild (i)[ids::channel] == uid)
+            p.removeChild (i, ctx.project.um());
+    selection.clear();
+    auto add = [&] (double start, double len, int pitch, float vel)
+    {
+        if (start < length)
+            selection.add (ctx.project.addNote (p, uid, start, juce::jmin (len, length - start), pitch, vel));
+    };
+
+    // Progresión de acordes (grados de la escala): una por compás
+    static const int progressions[][4] = { { 0, 5, 3, 4 }, { 0, 3, 4, 3 }, { 0, 4, 5, 3 }, { 5, 3, 0, 4 }, { 0, 2, 5, 4 }, { 0, 5, 2, 6 } };
+    const auto* prog = progressions[rnd.nextInt (6)];
+    const bool isBass = kind == 1 || getChannelType() == "bass808";
+    const int octave = isBass ? 3 : (kind == 0 ? 5 : 4);
+
+    for (int bar = 0; bar * barSteps < length; ++bar)
+    {
+        const int chordRoot = prog[bar % 4];
+        const double t0 = bar * barSteps;
+        if (kind == 2)
+        {
+            // Acordes: tres notas de la escala (1-3-5) durante el compás
+            for (int k : { 0, 2, 4 })
+                add (t0, barSteps, pitchOf (chordRoot + k, octave), 0.7f);
+        }
+        else if (kind == 3)
+        {
+            // Arpegio: las notas del acorde una detrás de otra
+            static const int shape[] = { 0, 2, 4, 7, 4, 2 };
+            for (int s = 0; s < barSteps; s += 2)
+                add (t0 + s, 2.0, pitchOf (chordRoot + shape[(s / 2) % 6], octave), s % 4 == 0 ? 0.85f : 0.65f);
+        }
+        else if (isBass)
+        {
+            // Bajo: la nota base del acorde con un ritmo que se repite
+            static const int rhythms[][8] = { { 0, 3, 6, 8, 11, 14, -1, -1 }, { 0, 6, 10, -1, -1, -1, -1, -1 }, { 0, 4, 8, 12, -1, -1, -1, -1 } };
+            const auto* r = rhythms[rnd.nextInt (3)];
+            for (int k = 0; k < 8 && r[k] >= 0 && r[k] < barSteps; ++k)
+            {
+                const int next = (k + 1 < 8 && r[k + 1] >= 0) ? r[k + 1] : barSteps;
+                const int deg = chordRoot + (rnd.nextFloat() < 0.2f ? 4 : 0);
+                add (t0 + r[k], juce::jmax (1, next - r[k]), pitchOf (deg, octave), k == 0 ? 0.9f : 0.75f);
+            }
+        }
+        else
+        {
+            // Melodía: pasos cortos por la escala, apoyándose en las notas del acorde
+            int degree = chordRoot + 2 * rnd.nextInt (3);
+            for (int s = 0; s < barSteps;)
+            {
+                const int len = rnd.nextFloat() < 0.5f ? 2 : (rnd.nextFloat() < 0.5f ? 1 : 4);
+                if (rnd.nextFloat() < 0.18f && s > 0) { s += len; continue; }   // un silencio
+                add (t0 + s, len, pitchOf (degree, octave), s % 4 == 0 ? 0.85f : 0.7f);
+                const int move = rnd.nextInt (5) - 2;   // -2..2 grados
+                degree = juce::jlimit (chordRoot - 3, chordRoot + 7, degree + move);
+                s += len;
+            }
+        }
+    }
+    grid.repaint();
+}
+
 bool PianoRoll::handleKey (const juce::KeyPress& key)
 {
     const auto mods = key.getModifiers();
@@ -1054,6 +1403,20 @@ void PianoRoll::showToolsMenu()
     arp.addItem (22, txt ("Sube y baja"));
     arp.addItem (23, txt ("Al azar"));
     menu.addSubMenu (txt ("Arpegiador (convierte los acordes en notas sueltas)"), arp);
+    juce::PopupMenu idea;
+    idea.addItem (40, txt ("Melodía"));
+    idea.addItem (41, txt ("Línea de bajo"));
+    idea.addItem (42, txt ("Acordes"));
+    idea.addItem (43, txt ("Arpegio"));
+    menu.addSubMenu (txt ("Generar una idea (con la escala; borra las notas de este canal)"), idea);
+    menu.addSeparator();
+    menu.addItem (50, txt ("Humanizar: mover un poco el tiempo y la fuerza"));
+    menu.addItem (51, txt ("Fuerza al azar"));
+    menu.addItem (52, txt ("Unir notas seguidas (pegar)"));
+    menu.addItem (53, txt ("Partir notas en 2"));
+    menu.addItem (54, txt ("Partir notas en trozos del ajuste"));
+    menu.addItem (55, txt ("Deslizar (slide): activar o quitar"));
+    menu.addItem (56, txt ("Ver las notas de otros canales (fantasma)"), true, showGhosts());
 
     juce::PopupMenu scale, root;
     const auto names = scaleNames();
@@ -1088,6 +1451,14 @@ void PianoRoll::showToolsMenu()
             case 12: transpose (12); break;
             case 13: transpose (-12); break;
             case 20: case 21: case 22: case 23: arpeggiate (r - 20); break;
+            case 40: case 41: case 42: case 43: generateIdea (r - 40); break;
+            case 50: humanize (true, true); break;
+            case 51: humanize (false, true); break;
+            case 52: glueNotes(); break;
+            case 53: splitNotes (2); break;
+            case 54: splitNotes (0); break;
+            case 55: toggleSlide(); break;
+            case 56: st.setProperty (ids::ghostNotes, ! showGhosts(), nullptr); break;
             case 30: exportMidi(); break;
             case 31: importMidi(); break;
             case 300: st.setProperty (ids::scaleLock, ! (bool) st.getProperty (ids::scaleLock, true), ctx.project.um()); break;
@@ -1259,7 +1630,7 @@ void PianoRoll::resized()
     auto h = headerArea.reduced (8, 7);
     helpButton.setBounds (h.removeFromLeft (26));
     // Anchos ideales; si no cabe todo (pantallas pequeñas), se encoge todo a la vez
-    constexpr int natural = 110 + 170 + 170 + 200 + 96 + 120 + 104 + 124 + 8 * 8;
+    constexpr int natural = 110 + 170 + 170 + 200 + 96 + 120 + 104 + 70 + 124 + 9 * 8;
     const bool roomForTitle = h.getWidth() >= natural;
     const float k = juce::jlimit (0.55f, 1.0f, (float) h.getWidth() / (float) (natural - (roomForTitle ? 0 : 110)));
     auto w = [k] (int px) { return juce::roundToInt ((float) px * k); };
@@ -1271,6 +1642,7 @@ void PianoRoll::resized()
     quantizeButton.setBounds (h.removeFromRight (w (96))); h.removeFromRight (8);
     toolsButton.setBounds (h.removeFromRight (w (120))); h.removeFromRight (8);
     selectButton.setBounds (h.removeFromRight (w (104))); h.removeFromRight (8);
+    slideButton.setBounds (h.removeFromRight (w (70))); h.removeFromRight (8);
     recordButton.setBounds (h.removeFromRight (w (124))); h.removeFromRight (8);
     patternLabel.setBounds (h);
     patternLabel.setVisible (h.getWidth() > 60);

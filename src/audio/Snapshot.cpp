@@ -112,6 +112,32 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
 
     const auto numChannels = snap->channels.size();
 
+    // Capas: un canal hace sonar también otros canales con sus notas (sin capas dentro de capas)
+    {
+        std::map<int, int> indexByUid;
+        for (size_t k = 0; k < numChannels; ++k)
+            indexByUid[snap->channels[k].uid] = (int) k;
+        size_t k = 0;
+        for (auto ch : state.getChildWithName (ids::CHANNELS))
+        {
+            if (k >= numChannels) break;
+            auto& c = snap->channels[k];
+            if (c.uid == (int) ch[ids::uid])
+                for (auto& token : juce::StringArray::fromTokens (ch[ids::layers].toString(), ",", ""))
+                {
+                    const auto it = indexByUid.find (token.getIntValue());
+                    if (it != indexByUid.end() && it->second != (int) k && c.layerIndexes.size() < 16
+                        && std::find (c.layerIndexes.begin(), c.layerIndexes.end(), it->second) == c.layerIndexes.end())
+                        c.layerIndexes.push_back (it->second);
+                }
+            ++k;
+        }
+        for (auto& c : snap->channels)   // una capa dentro de otra capa no cuenta (así no hay bucles)
+            c.layerIndexes.erase (std::remove_if (c.layerIndexes.begin(), c.layerIndexes.end(),
+                                                  [&] (int idx) { return ! snap->channels[(size_t) idx].layerIndexes.empty(); }),
+                                  c.layerIndexes.end());
+    }
+
     // --- Patrones -------------------------------------------------------------
     std::map<int, int> patternIndexByUid;
     const int currentUid = state[ids::currentPattern];
@@ -157,6 +183,10 @@ std::shared_ptr<Snapshot> Snapshot::build (const juce::ValueTree& state)
                 n.length = juce::jmax (0.05, pos (item[ids::length], 4096.0));
                 n.pitch = juce::jlimit (0, 127, (int) item[ids::pitch]);
                 n.velocity = num (item, ids::velocity, 0.0f, 1.0f, 0.8f);
+                n.pan = num (item, ids::notePan, -1.0f, 1.0f, 0.0f);
+                n.fine = num (item, ids::noteFine, -100.0f, 100.0f, 0.0f);
+                n.mod = num (item, ids::noteMod, 0.0f, 1.0f, 0.0f);
+                n.slide = (bool) item.getProperty (ids::slide, false);
                 if (n.start < ps.length)
                     notes.push_back (n);
             }

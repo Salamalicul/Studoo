@@ -69,6 +69,10 @@ namespace studoo
         void setVelocityAt (juce::Point<float>);
         AppContext& ctx;
         PianoRoll& roll;
+    public:
+        // Qué se edita en el carril: 0 fuerza, 1 panorama, 2 afinación fina, 3 modulación
+        int mode = 0;
+        void showModeMenu();
     };
 
     class PianoRoll : public juce::Component,
@@ -107,6 +111,13 @@ namespace studoo
         void deleteSelection();
         void transpose (int semitones);
         void arpeggiate (int style);          // 0 sube, 1 baja, 2 sube y baja, 3 al azar
+        void generateIdea (int kind);         // 0 melodía, 1 bajo, 2 acordes, 3 arpegio (en la escala)
+        void humanize (bool timing, bool velocity);
+        void glueNotes();                     // une las notas seguidas de la misma altura
+        void splitNotes (int parts);          // 0 = en trozos del ajuste
+        void toggleSlide();                   // las seleccionadas se deslizan desde la nota anterior
+        bool slideMode = false;               // botón "Slide": las notas nuevas se deslizan
+        bool showGhosts() const;
         juce::Array<juce::ValueTree> selectedOrAll();
         bool handleKey (const juce::KeyPress&);
 
@@ -140,7 +151,7 @@ namespace studoo
         HelpButton helpButton;
         juce::ComboBox channelBox, snapBox, chordBox;
         juce::Label patternLabel;
-        juce::TextButton clearButton, quantizeButton, toolsButton, selectButton, recordButton;
+        juce::TextButton clearButton, quantizeButton, toolsButton, selectButton, recordButton, slideButton;
         struct ScrollViewport : juce::Viewport
         {
             std::function<void()> onScroll;

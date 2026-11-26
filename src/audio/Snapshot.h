@@ -19,6 +19,11 @@ namespace studoo
         double length = 1.0;
         int pitch = 60;
         float velocity = 0.8f;
+        float pan = 0.0f;      // -1..1
+        float fine = 0.0f;     // cents -100..100
+        float mod = 0.0f;      // 0..1 (abre el filtro del sinte)
+        bool slide = false;    // se desliza desde la nota anterior
+        bool hasExtras() const { return std::abs (pan) > 0.001f || std::abs (fine) > 0.01f || mod > 0.001f || slide; }
     };
 
     struct SynthParams
@@ -65,6 +70,7 @@ namespace studoo
         SynthParams synth;
         Bass808Params bass;
         SamplerParams sampler;
+        std::vector<int> layerIndexes;   // capas: otros canales (posición) que tocan las mismas notas
     };
 
     struct PatternSnap

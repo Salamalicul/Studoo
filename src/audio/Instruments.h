@@ -35,7 +35,20 @@ namespace studoo
     public:
         void render (juce::AudioBuffer<float>& out, const juce::MidiBuffer& midi, int numSamples) override;
 
+        // Ajustes de cada nota del piano roll: llegan como controles MIDI justo antes de la nota
+        static constexpr int ccMod = 1, ccPan = 10, ccFine = 20, ccSlide = 65;
+
     protected:
+        struct NoteExtras { float pan = 0.0f, fine = 0.0f, mod = 0.0f; bool slide = false; };
+        NoteExtras extras;   // los de la próxima nota (se vuelven a cero después)
+        static void panGains (float pan, float& gl, float& gr)
+        {
+            const float angle = (juce::jlimit (-1.0f, 1.0f, pan) + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+            gl = std::cos (angle) * juce::MathConstants<float>::sqrt2;
+            gr = std::sin (angle) * juce::MathConstants<float>::sqrt2;
+        }
+        static double fineRatio (float cents) { return std::pow (2.0, (double) cents / 1200.0); }
+
         virtual void renderVoices (juce::AudioBuffer<float>& out, int start, int num) = 0;
         virtual void noteOn (int note, float velocity) = 0;
         virtual void noteOff (int note) = 0;
@@ -72,6 +85,8 @@ namespace studoo
             double regionStart = 0.0, regionEnd = 0.0;   // parte del sample que toca (en muestras)
             const SampleData* data = nullptr;             // el sample que suena (el normal o el de su zona)
             float gain = 1.0f, env = 1.0f;
+            float gl = 1.0f, gr = 1.0f;                   // panorama de esta nota
+            double glideRatio = 1.0;                      // nota deslizante: empieza en el tono de la anterior
             bool releasing = false;
             juce::uint32 age = 0;
         };
@@ -108,6 +123,11 @@ namespace studoo
             double phase1 = 0.0, phase2 = 0.0, inc1 = 0.0, inc2 = 0.0;
             float velocity = 0.0f;
             double glideRatio = 1.0;   // al deslizarse, empieza en la frecuencia de la nota anterior y llega a 1
+            float glideTime = 0.0f;    // segundos del deslizamiento de esta voz
+            double fine = 1.0;         // afinación fina de esta nota
+            float gl = 1.0f, gr = 1.0f; // panorama de esta nota
+            float modMul = 1.0f;       // modulación: abre el filtro (x veces el corte)
+            bool released = false;     // ya se soltó (está en su cola)
             juce::ADSR adsr;
             juce::dsp::StateVariableTPTFilter<float> filter;
             juce::uint32 age = 0;
@@ -145,6 +165,7 @@ namespace studoo
         int note = -1;
         double freq = 55.0, targetFreq = 55.0, phase = 0.0, timeSinceAttack = 0.0;
         float amp = 0.0f, velocity = 1.0f;
+        float gl = 1.0f, gr = 1.0f, glideTime = 0.0f;
     };
 
     // ------------------------------------------------------------------------

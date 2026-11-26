@@ -612,13 +612,25 @@ void AudioEngine::releaseAllNotes()
     }
 }
 
-void AudioEngine::scheduleNote (ChannelRuntime& rt, int note, float velocity, int sampleOffset, juce::int64 lengthSamples)
+void AudioEngine::scheduleNote (ChannelRuntime& rt, int note, float velocity, int sampleOffset, juce::int64 lengthSamples,
+                                const NoteEvent* extras)
 {
     note = juce::jlimit (0, 127, note);
     sampleOffset = juce::jlimit (0, juce::jmax (0, currentChunkSize - 1), sampleOffset);
 
     if (rt.noteOffAt[(size_t) note] >= 0)
         rt.midi.addEvent (juce::MidiMessage::noteOff (1, note), sampleOffset);
+
+    // Ajustes de esta nota (panorama, afinación fina, modulación, deslizar): van justo antes de la nota
+    // como controles MIDI. Solo los entienden los instrumentos de Studoo (a los plugins no se les mandan).
+    if (extras != nullptr && extras->hasExtras() && rt.type != ChannelType::plugin)
+    {
+        auto cc = [] (float v01) { return juce::jlimit (0, 127, juce::roundToInt (v01 * 127.0f)); };
+        rt.midi.addEvent (juce::MidiMessage::controllerEvent (1, VoiceInstrument::ccPan, cc ((extras->pan + 1.0f) * 0.5f)), sampleOffset);
+        rt.midi.addEvent (juce::MidiMessage::controllerEvent (1, VoiceInstrument::ccFine, cc ((extras->fine + 100.0f) / 200.0f)), sampleOffset);
+        rt.midi.addEvent (juce::MidiMessage::controllerEvent (1, VoiceInstrument::ccMod, cc (extras->mod)), sampleOffset);
+        rt.midi.addEvent (juce::MidiMessage::controllerEvent (1, VoiceInstrument::ccSlide, extras->slide ? 127 : 0), sampleOffset);
+    }
 
     rt.midi.addEvent (juce::MidiMessage::noteOn (1, note, juce::jlimit (0.01f, 1.0f, velocity)), sampleOffset);
     rt.noteOffAt[(size_t) note] = sampleClock + sampleOffset + juce::jmax ((juce::int64) 1, lengthSamples);
@@ -658,7 +670,12 @@ void AudioEngine::collectPatternEvents (const Snapshot& snap, const PatternSnap&
 
                 const double noteLength = juce::jmin (note.length, localEnd - t);
                 const int offset = sampleOffset + (int) ((t + globalShift - segmentStart) * samplesPerStep);
-                scheduleNote (rt, note.pitch, note.velocity, offset, (juce::int64) (noteLength * samplesPerStep));
+                scheduleNote (rt, note.pitch, note.velocity, offset, (juce::int64) (noteLength * samplesPerStep), &note);
+                // Capas: los otros canales de la capa tocan la misma nota
+                for (int li : snap.channels[ci].layerIndexes)
+                    if (juce::isPositiveAndBelow (li, (int) runtimes.size()) && ! snap.channels[(size_t) li].muted)
+                        scheduleNote (*runtimes[(size_t) li], note.pitch, note.velocity, offset,
+                                      (juce::int64) (noteLength * samplesPerStep), &note);
             }
         }
     }
@@ -825,9 +842,15 @@ void AudioEngine::renderChunk (const float* const* inputs, int numInputs, float*
         auto handle = [&] (int index)
         {
             const auto& e = previewEvents[(size_t) index];
-            for (auto& rt : runtimes)
-                if (rt->uid == e.channelUid)
-                    scheduleNote (*rt, e.note, e.velocity, 0, e.lengthSamples);
+            for (size_t k = 0; k < runtimes.size(); ++k)
+                if (runtimes[k]->uid == e.channelUid)
+                {
+                    scheduleNote (*runtimes[k], e.note, e.velocity, 0, e.lengthSamples);
+                    if (snap != nullptr && k < snap->channels.size())
+                        for (int li : snap->channels[k].layerIndexes)
+                            if (juce::isPositiveAndBelow (li, (int) runtimes.size()))
+                                scheduleNote (*runtimes[(size_t) li], e.note, e.velocity, 0, e.lengthSamples);
+                }
         };
         scope.forEach (handle);
     }

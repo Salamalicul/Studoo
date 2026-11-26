@@ -35,7 +35,22 @@ void VoiceInstrument::render (juce::AudioBuffer<float>& out, const juce::MidiBuf
 
         const auto msg = meta.getMessage();
         if (msg.isNoteOn())
+        {
             noteOn (msg.getNoteNumber(), msg.getFloatVelocity());
+            extras = {};
+        }
+        else if (msg.isController())
+        {
+            const float v = msg.getControllerValue() / 127.0f;
+            switch (msg.getControllerNumber())
+            {
+                case ccPan:   extras.pan = v * 2.0f - 1.0f; break;
+                case ccFine:  extras.fine = v * 200.0f - 100.0f; break;
+                case ccMod:   extras.mod = v; break;
+                case ccSlide: extras.slide = msg.getControllerValue() >= 64; break;
+                default: break;
+            }
+        }
         else if (msg.isNoteOff())
             noteOff (msg.getNoteNumber());
         else if (msg.isAllNotesOff() || msg.isAllSoundOff())
@@ -147,12 +162,27 @@ void SamplerInstrument::noteOn (int note, float velocity)
         semitones += (double) (note - root);
     }
 
+    // Nota deslizante: empieza en el tono de la última nota que sonaba y llega a la suya
+    double glideFrom = 1.0;
+    const double newIncrement = data->sampleRate / sr * std::pow (2.0, semitones / 12.0) * fineRatio (extras.fine);
+    if (extras.slide)
+    {
+        const Voice* last = nullptr;
+        for (auto& v : voices)
+            if (v.active && &v != voice && (last == nullptr || v.age > last->age))
+                last = &v;
+        if (last != nullptr && newIncrement > 0.0)
+            glideFrom = std::abs (last->increment) * last->glideRatio / newIncrement;
+    }
+
     voice->active = true;
     voice->note = note;
     voice->regionStart = from;
     voice->regionEnd = to;
     voice->data = data;
-    voice->increment = data->sampleRate / sr * std::pow (2.0, semitones / 12.0);
+    voice->increment = newIncrement;
+    voice->glideRatio = juce::jlimit (0.125, 8.0, glideFrom);
+    panGains (extras.pan, voice->gl, voice->gr);
     voice->position = params.reverse ? to - 1.0 - 1.0e-6 : from;
     if (params.reverse)
         voice->increment = -voice->increment;
@@ -177,6 +207,7 @@ void SamplerInstrument::renderVoices (juce::AudioBuffer<float>& out, int start, 
     float* outL = out.getWritePointer (0, start);
     float* outR = out.getWritePointer (1, start);
     const float releaseStep = (float) (1.0 / (0.03 * sr));
+    const double glideCoef = std::exp (-1.0 / (0.02 * sr));   // notas deslizantes: unos 80 ms
 
     for (auto& v : voices)
     {
@@ -209,10 +240,12 @@ void SamplerInstrument::renderVoices (juce::AudioBuffer<float>& out, int start, 
             const double remaining = v.increment > 0.0 ? v.regionEnd - v.position : v.position - v.regionStart;
             const float fade = (float) juce::jmin (1.0, remaining / (0.004 * sr * std::abs (v.increment) + 1.0));
             const float g = v.gain * v.env * fade;
-            outL[i] += l * g;
-            outR[i] += r * g;
+            outL[i] += l * g * v.gl;
+            outR[i] += r * g * v.gr;
 
-            v.position += v.increment;
+            if (! juce::approximatelyEqual (v.glideRatio, 1.0))
+                v.glideRatio = std::abs (v.glideRatio - 1.0) < 1.0e-5 ? 1.0 : 1.0 + (v.glideRatio - 1.0) * glideCoef;
+            v.position += v.increment * v.glideRatio;
 
             if (v.releasing)
             {
@@ -259,7 +292,7 @@ void SynthInstrument::setParameters (const ChannelSnap& c)
         v.adsr.setParameters (adsrParams);
         if (filterChanged || v.note < 0)
         {
-            v.filter.setCutoffFrequency (cutoff);
+            v.filter.setCutoffFrequency (juce::jlimit (20.0f, (float) (sr * 0.45), cutoff * v.modMul));
             v.filter.setResonance (q);
         }
     }
@@ -268,20 +301,25 @@ void SynthInstrument::setParameters (const ChannelSnap& c)
 void SynthInstrument::allNotesOff()
 {
     for (auto& v : voices)
+    {
         v.adsr.noteOff();
+        v.released = true;
+    }
 }
 
 void SynthInstrument::updateVoiceFrequency (Voice& v)
 {
-    const double f = noteToFrequency (v.note);
+    const double f = noteToFrequency (v.note) * v.fine;
     v.inc1 = f / sr;
     v.inc2 = v.inc1 * std::pow (2.0, params.detune / 1200.0);
 }
 
 void SynthInstrument::noteOn (int note, float velocity)
 {
-    // Modo mono: si ya suena una nota, la misma voz se desliza a la nueva (sin volver a empezar)
-    if (params.mono)
+    // Modo mono (o nota deslizante): si ya suena una nota, la misma voz se desliza a la nueva
+    const float glideTime = extras.slide ? juce::jmax (params.glide, 0.08f) : params.glide;
+    const float cutoffNow = juce::jlimit (20.0f, (float) (sr * 0.45), params.cutoff);
+    if (params.mono || extras.slide)
     {
         Voice* playing = nullptr;
         for (auto& v : voices)
@@ -289,17 +327,24 @@ void SynthInstrument::noteOn (int note, float velocity)
                 playing = &v;
         if (playing != nullptr)
         {
-            const double oldFreq = noteToFrequency (playing->note) * playing->glideRatio;
-            for (auto& v : voices)
-                if (&v != playing && v.note >= 0)
-                    v.adsr.noteOff();
+            const double oldFreq = noteToFrequency (playing->note) * playing->fine * playing->glideRatio;
+            if (params.mono)
+                for (auto& v : voices)
+                    if (&v != playing && v.note >= 0)
+                        v.adsr.noteOff();
             playing->note = note;
             playing->velocity = velocity;
             playing->age = ++ageCounter;
+            playing->fine = fineRatio (extras.fine);
+            playing->glideTime = glideTime;
+            panGains (extras.pan, playing->gl, playing->gr);
+            playing->modMul = std::pow (2.0f, extras.mod * 3.0f);
+            playing->filter.setCutoffFrequency (juce::jlimit (20.0f, (float) (sr * 0.45), cutoffNow * playing->modMul));
             updateVoiceFrequency (*playing);
-            playing->glideRatio = params.glide > 0.001f ? oldFreq / noteToFrequency (note) : 1.0;
-            if (playing->adsr.isActive() && ! juce::approximatelyEqual (params.sustain, 0.0f))
+            playing->glideRatio = glideTime > 0.001f ? oldFreq / (noteToFrequency (note) * playing->fine) : 1.0;
+            if (playing->adsr.isActive() && ! playing->released && ! juce::approximatelyEqual (params.sustain, 0.0f))
                 return;
+            playing->released = false;
             playing->adsr.noteOn();
             return;
         }
@@ -322,11 +367,16 @@ void SynthInstrument::noteOn (int note, float velocity)
     voice->phase1 = 0.0;
     voice->phase2 = 0.37;
     voice->glideRatio = 1.0;
+    voice->glideTime = glideTime;
     voice->age = ++ageCounter;
+    voice->fine = fineRatio (extras.fine);
+    panGains (extras.pan, voice->gl, voice->gr);
+    voice->modMul = std::pow (2.0f, extras.mod * 3.0f);
     updateVoiceFrequency (*voice);
     voice->filter.reset();
-    voice->filter.setCutoffFrequency (juce::jlimit (20.0f, (float) (sr * 0.45), params.cutoff));
+    voice->filter.setCutoffFrequency (juce::jlimit (20.0f, (float) (sr * 0.45), cutoffNow * voice->modMul));
     voice->filter.setResonance (0.707f + juce::jlimit (0.0f, 1.0f, params.resonance) * 8.0f);
+    voice->released = false;
     voice->adsr.reset();
     voice->adsr.noteOn();
 }
@@ -335,7 +385,10 @@ void SynthInstrument::noteOff (int note)
 {
     for (auto& v : voices)
         if (v.note == note)
+        {
             v.adsr.noteOff();
+            v.released = true;
+        }
 }
 
 float SynthInstrument::oscillator (double t, double dt) const
@@ -397,7 +450,7 @@ void SynthInstrument::renderVoices (juce::AudioBuffer<float>& out, int start, in
         const float cutoff = juce::jlimit (20.0f, (float) (sr * 0.45), baseCutoff * std::pow (2.0f, lfo * params.lfoAmount * 3.0f));
         for (auto& v : voices)
             if (v.note >= 0)
-                v.filter.setCutoffFrequency (cutoff);
+                v.filter.setCutoffFrequency (juce::jlimit (20.0f, (float) (sr * 0.45), cutoff * v.modMul));
         renderVoiceRange (outL + done, outR + done, n);
         lfoPhase = std::fmod (lfoPhase + params.lfoRate * n / sr, 1.0);
         done += n;
@@ -417,7 +470,7 @@ void SynthInstrument::renderVoiceRange (float* outL, float* outR, int num)
             continue;
         }
 
-        const double glideCoef = params.glide > 0.001f ? std::exp (-1.0 / (params.glide * 0.25 * sr)) : 0.0;
+        const double glideCoef = v.glideTime > 0.001f ? std::exp (-1.0 / (v.glideTime * 0.25 * sr)) : 0.0;
         for (int i = 0; i < num; ++i)
         {
             if (! juce::approximatelyEqual (v.glideRatio, 1.0))
@@ -429,8 +482,8 @@ void SynthInstrument::renderVoiceRange (float* outL, float* outR, int num)
 
             const float filtered = v.filter.processSample (0, osc);
             const float s = filtered * v.adsr.getNextSample() * v.velocity * 0.3f;
-            outL[i] += s;
-            outR[i] += s;
+            outL[i] += s * v.gl;
+            outR[i] += s * v.gr;
         }
     }
 }
@@ -450,8 +503,10 @@ void Bass808Instrument::allNotesOff()
 
 void Bass808Instrument::noteOn (int newNote, float vel)
 {
-    const double f = noteToFrequency (newNote);
-    const bool legato = active && ! releasing && amp > 0.02f && params.glide > 0.001f;
+    const double f = noteToFrequency (newNote) * fineRatio (extras.fine);
+    glideTime = extras.slide ? juce::jmax (params.glide, 0.08f) : params.glide;
+    const bool legato = active && (! releasing || extras.slide) && amp > 0.02f && glideTime > 0.001f;
+    panGains (extras.pan, gl, gr);
 
     if (legato)
     {
@@ -485,7 +540,7 @@ void Bass808Instrument::renderVoices (juce::AudioBuffer<float>& out, int start, 
     float* outL = out.getWritePointer (0, start);
     float* outR = out.getWritePointer (1, start);
 
-    const double glideCoef = params.glide > 0.001f ? 1.0 - std::exp (-1.0 / (params.glide * 0.3 * sr)) : 1.0;
+    const double glideCoef = glideTime > 0.001f ? 1.0 - std::exp (-1.0 / (glideTime * 0.3 * sr)) : 1.0;
     const float decayCoef = (float) std::exp (std::log (0.001) / (juce::jmax (0.05f, params.decay) * sr));
     const float releaseCoef = (float) std::exp (std::log (0.001) / (0.06 * sr));
     const float k = 1.0f + juce::jlimit (0.0f, 1.0f, params.drive) * 8.0f;
@@ -502,8 +557,8 @@ void Bass808Instrument::renderVoices (juce::AudioBuffer<float>& out, int start, 
 
         const float s = std::tanh ((float) std::sin (twoPi * phase) * k) * norm;
         const float v = s * amp * 0.8f;
-        outL[i] += v;
-        outR[i] += v;
+        outL[i] += v * gl;
+        outR[i] += v * gr;
 
         amp *= decayCoef;
         if (releasing)
